@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -142,6 +143,12 @@ func newFakeStream(t *testing.T, size, frames int) *fakeStream {
 
 func fakeCamera(t *testing.T, w, h, frames int) *Camera {
 	t.Helper()
+	// AVFoundation exists only on macOS; on a starved Linux CI runner the pipe-fed fake's
+	// producer/consumer timing drifts enough to hit EOF mid-test, so the lifecycle tests
+	// run only where the driver can.
+	if runtime.GOOS != "darwin" {
+		t.Skip("avfoundation driver is macOS-only")
+	}
 	c := New("1", WithSize(w, h))
 	c.lister = func(context.Context) ([]Device, error) { return parseDevices(realListing), nil }
 	stream := newFakeStream(t, w*h, frames)
