@@ -1,0 +1,38 @@
+# Gate for the card workflow (.claude/skills/pick-card): every PR must pass the
+# hermetic Go unit suite before it may merge into main. Host-app tests (siril-cli,
+# GIMP, sips) self-skip when the binary is absent, and live tests self-skip without
+# their ASTRO_* env vars — so on this Linux runner exactly the hermetic suite runs.
+# The full host suite still runs locally via `just check` before the PR is opened.
+name: tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: go build · vet · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -timeout 20m ./...
