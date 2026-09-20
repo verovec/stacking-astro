@@ -75,3 +75,6 @@ note.txt
 stacking-doc.md
 tasks-context
 cards
+# local card-workflow state (see .claude/skills/new-card) — planning lives outside git.
+# Root-anchored: the skill's templates/bootstrap copies of roadmap.md ARE committed.
+/roadmap.md
