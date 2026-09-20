@@ -58,9 +58,12 @@ what the card already answers; do not skip what it points at.
 - Push and `gh pr create` — title = the card title in commit style, body = card ID,
   the acceptance criteria as a checklist, and the review notes.
 - CI (`.github/workflows/tests.yml`) runs the hermetic unit suite on the PR. Merge
-  only when green: `gh pr merge --auto --squash`; if the repo refuses auto-merge, watch
-  with `gh pr checks --watch` and `gh pr merge --squash` once green. CI red → fix on
-  the branch; never merge red, never bypass the review.
+  only when green: wait with `gh pr checks <n> --watch`, then confirm every check
+  actually reports `pass` via `gh pr checks <n>` (the watch exits 0 even on failure),
+  then `gh pr merge <n> --squash`. Use `--auto` ONLY if main has branch protection
+  with required checks — without it, gh falls through to an immediate merge and the
+  PR lands before CI finishes. CI red → fix on the branch; never merge red, never
+  bypass the review.
 
 ## 7 · Release
 
