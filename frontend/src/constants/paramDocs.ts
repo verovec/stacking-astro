@@ -105,6 +105,7 @@ const DEEPSKY_GROUPS: ParamGroup[] = [
       "sky_chroma_flatten_px",
       "sky_lum_flatten_px",
       "star_reduce",
+      "star_tiers",
       "emit_luminance_mono",
       "emit_all_channel_mono",
     ],

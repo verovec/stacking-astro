@@ -56,7 +56,7 @@ feeds are fetched at runtime and cached, and both soft-fail.
 | `internal/preset` | The built-in "best params per situation" catalog (16 recipes) merged with user presets. |
 | `internal/postprocess` | LRGB+Ha channel combine, color calibration, stretch; optional GIMP touch-ups. |
 | `internal/graxpert` | Optional host CLI: GraXpert AI background-gradient extraction / denoise (`GRAXPERT_BIN`). |
-| `internal/starnet` | Optional host CLI: StarNet++ v2 star removal for star-reduced finishing (`STARNET_BIN`). |
+| `internal/starnet` | Optional host CLI: StarNet star removal for star-reduced finishing + the star-presence set (`STARNET_BIN`; both the positional StarNet++ v2 and flag-style StarNet2 CLIs, auto-detected). |
 | `internal/llm` | Optional, opt-in: drives a host-run OpenAI-compatible vision model to auto-tune the finish for **every stacking mode** — deep-sky/nebula composite, comet colour composite, milkyway grade, planetary sharpen — via per-mode `candidateRenderer` adapters (`internal/pipeline/supervise_*.go`); the shared render→judge→re-tune loop soft-fails when the server is down. |
 | `internal/planetary` | SER/AVI/MP4/MOV/stills lucky-imaging path: native-res disk-masked sharpness ranking, multi-point ZNCC alignment, per-AP top-K selection stack (each region built from its locally-sharpest frames), RL deconvolution, true-luminance colour compose (`true_lum`). Opt-in earthshine reveal (`earthshine_gain`): deterministic limb circle fit + SNR-gated lift of the unlit disc, composited after the Siril finish. |
 | `internal/comet` | Pure comet primitives: multi-scale coma detection, robust linear/quadratic track fit, starless ZNCC alignment, sub-pixel translate (driven by `pipeline.ProcessComet`). |

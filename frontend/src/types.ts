@@ -419,6 +419,17 @@ export interface MonoOutput {
   tif?: string;
 }
 
+// One entry of the star-presence set: the same finish with `percent` of the original star brightness
+// kept — 0 (starless), 25/50/75, and 100 (the final itself). kind is "starless" | "stars" | "final".
+// Every png except the final's is also in FinalResult.outputs; this typed list drives the star-level
+// switcher in RunResultPanels.
+export interface StarTier {
+  kind: string;
+  percent: number;
+  png: string;
+  tif?: string;
+}
+
 export interface FinalResult {
   mode: string;
   channels: string[];
@@ -426,6 +437,7 @@ export interface FinalResult {
   notes?: string[];
   iterations?: IterationRecord[];
   mono_outputs?: MonoOutput[];
+  star_tiers?: StarTier[];
 }
 
 export interface RunResult {

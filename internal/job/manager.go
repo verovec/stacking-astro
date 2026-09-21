@@ -1286,6 +1286,10 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 		format = mode.FormatImage
 	}
 	preset := mode.For(mo)
+	// The star-presence set is an IMAGE deliverable: a pure-video run renders its MP4 from the final
+	// PNG and would pay for a star-removal pass nobody ever sees. An explicit star_tiers param
+	// (ApplyParamPatch, below) still wins.
+	preset.StarTiers = preset.StarTiers && format.WantsImage()
 	if p.DropWheelTransition != nil {
 		preset.DropFilterWheelTransition = *p.DropWheelTransition
 	}
@@ -1374,7 +1378,7 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 	}
 	gclient := gimp.New(m.cfg.GimpBin, m.cfg.GimpHost, m.cfg.GimpPort)
 	graxRunner := graxpert.New(m.cfg.GraxpertBin, m.cfg.GraxpertURL).SetDefaults(m.cfg.GraxpertGPU, m.cfg.GraxpertBatch) // optional; skipped when binary absent
-	starRunner := starnet.New(m.cfg.StarnetBin)                                                                          // optional; skipped when binary absent
+	starRunner := starnet.NewVariant(m.cfg.StarnetBin, starnet.Variant(m.cfg.StarnetCLI))                                // optional; skipped when binary absent
 	var superRunner *llm.Runner
 	if p.Supervise || p.Refine != nil { // opt-in local-AI-agent finish (always on for a refine); nil → standard finish
 		superRunner = llm.New(m.cfg.LLMBaseURL, m.cfg.LLMModel, m.cfg.LLMImageFormat).WithTimeout(m.cfg.LLMTimeout)

@@ -145,6 +145,12 @@ const COMPOSITE_KNOBS: KnobDef[] = [
     kind: "toggle",
     def: true,
   },
+  {
+    key: "star_tiers",
+    labelKey: "rerun.knobs.star_tiers",
+    kind: "toggle",
+    def: true,
+  },
 ];
 
 // Tier B — linear finish prep (tens of s–min): the Combined / ColorCal milestones.

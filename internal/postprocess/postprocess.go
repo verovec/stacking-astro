@@ -61,6 +61,21 @@ type Result struct {
 	// the processed Luminance-only image and/or the combined all-channel integration. The files are
 	// also listed in Outputs (for download / S3 mirror); this typed list gives the UI a clean contract.
 	MonoOutputs []MonoOutput `json:"mono_outputs,omitempty"`
+	// StarTiers is the star-presence set shipped with every image run — the same finish rendered with
+	// 0 % (starless), 25/50/75 % and 100 % (the untouched final) of the original star brightness — so
+	// picking a star level is a screen-side choice instead of a re-process. Ascending by Percent; the
+	// files (except the final, already first) are also listed in Outputs.
+	StarTiers []StarTier `json:"star_tiers,omitempty"`
+}
+
+// StarTier is one star-presence deliverable. Percent is how much of the original star brightness it
+// keeps; Kind is a stable key the UI localizes ("starless" at 0, "stars" in between, "final" at 100).
+// Primitive fields only so package pipeline can populate it without a cycle.
+type StarTier struct {
+	Kind    string `json:"kind"`
+	Percent int    `json:"percent"`
+	Png     string `json:"png"`
+	Tif     string `json:"tif,omitempty"`
 }
 
 // MonoOutput is one auxiliary monochrome deliverable saved next to the colour final. Kind is a stable

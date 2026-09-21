@@ -61,7 +61,7 @@ func runRefine(args []string) error {
 	var starRunner *starnet.Runner
 	if !*noAI {
 		graxRunner = graxpert.New(cfg.GraxpertBin, cfg.GraxpertURL).SetDefaults(cfg.GraxpertGPU, cfg.GraxpertBatch)
-		starRunner = starnet.New(cfg.StarnetBin)
+		starRunner = starnet.NewVariant(cfg.StarnetBin, starnet.Variant(cfg.StarnetCLI))
 	}
 	refineSolve, refineSpcc := postprocess.SolveSpccFromConfig(cfg)
 

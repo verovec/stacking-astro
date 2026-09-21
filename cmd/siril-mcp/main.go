@@ -214,7 +214,7 @@ func (a *app) runPipeline(ctx context.Context, args json.RawMessage) (string, er
 		WorkDir:    pick(p.Work, a.cfg.WorkDir),
 		Runner:     a.runner,
 		Graxpert:   graxpert.New(a.cfg.GraxpertBin, a.cfg.GraxpertURL).SetDefaults(a.cfg.GraxpertGPU, a.cfg.GraxpertBatch),
-		Starnet:    starnet.New(a.cfg.StarnetBin),
+		Starnet:    starnet.NewVariant(a.cfg.StarnetBin, starnet.Variant(a.cfg.StarnetCLI)),
 		Library:    library,
 		LibraryDir: a.cfg.LibraryDir,
 		OnProgress: func(pr pipeline.Progress) {
@@ -311,7 +311,7 @@ func (a *app) refineFinish(ctx context.Context, args json.RawMessage) (string, e
 		Runner:     a.runner,
 		Gimp:       gimp.New(a.cfg.GimpBin, a.cfg.GimpHost, a.cfg.GimpPort),
 		Graxpert:   graxpert.New(a.cfg.GraxpertBin, a.cfg.GraxpertURL).SetDefaults(a.cfg.GraxpertGPU, a.cfg.GraxpertBatch),
-		Starnet:    starnet.New(a.cfg.StarnetBin),
+		Starnet:    starnet.NewVariant(a.cfg.StarnetBin, starnet.Variant(a.cfg.StarnetCLI)),
 		Supervisor: supervisor,
 		Preset:     &preset,
 		Solve:      solve,

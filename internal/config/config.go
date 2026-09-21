@@ -3,10 +3,13 @@ package config
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/verove-jordan/astronomy/internal/starnet"
 )
 
 // Config holds all runtime configuration for the engine.
@@ -49,7 +52,14 @@ type Config struct {
 	// ChannelParallel stacks up to N deep-sky channels concurrently (each Siril instance gets an
 	// equal share of the CPU/memory budget). 1 (the default) keeps the proven serial loop.
 	ChannelParallel int
-	StarnetBin      string // StarNet++ v2: star removal (for star-reduced finishing)
+	// StarnetBin is the host StarNet used for star removal (star-reduced finishing + the star-tier
+	// deliverables). Unset → the first of starnet.DefaultBinCandidates found on PATH, so either CLI
+	// generation is picked up without configuration.
+	StarnetBin string
+	// StarnetCLI pins how that binary is invoked — "positional" (StarNet++ v2) or "flags" (StarNet2
+	// v2.5+). Empty/"auto" (the default) probes the binary itself; set it only to override a
+	// misdetection.
+	StarnetCLI string
 
 	// Optional local LLM "supervisor" (opt-in via the run request / --supervise). The engine drives a
 	// host-run, OpenAI-compatible model server (LM Studio / mlx-vlm) over HTTP to auto-tune the finish.
@@ -306,9 +316,9 @@ func Load() *Config {
 	}
 	libraryDir := env("ASTRO_LIBRARY_DIR", "./library")
 	return &Config{
-		DatabaseURL:    env("DATABASE_URL", "postgres://astro:astro@localhost:5432/astrostack?sslmode=disable"),
-		APIAddr:        env("API_ADDR", ":8080"),
-		LogLevel:       env("LOG_LEVEL", "info"),
+		DatabaseURL: env("DATABASE_URL", "postgres://astro:astro@localhost:5432/astrostack?sslmode=disable"),
+		APIAddr:     env("API_ADDR", ":8080"),
+		LogLevel:    env("LOG_LEVEL", "info"),
 		// ./input, not ./data: compose.yaml pins the container's ASTRO_DATA_DIR to ${PWD}/input, and
 		// two different defaults meant host-dev and the container browsed different roots — the same
 		// capture visible in one mode and invisible in the other, with nothing to explain why.
@@ -333,7 +343,8 @@ func Load() *Config {
 		GraxpertBatch:   envInt("ASTRO_GRAXPERT_BATCH", 0),
 		DenoiseScale:    envFloat("ASTRO_DENOISE_SCALE", 1.0),
 		ChannelParallel: envInt("ASTRO_CHANNEL_PARALLEL", 1),
-		StarnetBin:      env("STARNET_BIN", "starnet++"),
+		StarnetBin:      env("STARNET_BIN", firstOnPath(starnet.DefaultBinCandidates)),
+		StarnetCLI:      env("STARNET_CLI", string(starnet.VariantAuto)),
 
 		LLMBaseURL:           env("ASTRO_LLM_URL", "http://127.0.0.1:1234/v1"),
 		LLMModel:             env("ASTRO_LLM_MODEL", ""),
@@ -553,6 +564,18 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// firstOnPath returns the first candidate executable resolvable on PATH — the default for a tool
+// whose binary is named differently across generations. With none installed it returns the last
+// candidate, so the eventual "not found" error still names a real tool.
+func firstOnPath(candidates []string) string {
+	for _, c := range candidates {
+		if _, err := exec.LookPath(c); err == nil {
+			return c
+		}
+	}
+	return candidates[len(candidates)-1]
 }
 
 // LocalGaiaAstroCat returns the local Gaia astrometric catalogue path when the file is actually

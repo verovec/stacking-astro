@@ -942,6 +942,10 @@ func finishAligned(ctx context.Context, opts Options, channels map[string]string
 	// below has set res.Final — one defer covers every finish path (supervised / GIMP / Siril fallback),
 	// and it captures the (possibly cluster-adjusted) opts.Preset above. Soft-fail; never blocks the run.
 	defer emitMonoOutputs(ctx, opts, channels, res, workRun, outDir)
+	// And the star-presence set (starless + 25/50/75 % blends). Deferred for the same reason, and
+	// registered AFTER the mono defer so it runs BEFORE it — LIFO — while the promoted final.* is the
+	// freshest thing on disk. Soft-fail; reuses the StarReduce star-removal pass (startiers.go).
+	defer emitStarTiers(ctx, opts, res, outDir)
 
 	// Optional: local-AI-agent supervised finish (opt-in; GIMP composite path only). Soft-fall to the
 	// standard finish on any error so a run never fails because of the agent. The loop owns one step
@@ -1043,6 +1047,14 @@ func finishWithGimp(ctx context.Context, opts Options, channels map[string]strin
 	return final, method, err
 }
 
+// finalOutputs lists the finished composite's three files for a result's Outputs, in the order the
+// rest of the stack relies on: the first .png is the gallery hero / video source / preview
+// (internal/api runSummary, RunResultPanels). Every finish path spells it through here, and anything
+// additive — mono side-outputs, the star-presence set — is APPENDED after it, never before.
+func finalOutputs(base string) []string {
+	return []string{base + ".xcf", base + ".tif", base + ".png"}
+}
+
 // finishComposite applies the Tier-A composite knobs from the working preset onto a linear prep —
 // freshly built (finishWithGimp) or persisted (a Tier-A rerun, checkpoint.go) — renders the layered
 // GIMP composite into <outDir>/final.*, and applies the optional StarNet++ star reduction (capturing
@@ -1072,7 +1084,7 @@ func finishComposite(ctx context.Context, opts Options, in gimp.Inputs, notes []
 	out := &postprocess.Result{
 		Mode:     compMode(channels, opts.Preset),
 		Channels: filterList(channels),
-		Outputs:  []string{g.Xcf, g.Tif, g.Png},
+		Outputs:  finalOutputs(filepath.Join(outDir, "final")),
 		Notes:    append([]string{"layered GIMP composite + curves"}, notes...),
 	}
 

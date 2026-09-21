@@ -100,7 +100,7 @@ brighter nebula sky, and a tuned `star_reduce` (Tier B) re-runs StarNet on the w
 ## Outputs & artifacts
 
 Same run-directory layout as [deepsky](deepsky.md#outputs--artifacts). Because `StarReduce`
-defaults to 0.5, a healthy run additionally always contains `final_starless.tif` and
+defaults to 0.5, a healthy run additionally always contains `final-starless.tif` and
 `final_reduced.{tif,png}`; `run.json` carries the same `engine` stamp and `finish_quality`
 snapshot.
 

@@ -17,7 +17,6 @@ import (
 	"github.com/verove-jordan/astronomy/internal/gimp"
 	"github.com/verove-jordan/astronomy/internal/graxpert"
 	"github.com/verove-jordan/astronomy/internal/siril"
-	"github.com/verove-jordan/astronomy/internal/starnet"
 )
 
 // denoiseAppliedNote is the success note denoiseAI returns; the cache only persists a genuine success.
@@ -295,17 +294,11 @@ func aiStars(ctx context.Context, opts Options) bool {
 // Soft-fail by contract: it returns extra output paths and a note rather than an error, so the
 // with-stars final produced by GIMP is always kept even when StarNet or the blend fails.
 func reduceStarsAI(ctx context.Context, opts Options, withStarsTif, outDir string, onProgress func(siril.Progress)) (outputs []string, note string) {
-	starless := filepath.Join(outDir, "final_starless.tif")
-	fwd := func(p starnet.Progress) {
-		if onProgress != nil {
-			onProgress(siril.Progress{Line: p.Line, Percent: p.Percent, Sample: p.Sample})
-		}
-	}
-	if err := opts.Starnet.RemoveStars(ctx, withStarsTif, starless, starnet.Options{}, fwd); err != nil {
+	// Shared with the star-tier set (startiers.go): whichever runs first pays for the star removal,
+	// the other reuses it — one pass per final, never two.
+	starless, err := starlessTIFF(ctx, opts, withStarsTif, outDir, onProgress)
+	if err != nil {
 		return nil, "StarNet++ star removal skipped: " + err.Error()
-	}
-	if !fileExists(starless) {
-		return nil, "StarNet++ star removal skipped: no output produced"
 	}
 	red, err := gimp.ReduceStars(opts.Gimp, withStarsTif, starless, opts.Preset.StarReduce, filepath.Join(outDir, "final_reduced"))
 	if err != nil {

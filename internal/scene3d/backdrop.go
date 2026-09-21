@@ -31,8 +31,10 @@ const (
 
 // backdropSources lists the images the billboard texture is cut from, best first. The starless
 // output is preferred when the run produced one: it is a real star removal rather than this
-// package's local-median patch, so nothing has to be reconstructed at all.
-var backdropSources = []string{"final_starless.tif", "final.png"}
+// package's local-median patch, so nothing has to be reconstructed at all. Both the current name
+// (final-starless, shared by the star-tier set) and the legacy one are accepted, so runs finished
+// by an older engine still resolve.
+var backdropSources = []string{"final-starless.tif", "final-starless.png", "final_starless.tif", "final.png"}
 
 // writeBackdrop renders the billboard texture — the run's final image with its stars taken out —
 // and returns the run-relative file name it wrote.

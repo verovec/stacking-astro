@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/verove-jordan/astronomy/internal/gimp"
 	"github.com/verove-jordan/astronomy/internal/graxpert"
+	"github.com/verove-jordan/astronomy/internal/llm"
 	"github.com/verove-jordan/astronomy/internal/mode"
 	"github.com/verove-jordan/astronomy/internal/siril"
 	"github.com/verove-jordan/astronomy/internal/starnet"
@@ -86,6 +87,32 @@ func TestFinishStepPlan(t *testing.T) {
 			"no gimp falls back to the siril combine",
 			Options{Preset: &mode.Preset{}},
 			[]string{"aligning channels", "combining channels (Siril)", "export"},
+		},
+		{
+			"star tiers add their own step before the export",
+			Options{Gimp: gimpClient, Starnet: &starnet.Runner{}, Preset: &mode.Preset{StarTiers: true}},
+			[]string{"aligning channels", "combining channels + background",
+				"colour calibration + stretch", "composite (GIMP)", "star tiers (StarNet)", "export"},
+		},
+		{
+			"star tiers are planned on the supervised path too",
+			Options{
+				Gimp: gimpClient, Starnet: &starnet.Runner{}, Supervisor: &llm.Runner{},
+				Preset: &mode.Preset{Supervise: true, StarTiers: true},
+			},
+			[]string{"aligning channels", "supervised finish", "star tiers (StarNet)", "export"},
+		},
+		{
+			"star tiers without a StarNet runner are not planned",
+			Options{Gimp: gimpClient, Preset: &mode.Preset{StarTiers: true}},
+			[]string{"aligning channels", "combining channels + background",
+				"colour calibration + stretch", "composite (GIMP)", "export"},
+		},
+		{
+			"one star-removal pass, one step: reduction and tiers together",
+			Options{Gimp: gimpClient, Starnet: &starnet.Runner{}, Preset: &mode.Preset{StarReduce: 0.5, StarTiers: true}},
+			[]string{"aligning channels", "combining channels + background",
+				"colour calibration + stretch", "composite (GIMP)", "star reduction (StarNet++)", "export"},
 		},
 	}
 	for _, tt := range tests {

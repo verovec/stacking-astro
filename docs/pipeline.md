@@ -102,10 +102,19 @@ continues on the Siril/GIMP path. They are invoked, never bundled (see CLAUDE.md
   right after stacking (and on the OSC master), removing complex light-pollution gradients with its
   AI model; a second pass cleans the combined RGB. Siril then applies only a gentle `subsky`
   cleanup at finish. Enabled per mode via `Preset.BackgroundAI`/`CombinedBackgroundAI`.
-- **StarNet++ star reduction** (`internal/starnet`) — runs on the *flattened* GIMP composite, then
+- **StarNet star reduction** (`internal/starnet`) — runs on the *flattened* GIMP composite, then
   GIMP blends the stars back over the starless image at `Preset.StarReduce` opacity
-  (`result = (1-r)·starless + r·original`). Emits `final_reduced.{tif,png}` and keeps the
-  `final_starless.tif` as a bonus artifact. Works for every compose mode.
+  (`result = (1-r)·starless + r·original`). Emits `final_reduced.{tif,png}` and keeps
+  `final-starless.tif` as a bonus artifact. Works for every compose mode.
+- **Star-presence set** (`emitStarTiers` in `internal/pipeline/startiers.go`, gated by
+  `Preset.StarTiers`, on by default for image runs) — ships the finish at five star levels:
+  `final.png` (100 %), `final-starless.png` (0 %) and `final-{25,50,75}-stars.png`, so choosing how
+  present the stars are is a screen-side choice instead of a re-process. It **reuses the same single
+  star-removal pass** as star reduction (whichever runs first pays for it); the intermediate levels
+  are blended natively in Go (`postprocess.BlendStars`), no GIMP round-trip. Soft-fail: without a
+  StarNet install the run warns and keeps the full-stars final untouched.
+  Both StarNet CLI generations are driven — positional `starnet++` and flag-style `starnet2` —
+  auto-detected per binary (`STARNET_CLI` pins it if detection ever guesses wrong).
 
 ### Optional AI finish supervisor (opt-in)
 

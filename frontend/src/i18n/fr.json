@@ -2123,6 +2123,10 @@
       "luminance": "Luminance (mono)",
       "all_channels": "Mono (toutes couches)"
     },
+    "starTier": {
+      "starless": "Sans étoiles",
+      "stars": "Étoiles à {percent} %"
+    },
     "framesStacked": "{kept} poses empilées sur {total}",
     "livePreview": "Aperçu en direct",
     "channelsTitle": "Couches",
@@ -2261,6 +2265,7 @@
       "chroma_smooth_px": "Lissage chroma (fin)",
       "chroma_bg_smooth_px": "Lissage chroma (ciel)",
       "star_reduce": "Réduction d’étoiles",
+      "star_tiers": "Jeu de niveaux d’étoiles",
       "fwhm_sigma": "σ de rejet FWHM",
       "roundness_floor": "Rondeur minimale",
       "background_sigma": "σ de rejet du fond",
@@ -2404,6 +2409,7 @@
     "chroma_smooth_px": "Lissage couleur-seule du RVB linéaire, protégé des étoiles (px). Aplanit les taches de couleur résiduelles ; la luminance et la couleur des étoiles sont intactes. 0 désactive.",
     "chroma_bg_smooth_px": "Lissage couleur supplémentaire restreint au fond de ciel (px). Retire les marbrures de couleur à grande échelle ; galaxies, nébuleuses et étoiles gardent leur couleur. 0 désactive.",
     "star_reduce": "Opacité de réduction d'étoiles StarNet++ à la finition : 1 = étoiles pleines, 0,5 = réduites de moitié, 0 = tout garder.",
+    "star_tiers": "Enregistre aussi la finition à cinq niveaux d’étoiles — sans étoiles, 25 %, 50 %, 75 % et l’image finale complète — pour choisir le niveau à l’écran plutôt que de retraiter. Nécessite StarNet ; la passe de suppression d’étoiles est partagée avec la réduction d’étoiles, activer les deux ne coûte rien de plus.",
     "fwhm_sigma": "Rejet de poses : écarte les poses dont la netteté d'étoile (FWHM) est plus mauvaise que ce nombre de σ. Plus bas = rejet plus sévère.",
     "roundness_floor": "Rejet de poses : rondeur d'étoile minimale pour garder une pose — écarte les poses filées / secouées par le vent. Plus haut = ne garde que les étoiles plus rondes.",
     "background_sigma": "Rejet de poses : écarte les poses dont le fond est à ce nombre de σ au-dessus de la médiane (nuages, lune, gradients).",

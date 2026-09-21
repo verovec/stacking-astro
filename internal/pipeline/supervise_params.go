@@ -143,6 +143,9 @@ type supervisePatch struct {
 	// Tier B: the monos are rendered by the finish, which a Tier-B re-entry re-runs.
 	EmitLuminanceMono  *bool `json:"emit_luminance_mono,omitempty"`
 	EmitAllChannelMono *bool `json:"emit_all_channel_mono,omitempty"`
+	// StarTiers is the star-presence set (starless + 25/50/75 % blends). Also a deliverable flag, not
+	// a look knob: Tier A, since the tiers are re-derived from whichever final the re-finish promotes.
+	StarTiers *bool `json:"star_tiers,omitempty"`
 
 	// Tier C — re-stack from the raw frames (min–hours).
 	RoundnessFloor  *float64 `json:"roundness_floor,omitempty"`
@@ -199,6 +202,7 @@ func (patch supervisePatch) apply(p mode.Preset) mode.Preset {
 	setB(&p.HaContinuumSub, patch.HaContinuumSub)
 	setB(&p.EmitLuminanceMono, patch.EmitLuminanceMono)
 	setB(&p.EmitAllChannelMono, patch.EmitAllChannelMono)
+	setB(&p.StarTiers, patch.StarTiers)
 	if patch.Palette != nil { // string enum — validate against the known palettes (like nightscape Look)
 		if s := strings.ToLower(strings.TrimSpace(*patch.Palette)); isPaletteName(s) {
 			p.Palette = s
@@ -341,7 +345,10 @@ func composeChanged(prev, next mode.Preset) bool {
 		floatChanged(prev.HighlightKnee, next.HighlightKnee) ||
 		floatChanged(prev.HighlightCeil, next.HighlightCeil) ||
 		floatChanged(prev.StarDesat, next.StarDesat) ||
-		prev.HaExcludeStars != next.HaExcludeStars
+		prev.HaExcludeStars != next.HaExcludeStars ||
+		// Not a look knob, but a Tier-A re-entry re-runs the finish tail that emits the set, so
+		// toggling it IS work to do — never treat it as a converged no-op.
+		prev.StarTiers != next.StarTiers
 }
 
 func gradeChanged(a, b grade.Options) bool {

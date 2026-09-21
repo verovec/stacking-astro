@@ -219,13 +219,17 @@ where it removes the correlated outliers (walking noise, trail remnants) a 3σ c
 16. **StarNet++ star reduction** (`reduceStarsAI` in `internal/pipeline/enhance.go`, gated by
     `Preset.StarReduce > 0` + binary availability): stars removed from the flattened composite,
     then blended back at `StarReduce` opacity (`gimp.ReduceStars`) →
-    `final_reduced.{tif,png}` + `final_starless.tif`.
-17. **Finish-quality stamp** (`stampFinishQuality` in `internal/pipeline/finishquality.go`) — on
+    `final_reduced.{tif,png}` + `final-starless.tif`.
+17. **Star-presence set** (`emitStarTiers` in `internal/pipeline/startiers.go`, gated by
+    `Preset.StarTiers`): the same starless render (shared pass — StarNet never runs twice) blended
+    at 25/50/75 % → `final-starless.png` + `final-{25,50,75}-stars.png`, listed in
+    `final.star_tiers` in `run.json`.
+18. **Finish-quality stamp** (`stampFinishQuality` in `internal/pipeline/finishquality.go`) — on
     **every** run, supervised or not: the exported PNG is measured (`measureFinish` in
     `internal/pipeline/finishmetrics.go`) and the snapshot is stored as
     `final.finish_quality` in `run.json`, with run warnings for threshold breaches
     (warm cast > 0.015, |signal cast| > 0.03, green cast > 0.02, white clip > 1 %).
-18. **Persist.** Stage previews are collected from `previews/`, and `writeRunJSON` writes the
+19. **Persist.** Stage previews are collected from `previews/`, and `writeRunJSON` writes the
     self-contained `run.json` (stamped with the engine build, `internal/buildinfo`). A stage
     manifest checkpoint additionally enables **per-stage reruns** — edit a stage's parameters on
     the run's timeline and re-enter from that stage (`internal/pipeline/rerun.go`).
@@ -276,6 +280,7 @@ each knob requires.
 | `CombinedBackgroundAI` | true | 2nd GraXpert pass + RBF on the combined RGB | B (`combined_background_ai`) |
 | `ColorDenoiseAI` | true | GraXpert denoise on the combined linear RGB | B (`color_denoise_ai`) |
 | `StarReduce` | 0 | StarNet++ star reduction opacity (0 = full stars) | B (`star_reduce`) |
+| `StarTiers` | true | also ship the star-presence set (starless + 25/50/75 % blends) | A (`star_tiers`) |
 | `HaExcludeStars` | true | median-remove stars before the red Ha screen | A (`ha_exclude_stars`) |
 | `DropFilterWheelTransition` | true | drop the off-brightness first frame of a wheel move | — |
 | `ColorCalibration` | true | run the SPCC → star-field → neutralization ladder | B (`color_calibration`) |
@@ -297,7 +302,7 @@ each knob requires.
 | Star-field fallback finds < 20 usable stars or errors | **background neutralization** (`subsky 1` + `rmgreen 0`) + **unlinked** stretch; note recorded |
 | Fewer than 8 raw darks in the pool | defect map skipped; cosmetic correction falls back to `-cc=dark` |
 | Fewer than 5 registered frames | no pointing diagnosis (too few offsets to classify) |
-| StarNet++ absent or fails | full stars kept; warning; a failed blend still keeps `final_starless.tif` |
+| StarNet absent or fails | full stars kept; warning (star reduction AND the star-presence set are skipped); a failed blend still keeps `final-starless.tif` |
 | GIMP absent or the compose fails | Siril finish via `postprocess.Combine` (`rgbcomp` + colour ladder + stretch), warning |
 | Cross-channel alignment fails/incomplete | unaligned masters are composited, warning |
 | Trail mask or denoise errors | channel stacks as-is, note in `Selection.Notes` |
@@ -365,7 +370,8 @@ Run directory `output/<object>/<runID>/`:
 |----------|---------|
 | `final.xcf` | layered GIMP project (RGB base + L luminance + Ha screen), full frame |
 | `final.tif` / `final.png` | flattened, curved, cropped export |
-| `final_starless.tif`, `final_reduced.{tif,png}` | StarNet++ artifacts (when `StarReduce > 0`) |
+| `final-starless.{tif,png}`, `final-{25,50,75}-stars.png` | the star-presence set (when `StarTiers`) |
+| `final_reduced.{tif,png}` | star-reduced blend (when `StarReduce > 0`) |
 | `master_<filter>.fits` | per-channel linear stacks (background-extracted + denoised) |
 | `aligned_<filter>.fits` | co-registered channel masters (the refine/Tier-C inputs) |
 | `master_<filter>_preview.png` | quick per-channel previews |
@@ -389,7 +395,7 @@ the tables). Most relevant to this mode:
 |----------|------|
 | `SIRIL_BIN`, `GIMP_BIN`, `GIMP_HOST`/`GIMP_PORT` | the two core engines (host apps / Script-Fu server) |
 | `GRAXPERT_BIN` | GraXpert CLI. The engine **deep-probes** it (a real tiny extraction) — a present-but-broken install (typically `No module named 'onnxruntime'`) is treated as absent and shown in `/api/environment`. Fix a pipx install with `pipx inject graxpert onnxruntime`. |
-| `STARNET_BIN` | StarNet++ CLI (soft-fail to full stars) |
+| `STARNET_BIN` | StarNet CLI — star reduction + the star-presence set (soft-fail to full stars) |
 | `ASTRO_FOCAL_MM`, `ASTRO_PIXEL_UM` | rig optics for plate-solving |
 | `ASTRO_SPCC_SENSOR/RFILTER/GFILTER/BFILTER/WHITEREF` | SPCC database names — must match Siril's `siril-spcc-database` entries exactly |
 | `ASTRO_GAIA_ASTRO_CAT`, `ASTRO_GAIA_XPSAMP_DIR` | **offline** Gaia DR3 catalogues (one-time `just download-catalogues`); with the astrometric file present, plate-solve + SPCC need no network and `-catalog=localgaia` becomes the default |
