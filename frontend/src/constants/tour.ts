@@ -47,7 +47,6 @@ export const TOURS: Record<string, readonly string[]> = {
   storage: ["connections", "browse", "free", "backup"],
 
   // Agent
-  astroagent: ["chat", "tools", "confirm"],
 };
 
 // hasTour reports whether a route name has a tour, so the help button can render nothing rather

@@ -45,11 +45,6 @@ const router = createRouter({
       name: "solarsystem",
       component: () => import("@/views/SolarSystemView.vue"),
     },
-    {
-      path: "/astroagent",
-      name: "astroagent",
-      component: () => import("@/views/AstroAgentView.vue"),
-    },
     // The "Processing" hub: one page, six tabs as child routes. Names are preserved from the old flat
     // routes so existing `router.push({ name: "job" })` calls keep working.
     {

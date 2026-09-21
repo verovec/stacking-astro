@@ -18,48 +18,11 @@
     "runs": "Runs",
     "library": "Calibration library",
     "processing": "Processing",
-    "astroAgent": "AstroAgent",
     "collapse": "Collapse",
     "expand": "Expand",
     "mosaic": "Mosaic",
     "capture": "Capture",
     "logbook": "Logbook"
-  },
-  "astroAgent": {
-    "title": "AstroAgent",
-    "subtitle": "Your astrophotography copilot — ask about your data, sky and setup, and let it run tasks for you (you approve every action).",
-    "modelLabel": "Model",
-    "modelMissing": "No model configured. Set ASTRO_LLM_MODEL (or pick one above) to chat.",
-    "placeholder": "Ask the model something, or attach an image and describe what you want…",
-    "attach": "Attach image",
-    "removeImage": "Remove image",
-    "send": "Send",
-    "sending": "Sending…",
-    "sendHint": "⌘/Ctrl + Enter to send",
-    "thinking": "AstroAgent is thinking…",
-    "clear": "Clear",
-    "empty": "No messages yet. Ask a question or attach an image to test the model.",
-    "notRunning": "The local agent is not running.",
-    "notRunningHint": "Start the local vision model server, then this page reconnects automatically:",
-    "newChat": "New chat",
-    "history": "Conversations",
-    "noChats": "No conversations yet.",
-    "deleteChat": "Delete conversation",
-    "copy": "Copy",
-    "copied": "Copied",
-    "stats": {
-      "title": "Measured stats",
-      "background": "Background",
-      "cast": "Colour cast",
-      "clipping": "Clipping (black/white)",
-      "gradient": "Gradient",
-      "trail": "Trail",
-      "neutral": "neutral",
-      "green": "green",
-      "magenta": "magenta",
-      "detected": "detected",
-      "none": "none"
-    }
   },
   "agent": {
     "activity": {
@@ -1417,23 +1380,6 @@
         "backup": {
           "title": "Backup and restore",
           "body": "Backs up the database and browser-side state (favourites, setups, agent chats). Secrets in your .env are deliberately excluded. Restoring the database is destructive — it replaces what is there."
-        }
-      }
-    },
-    "astroagent": {
-      "title": "AstroAgent",
-      "steps": {
-        "chat": {
-          "title": "A local model over your data",
-          "body": "Ask about your captures, runs, sky and equipment. The model runs on your own machine — nothing is sent anywhere."
-        },
-        "tools": {
-          "title": "It can look things up",
-          "body": "It can read your inventories and runs, check tonight's sky, and attach an image for a measured critique rather than a vague opinion."
-        },
-        "confirm": {
-          "title": "Nothing happens without you",
-          "body": "Every action that would change something — launching a run, re-tuning a finish — asks first. Supervised runs also appear here as conversations you can steer while they work."
         }
       }
     }

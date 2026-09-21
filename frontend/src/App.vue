@@ -7,21 +7,12 @@ import NightSky from "@/components/Common/NightSky.vue";
 import FileViewer from "@/components/Common/FileViewer.vue";
 import IconMenu from "@/components/Icons/IconMenu.vue";
 import { useViewerStore } from "@/stores/viewer";
-import { useAgentStore } from "@/stores/agent";
-import { useAutoRefresh } from "@/composables/useAutoRefresh";
 
 // AstroStack is always dark (night-sky tool); the dark class is forced in index.html.
 const { t } = useI18n();
 // One app-wide file viewer (opened from any file table / the inspector via the viewer store).
 const viewer = useViewerStore();
 
-// Poll local-agent availability app-wide so the "AstroAgent" nav link (and page) show only while the
-// local vision model server is running.
-const agent = useAgentStore();
-const { enabled: agentPoll } = useAutoRefresh(
-  () => agent.refreshStatus(),
-  10_000,
-);
 
 // Mobile: the left rail is an off-canvas drawer toggled by the top-bar hamburger.
 const drawerOpen = ref(false);
@@ -58,8 +49,6 @@ onMounted(() => {
   const aside = sidebar.value?.$el as HTMLElement | undefined;
   if (aside) ro.observe(aside);
   lgQuery.addEventListener("change", syncRailWidth);
-  void agent.refreshStatus(); // immediate check so the link appears without waiting a full interval
-  agentPoll.value = true;
 });
 onBeforeUnmount(() => {
   ro?.disconnect();
