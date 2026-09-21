@@ -21,7 +21,6 @@ import (
 	"github.com/verove-jordan/astronomy/internal/config"
 	"github.com/verove-jordan/astronomy/internal/gimp"
 	"github.com/verove-jordan/astronomy/internal/graxpert"
-	"github.com/verove-jordan/astronomy/internal/livestack"
 	"github.com/verove-jordan/astronomy/internal/llm"
 	"github.com/verove-jordan/astronomy/internal/mode"
 	"github.com/verove-jordan/astronomy/internal/photom"
@@ -30,7 +29,6 @@ import (
 	"github.com/verove-jordan/astronomy/internal/s3conn"
 	"github.com/verove-jordan/astronomy/internal/secret"
 	"github.com/verove-jordan/astronomy/internal/siril"
-	"github.com/verove-jordan/astronomy/internal/source"
 	"github.com/verove-jordan/astronomy/internal/starnet"
 	"github.com/verove-jordan/astronomy/internal/store"
 	"github.com/verove-jordan/astronomy/internal/transfer"
@@ -257,10 +255,6 @@ type RunRequest struct {
 	ReuseDisabled bool    `json:"reuse_disabled,omitempty"`
 	ReuseSessions []int64 `json:"reuse_sessions,omitempty"`
 
-	// Live configures a live-stacking session (mode "livestack"). Path is still the lock/display key
-	// (a real directory for a local source, or a synthetic "s3://bucket/prefix" for an S3 source).
-	Live *LiveRequest `json:"live,omitempty"`
-
 	// Supervise opts this run into the local-AI-agent finish (auto-tune the GIMP composite with a host
 	// vision model). Default false → the standard single-pass finish. Requires ASTRO_LLM_URL reachable.
 	Supervise bool `json:"supervise,omitempty"`
@@ -443,16 +437,6 @@ type TierRequest struct {
 type S3Target struct {
 	Bucket string `json:"bucket"`
 	Prefix string `json:"prefix"`
-}
-
-// LiveRequest is the live-stacking source + capture settings. Credentials are never carried here — the
-// S3 access keys come from the host environment (config). SourceKind "local" watches Path; "s3" watches
-// Bucket/Prefix.
-type LiveRequest struct {
-	SourceKind  string  `json:"source_kind,omitempty"` // "local" (default) | "s3"
-	Bucket      string  `json:"bucket,omitempty"`
-	Prefix      string  `json:"prefix,omitempty"`
-	ExposureSec float64 `json:"exposure_sec,omitempty"` // per-sub exposure (fallback + integration display)
 }
 
 // RefineRequest re-finishes an existing completed run under the AI supervisor. RunDir is the run's
@@ -722,7 +706,7 @@ func (m *Manager) RetryTuned(ctx context.Context, id int64, params json.RawMessa
 	if err := json.Unmarshal(j.Params, &req); err != nil {
 		return 0, fmt.Errorf("job %d has invalid params: %w", id, err)
 	}
-	req.Refine, req.Live = nil, nil
+	req.Refine = nil
 	req.Sequential = false
 	req.Supervise = true
 	req.Params = params
@@ -767,7 +751,6 @@ func (m *Manager) Refine(ctx context.Context, sourceJobID int64, opts RefineRequ
 		}
 	}
 	req := src // clone the source's processing choices; only the refine-specific bits change
-	req.Live = nil
 	req.Sequential = false
 	req.Supervise = true
 	req.Refine = &opts
@@ -811,7 +794,7 @@ func (m *Manager) Rerun(ctx context.Context, sourceJobID int64, stage string, pa
 	// ORIGINAL baseline preset (the fallback when a run predates the stage checkpoint); the NEW override
 	// rides in Rerun.Params, which RerunFromStage applies onto the checkpoint to pick the re-entry tier.
 	req := src
-	req.Live, req.Refine, req.Transfer, req.Backup, req.Restore = nil, nil, nil, nil, nil
+	req.Refine, req.Transfer, req.Backup, req.Restore = nil, nil, nil, nil
 	req.Sequential = false
 	req.Supervise = false
 	req.Rerun = &RerunRequest{RunDir: runDir, Stage: stage, Params: params}
@@ -839,7 +822,7 @@ func (m *Manager) DenoiseFinal(ctx context.Context, sourceJobID int64) (int64, e
 		return 0, fmt.Errorf("job %d has invalid params: %w", sourceJobID, err)
 	}
 	req := src
-	req.Live, req.Refine, req.Transfer, req.Backup, req.Restore, req.Rerun = nil, nil, nil, nil, nil, nil
+	req.Refine, req.Transfer, req.Backup, req.Restore, req.Rerun = nil, nil, nil, nil, nil
 	req.Sequential, req.Supervise = false, false
 	req.DenoiseFinal = &DenoiseFinalRequest{RunDir: runDir}
 	return m.Enqueue(ctx, req)
@@ -1598,52 +1581,6 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 		}
 		return r, nil
 
-	case mode.Livestack:
-		// Live stacking: watch a source, incrementally stack, and finalize through the standard deep-sky
-		// pipeline on Stop. The finalize options mirror the deepsky branch (incl. cross-session reuse) so
-		// the published master is identical to a normal run; livestack.Run sets InputDir to the source's
-		// local root (the watched dir, or the S3 download mirror).
-		src, serr := m.liveSource(ctx, p)
-		if serr != nil {
-			return nil, serr
-		}
-		fopts := pipeline.Options{
-			InputDir: src.LocalRoot(), OutputDir: m.cfg.OutputDir, WorkDir: m.cfg.WorkDir, Runner: m.runner,
-			Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: graxRunner, Starnet: starRunner, DenoiseScale: m.cfg.DenoiseScale, ChannelParallel: m.cfg.ChannelParallel,
-			Supervisor: superRunner,                                                          // opt-in local-AI-agent finish (nil → standard finish)
-			JobID:      id, FinishIterStore: m.store, FinishPriors: m.priors(), Goal: p.Goal, // persist supervised iterations against this job
-			Library: m.store, LibraryDir: m.cfg.LibraryDir, LibraryMirror: m.libPuller(ctx), OnProgress: pipeProg, Steer: steer, Confirm: confirm,
-			FilterMapping: p.FilterMap, Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
-			Catalog: m.store,
-		}
-		if m.cfg.ReuseEnabled && !p.ReuseDisabled {
-			fopts.RawCalib = m.store
-			fopts.Deep = deepOptions(m.cfg)
-			fopts.Reuse = pipeline.ReuseConfig{Provider: m.store, ConeDeg: m.cfg.ReuseConeDeg, Sessions: p.reuseSessions()}
-		}
-		var expSec float64
-		if p.Live != nil {
-			expSec = p.Live.ExposureSec
-		}
-		r, err := livestack.Run(ctx, livestack.Options{
-			Source:       src,
-			Finalize:     fopts,
-			ExposureMs:   int64(expSec * 1000),
-			Poll:         time.Duration(m.cfg.LivePollSec) * time.Second,
-			Stability:    time.Duration(m.cfg.LiveStabilitySec) * time.Second,
-			RestackEvery: m.cfg.LiveRestackEvery,
-			MinInterval:  time.Duration(m.cfg.LiveMinIntervalSec) * time.Second,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if r != nil && r.Final != nil {
-			// ctx (the user's Stop) is already cancelled here; the video is part of the post-Stop finish,
-			// so render it on a detached context like the master rather than the cancelled runCtx.
-			r.Final.Outputs = m.appendVideo(context.Background(), id, format, r.Final.Outputs)
-		}
-		return r, nil
-
 	case mode.Comet:
 		// Moving-comet mode: a dual star/comet stack + star-layer recomposite (pipeline.ProcessComet).
 		r, err := pipeline.ProcessComet(ctx, pipeline.Options{
@@ -1799,7 +1736,7 @@ func (m *Manager) executeRefine(ctx context.Context, id int64, p RunRequest, pre
 	// planetary) keep no pipeline run.json at the run dir, so return the finish result directly — reading a
 	// missing run.json would fail the refine even though the supervised finish just succeeded.
 	switch preset.Mode {
-	case mode.Deepsky, mode.Nebula, mode.Livestack:
+	case mode.Deepsky, mode.Nebula:
 		res, rerr := pipeline.ReadRunResult(p.Refine.RunDir)
 		if rerr != nil {
 			return nil, rerr
@@ -1903,29 +1840,6 @@ func (m *Manager) executeDenoiseFinal(ctx context.Context, id int64, p RunReques
 // optional dark recency cutoff (darks older than ReuseDarkRecencyDays are excluded; 0 = unbounded).
 func deepOptions(cfg *config.Config) calib.DeepOptions {
 	return calib.DeepOptions{TempTolC: cfg.ReuseTempTolC, DarkSinceMs: cfg.DarkSinceMs()}
-}
-
-// liveSource builds the frame source for a live-stacking job: a local directory (default) or an S3
-// bucket. S3 credentials come from the resolved pipeline config (default UI connection, else the host
-// environment) — never the request. Bucket/prefix still come per-job from the request.
-func (m *Manager) liveSource(ctx context.Context, p RunRequest) (source.Source, error) {
-	if p.Live == nil || p.Live.SourceKind == "" || p.Live.SourceKind == "local" {
-		return source.NewLocal(p.Path)
-	}
-	if p.Live.SourceKind == "s3" {
-		if p.Live.Bucket == "" {
-			return nil, fmt.Errorf("live s3 source: bucket is required")
-		}
-		key := strings.NewReplacer("/", "_", ":", "_", " ", "_").Replace(p.Live.Bucket + "_" + p.Live.Prefix)
-		dl := filepath.Join(m.cfg.WorkDir, "live_s3", key)
-		sc := m.s3ConfigResolved(ctx)
-		return source.NewS3(source.S3Config{
-			Endpoint: sc.Endpoint, Region: sc.Region,
-			AccessKeyID: sc.AccessKeyID, SecretKey: sc.SecretKey, UseSSL: sc.UseSSL,
-			Bucket: p.Live.Bucket, Prefix: p.Live.Prefix, DownloadDir: dl,
-		})
-	}
-	return nil, fmt.Errorf("unknown live source kind %q (want: local, s3)", p.Live.SourceKind)
 }
 
 // appendVideo renders a Ken-Burns MP4 from the final PNG when the format requests video.

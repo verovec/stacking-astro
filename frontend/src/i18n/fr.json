@@ -13,7 +13,6 @@
     "calendar": "Calendrier",
     "solarSystem": "Système solaire",
     "import": "Importer",
-    "livestack": "Empilement direct",
     "jobs": "Tâches",
     "runs": "Traitements",
     "library": "Bibliothèque de calibration",
@@ -569,7 +568,6 @@
   "processing": {
     "tabs": {
       "import": "Importer",
-      "live": "Empilement direct",
       "tasks": "Tâches",
       "runs": "Traitements",
       "library": "Bibliothèque",
@@ -1306,27 +1304,6 @@
         }
       }
     },
-    "livestack": {
-      "title": "Empilement en direct",
-      "steps": {
-        "source": {
-          "title": "Quoi surveiller",
-          "body": "Désignez le dossier dans lequel écrit votre logiciel d’acquisition — ou un préfixe S3. Chaque nouvelle pose est prise au vol."
-        },
-        "start": {
-          "title": "Démarrer",
-          "body": "Les images sont calibrées et ajoutées à la pile à mesure qu’elles arrivent : vous voyez l’image se creuser au fil de la nuit au lieu d’attendre le matin pour découvrir que cela n’a pas marché."
-        },
-        "preview": {
-          "title": "La pile qui grandit",
-          "body": "L’aperçu est un vrai empilement, pas une pose isolée — de quoi juger le cadrage, la mise au point et si la cible sort tout simplement."
-        },
-        "finalize": {
-          "title": "Arrêter et finaliser",
-          "body": "L’arrêt lance le traitement complet sur tout ce qui a été collecté : recalage propre, notation, empilement et finition complète. L’aperçu était la répétition ; ceci est le résultat."
-        }
-      }
-    },
     "jobs": {
       "title": "Tâches",
       "steps": {
@@ -1492,23 +1469,6 @@
       "nameTaken": "Une sélection enregistrée porte déjà ce nom",
       "saved": "Sélection enregistrée"
     }
-  },
-  "livestack": {
-    "title": "Empilement en direct",
-    "hint": "Surveillez un dossier ou un bucket S3 et empilez les poses à mesure qu’elles arrivent. Appuyez sur Arrêter pour terminer et produire l’image finale.",
-    "source": "Source",
-    "local": "Dossier local",
-    "s3": "Bucket S3",
-    "pickFolder": "Naviguez jusqu’au dossier où vous allez capturer — il peut être vide au départ.",
-    "useCurrent": "Surveiller ce dossier",
-    "watching": "Surveillance",
-    "bucket": "Bucket",
-    "prefix": "Préfixe",
-    "s3hint": "Les objets sous ce bucket/préfixe sont téléchargés et empilés dès leur apparition. Les identifiants proviennent de l’environnement serveur, pas d’ici.",
-    "exposure": "Exposition (secondes)",
-    "exposureHint": "Exposition par pose — sert à l’affichage du temps d’intégration et de valeur de repli quand l’en-tête d’un fichier ne la précise pas.",
-    "start": "Démarrer l’empilement",
-    "startHint": "Ouvre la tâche en direct : aperçu rafraîchi, compteur de poses et journaux. Arrêter & finaliser une fois terminé."
   },
   "capture": {
     "summary": "Capture sélectionnée",
@@ -2156,7 +2116,6 @@
     "collapseLogs": "Réduire le journal",
     "cancel": "Annuler le traitement",
     "cancelling": "Annulation…",
-    "stopFinalize": "Arrêter & finaliser",
     "pause": "Mettre en pause",
     "pausing": "Mise en pause…",
     "continue": "Reprendre",

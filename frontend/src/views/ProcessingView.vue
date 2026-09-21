@@ -13,7 +13,6 @@ const { t } = useI18n();
 
 const keyToName: Record<string, string> = {
   import: "import",
-  live: "livestack",
   tasks: "jobs",
   runs: "runs",
   library: "library",
@@ -21,7 +20,6 @@ const keyToName: Record<string, string> = {
 };
 const nameToKey: Record<string, string> = {
   import: "import",
-  livestack: "live",
   jobs: "tasks",
   job: "tasks", // job detail lives under the Tasks tab
   runs: "runs",
@@ -31,7 +29,6 @@ const nameToKey: Record<string, string> = {
 
 const tabs = computed(() => [
   { key: "import", label: t("processing.tabs.import") },
-  { key: "live", label: t("processing.tabs.live") },
   { key: "tasks", label: t("processing.tabs.tasks") },
   { key: "runs", label: t("processing.tabs.runs") },
   { key: "library", label: t("processing.tabs.library") },

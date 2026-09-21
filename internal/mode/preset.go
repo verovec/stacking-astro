@@ -42,7 +42,6 @@ const (
 	Nebula    Mode = "nebula"    // large faint emission objects (mono LRGB+Ha, Ha-forward)
 	Milkyway  Mode = "milkyway"  // wide-field one-shot-color (e.g. iPhone ProRAW/HEIC)
 	Planetary Mode = "planetary" // Moon/planets via lucky imaging
-	Livestack Mode = "livestack" // watch a source + incrementally stack during a session; finalize = deepsky
 	Comet     Mode = "comet"     // moving comet: dual star/comet stack + star-layer recomposite
 	Mosaic    Mode = "mosaic"    // tiled panels of one large object: per-panel deepsky stacks + WCS assembly
 	Sun       Mode = "sun"       // the Sun in Hα or white light: limb-registered lucky imaging
@@ -518,10 +517,10 @@ func (f Format) WantsImage() bool { return f != FormatVideo }
 // ParseMode validates a mode string.
 func ParseMode(s string) (Mode, error) {
 	switch Mode(strings.ToLower(s)) {
-	case Deepsky, Nebula, Milkyway, Planetary, Livestack, Comet, Mosaic, Sun, Nightpano, Eclipse:
+	case Deepsky, Nebula, Milkyway, Planetary, Comet, Mosaic, Sun, Nightpano, Eclipse:
 		return Mode(strings.ToLower(s)), nil
 	default:
-		return "", fmt.Errorf("unknown mode %q (want: deepsky, nebula, milkyway, planetary, livestack, comet, mosaic, sun, nightpano, eclipse)", s)
+		return "", fmt.Errorf("unknown mode %q (want: deepsky, nebula, milkyway, planetary, comet, mosaic, sun, nightpano, eclipse)", s)
 	}
 }
 
@@ -751,12 +750,6 @@ func presetFor(m Mode) Preset {
 		// full-disc solar path had already measured it making the limb worse; a crescent only sharpens
 		// the case.
 		s.APAlign = false
-		return p
-	case Livestack:
-		// Live stacking finalizes through the standard deep-sky path; the per-batch live preview reads
-		// only the grade thresholds. Reuse the deepsky preset verbatim, just retagging the mode.
-		p := For(Deepsky)
-		p.Mode = Livestack
 		return p
 	default: // Deepsky
 		return Preset{

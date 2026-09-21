@@ -211,7 +211,7 @@ func TestApplyParamPatch_StackingRejectsUnknownValues(t *testing.T) {
 // TestApplyParamPatch_StackingIsModeScoped: the modes that stack natively must not advertise the
 // Siril stacking knobs — offering them there would be a lie.
 func TestApplyParamPatch_StackingIsModeScoped(t *testing.T) {
-	for _, m := range []mode.Mode{mode.Deepsky, mode.Nebula, mode.Livestack, mode.Mosaic, mode.Comet} {
+	for _, m := range []mode.Mode{mode.Deepsky, mode.Nebula, mode.Mosaic, mode.Comet} {
 		_, res := patchStack(t, m, map[string]any{"stack_reject": "mad"})
 		assert.Empty(t, res.Ignored, "%s stacks with Siril and must accept the knobs", m)
 	}

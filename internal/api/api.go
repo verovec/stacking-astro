@@ -525,14 +525,7 @@ func (s *Server) createJob(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "invalid body")
 		return
 	}
-	if req.Live != nil && req.Live.SourceKind == "s3" {
-		// A livestack S3 source uses a synthetic "s3://bucket/prefix" path as the lock/display key, not a
-		// filesystem path — skip data-dir confinement (and the rewrite that would corrupt the scheme).
-		if req.Live.Bucket == "" {
-			badRequest(w, "s3 live source requires a bucket")
-			return
-		}
-	} else {
+	{
 		roots, ok := s.resolveRoots(req.Path, req.Paths)
 		if !ok {
 			badRequest(w, "path must be inside the data directory")

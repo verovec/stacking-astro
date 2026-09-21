@@ -13,7 +13,6 @@
     "calendar": "Calendar",
     "solarSystem": "Solar system",
     "import": "Import",
-    "livestack": "Live stack",
     "jobs": "Jobs",
     "runs": "Runs",
     "library": "Calibration library",
@@ -569,7 +568,6 @@
   "processing": {
     "tabs": {
       "import": "Import",
-      "live": "Live stack",
       "tasks": "Tasks",
       "runs": "Runs",
       "library": "Library",
@@ -1306,27 +1304,6 @@
         }
       }
     },
-    "livestack": {
-      "title": "Live stacking",
-      "steps": {
-        "source": {
-          "title": "What to watch",
-          "body": "Point it at the folder your capture software is writing into — or an S3 prefix. It picks up each new sub as it lands."
-        },
-        "start": {
-          "title": "Starting",
-          "body": "Frames are calibrated and added to the stack as they arrive, so you see the image deepen through the night instead of waiting until morning to find out it did not work."
-        },
-        "preview": {
-          "title": "The growing stack",
-          "body": "The preview is a real stack, not a single frame — enough to judge framing, focus and whether the target is showing at all."
-        },
-        "finalize": {
-          "title": "Stop & finalize",
-          "body": "Stopping runs the full pipeline over everything collected: proper registration, grading, stacking and the complete finish. The live preview was the rehearsal; this is the result."
-        }
-      }
-    },
     "jobs": {
       "title": "Tasks",
       "steps": {
@@ -1492,23 +1469,6 @@
       "nameTaken": "A saved selection with that name already exists",
       "saved": "Saved selection"
     }
-  },
-  "livestack": {
-    "title": "Live stacking",
-    "hint": "Watch a folder or S3 bucket and stack subs as they arrive. Press Stop to finish and produce the final master.",
-    "source": "Source",
-    "local": "Local folder",
-    "s3": "S3 bucket",
-    "pickFolder": "Browse to the folder you'll capture into — it can be empty to start.",
-    "useCurrent": "Watch this folder",
-    "watching": "Watching",
-    "bucket": "Bucket",
-    "prefix": "Prefix",
-    "s3hint": "Objects under this bucket/prefix are downloaded and stacked as they appear. Credentials come from the server environment, not here.",
-    "exposure": "Exposure (seconds)",
-    "exposureHint": "Per-sub exposure — drives the integration-time display and is a fallback when a file's header lacks it.",
-    "start": "Start live stacking",
-    "startHint": "Opens the live job: a refreshing preview, sub counter and logs. Stop & finalize when you're done."
   },
   "capture": {
     "summary": "Selected capture",
@@ -2156,7 +2116,6 @@
     "collapseLogs": "Collapse log",
     "cancel": "Cancel run",
     "cancelling": "Cancelling…",
-    "stopFinalize": "Stop & finalize",
     "pause": "Pause",
     "pausing": "Pausing…",
     "continue": "Continue",

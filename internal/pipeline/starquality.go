@@ -112,7 +112,7 @@ func maxWhiteClip(m finishMetrics) float64 {
 // isStarFixMode reports whether a mode uses the LRGB GIMP composite finish the repair re-enters.
 func isStarFixMode(m mode.Mode) bool {
 	switch m {
-	case mode.Deepsky, mode.Nebula, mode.Livestack:
+	case mode.Deepsky, mode.Nebula:
 		return true
 	default:
 		return false

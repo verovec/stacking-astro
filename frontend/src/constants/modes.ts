@@ -23,7 +23,6 @@ export type Mode = (typeof MODES)[number];
 export const STAR_MODES: readonly string[] = [
   "deepsky",
   "nebula",
-  "livestack",
   "comet",
   "milkyway",
   "nightpano",

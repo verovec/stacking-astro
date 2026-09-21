@@ -37,10 +37,10 @@ func tierForStage(stage string) tier {
 }
 
 // rerunModeSupported reports whether RerunFromStage handles a mode. The deepsky family (deepsky /
-// nebula / livestack) uses the full A/B/C tier model and the LRGB composite where the editable knobs
+// nebula) uses the full A/B/C tier model and the LRGB composite where the editable knobs
 // (incl. lum_opacity) live; the other modes re-finish through their own Refine path instead.
 func rerunModeSupported(m mode.Mode) bool {
-	return m == mode.Deepsky || m == mode.Nebula || m == mode.Livestack
+	return m == mode.Deepsky || m == mode.Nebula
 }
 
 // RerunFromStage re-runs an already-stacked deepsky/nebula run from the stage a parameter edit
