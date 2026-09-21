@@ -525,18 +525,16 @@ func (s *Server) createJob(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "invalid body")
 		return
 	}
-	{
-		roots, ok := s.resolveRoots(req.Path, req.Paths)
-		if !ok {
-			badRequest(w, "path must be inside the data directory")
-			return
-		}
-		req.Path = roots[0] // primary dir: session, target lock, run naming
-		if len(roots) > 1 {
-			req.Paths = roots // multi-folder selection, merged into one session
-		} else {
-			req.Paths = nil // single folder → unchanged single-session run
-		}
+	roots, ok := s.resolveRoots(req.Path, req.Paths)
+	if !ok {
+		badRequest(w, "path must be inside the data directory")
+		return
+	}
+	req.Path = roots[0] // primary dir: session, target lock, run naming
+	if len(roots) > 1 {
+		req.Paths = roots // multi-folder selection, merged into one session
+	} else {
+		req.Paths = nil // single folder → unchanged single-session run
 	}
 	if req.BuildMasters {
 		// A masters-only calibration build is not a pipeline mode — the job kind reads "masters" in
