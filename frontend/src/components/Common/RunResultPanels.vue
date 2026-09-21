@@ -121,21 +121,39 @@ const monoViews = computed(() =>
       src: fileUrl(m.png),
     })),
 );
-const activeView = ref("final"); // "final", a channel filter name, or a "mono:<kind>" key
+// The star-presence set: the same finish with 0 % (starless) / 25 / 50 / 75 % of the original star
+// brightness. View key = "tier:<percent>". 100 % is deliberately NOT an entry — that is the Final
+// button, pointing at the very same file.
+const starTierViews = computed(() =>
+  (props.result.final?.star_tiers ?? [])
+    .filter((s) => s.png && s.percent < 100)
+    .map((s) => ({
+      key: `tier:${s.percent}`,
+      label:
+        s.kind === "starless"
+          ? t("job.starTier.starless")
+          : t("job.starTier.stars", { percent: s.percent }),
+      src: fileUrl(s.png),
+    })),
+);
+const activeView = ref("final"); // "final", a channel filter, a "mono:<kind>" or a "tier:<pct>" key
 const activeSrc = computed(() => {
   if (activeView.value === "final") return finalImage.value;
   const mono = monoViews.value.find((v) => v.key === activeView.value);
   if (mono) return mono.src;
+  const tier = starTierViews.value.find((v) => v.key === activeView.value);
+  if (tier) return tier.src;
   return (
     channelViews.value.find((v) => v.filter === activeView.value)?.src ??
     finalImage.value
   );
 });
-// Label for the currently-shown view (Final / a mono output's name / the channel filter).
+// Label for the currently-shown view (Final / a mono output / a star level / the channel filter).
 const activeLabel = computed(() => {
   if (activeView.value === "final") return t("job.finalView");
   return (
     monoViews.value.find((v) => v.key === activeView.value)?.label ??
+    starTierViews.value.find((v) => v.key === activeView.value)?.label ??
     activeView.value
   );
 });
@@ -153,6 +171,7 @@ const views = computed(() => [
   "final",
   ...channelViews.value.map((v) => v.filter),
   ...monoViews.value.map((v) => v.key),
+  ...starTierViews.value.map((v) => v.key),
 ]);
 function step(dir: number) {
   const list = views.value;
@@ -516,7 +535,12 @@ const rejectedClass = (r: Row) =>
       <!-- Channel switcher: flip the preview between the final composite, each channel, any mono
            output, and the 3D field map -->
       <div
-        v-if="channelViews.length || monoViews.length || scene3dAvailable"
+        v-if="
+          channelViews.length ||
+          monoViews.length ||
+          starTierViews.length ||
+          scene3dAvailable
+        "
         class="mb-2 flex flex-wrap items-center gap-1.5"
       >
         <button
@@ -548,6 +572,20 @@ const rejectedClass = (r: Row) =>
         </button>
         <button
           v-for="v in monoViews"
+          :key="v.key"
+          type="button"
+          class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
+          :class="
+            activeView === v.key
+              ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-200'
+              : 'border-slate-200 text-slate-600 hover:border-brand-400 dark:border-slate-700 dark:text-slate-300'
+          "
+          @click="activeView = v.key"
+        >
+          {{ v.label }}
+        </button>
+        <button
+          v-for="v in starTierViews"
           :key="v.key"
           type="button"
           class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"

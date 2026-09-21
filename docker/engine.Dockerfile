@@ -155,7 +155,8 @@ RUN set -eux; \
     test -d /opt/siril-spcc-database/mono_sensors && test -d /opt/siril-spcc-database/wb_refs
 
 # StarNet++ is deliberately NOT baked in (its licence isn't redistributable). To enable star removal,
-# bind-mount your StarNet install and set STARNET_BIN; until then the pipeline keeps full stars.
+# bind-mount your StarNet install and set STARNET_BIN; until then the pipeline keeps full stars
+# (no star reduction AND no star-presence set — the tier PNGs are simply not written).
 
 # --- engine binary + entrypoint, run as a non-root user ---
 RUN useradd --create-home --uid 10001 app

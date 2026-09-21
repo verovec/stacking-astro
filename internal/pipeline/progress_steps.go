@@ -185,6 +185,7 @@ func (o Options) finishSteps() {
 // unplanned one (the index clamps): sizing is best-effort and strictly monotonic either way.
 func finishStepPlan(opts Options) []string {
 	steps := []string{"aligning channels"}
+	starRemoval := false // whether a step above already pays for the (single, shared) StarNet pass
 	switch {
 	case opts.Preset != nil && opts.Preset.Supervise && opts.Supervisor != nil:
 		steps = append(steps, "supervised finish")
@@ -196,12 +197,18 @@ func finishStepPlan(opts Options) []string {
 		steps = append(steps, "colour calibration + stretch", "composite (GIMP)")
 		if opts.Preset.StarReduce > 0 && opts.Starnet != nil {
 			steps = append(steps, "star reduction (StarNet++)")
+			starRemoval = true
 		}
 		if opts.Preset.AutoFixStars {
 			steps = append(steps, "star quality check")
 		}
 	default:
 		steps = append(steps, "combining channels (Siril)")
+	}
+	// The star-presence set earns its own step only when nothing above already ran StarNet: the tier
+	// blends reuse that one starless render and are cheap arithmetic on their own.
+	if !starRemoval && opts.Preset != nil && opts.Preset.StarTiers && opts.Starnet != nil {
+		steps = append(steps, "star tiers (StarNet)")
 	}
 	return append(steps, "export")
 }

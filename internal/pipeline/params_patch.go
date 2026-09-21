@@ -384,6 +384,7 @@ func deepskyParams(p mode.Preset) map[string]any {
 		"star_reduce":           p.StarReduce, "stretch_headroom": p.StretchHeadroom,
 		"emit_luminance_mono":   p.EmitLuminanceMono,
 		"emit_all_channel_mono": p.EmitAllChannelMono,
+		"star_tiers":            p.StarTiers,
 		"palette":               p.Palette,
 		"roundness_floor":       p.Grade.RoundnessFloor, "fwhm_sigma": p.Grade.FWHMSigma,
 		"background_sigma": p.Grade.BackgroundSigma, "star_count_frac": p.Grade.StarCountFrac,

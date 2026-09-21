@@ -48,7 +48,8 @@ UI shows at `GET /api/environment`.
 | `ASTRO_GRAXPERT_URL` | — | Optional host GraXpert HTTP service (`cmd/graxpert-host`) so a containerized engine can offload to the host GPU; empty → exec `GRAXPERT_BIN` locally |
 | `ASTRO_GRAXPERT_GPU` | `false` | Pass `-gpu true` to GraXpert background extraction (Apple Silicon) |
 | `ASTRO_GRAXPERT_BATCH` | `0` | GraXpert denoise batch size (0 → GraXpert default) |
-| `STARNET_BIN` | `starnet++` | StarNet++ v2 — optional star removal; soft-fails to full stars |
+| `STARNET_BIN` | first of `starnet2`, `starnet++` on PATH | StarNet — optional star removal (star reduction + the star-presence set); soft-fails to full stars |
+| `STARNET_CLI` | `auto` | How StarNet is invoked: `positional` (StarNet++ v2), `flags` (StarNet2 v2.5+), or `auto` to probe the binary |
 | `FFPROBE_BIN` | ffmpeg's sibling | ffprobe, used to probe video streams before lucky imaging |
 | `DCRAW_BIN` | `dcraw_emu` | LibRaw's developer — **preferred** for camera raws (no auto-brightening, no baked orientation, an exactly-known transfer curve). `brew install libraw` |
 | `SIPS_BIN` | `sips` | macOS fallback raw developer. Works, but applies Apple's opaque tone curve and cannot disable white balance — install LibRaw for narrowband-safe development |

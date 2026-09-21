@@ -2123,6 +2123,10 @@
       "luminance": "Luminance (mono)",
       "all_channels": "Mono (all channels)"
     },
+    "starTier": {
+      "starless": "Starless",
+      "stars": "{percent}% stars"
+    },
     "framesStacked": "{kept} of {total} frames stacked",
     "livePreview": "Live preview",
     "channelsTitle": "Channels",
@@ -2261,6 +2265,7 @@
       "chroma_smooth_px": "Chroma smoothing (fine)",
       "chroma_bg_smooth_px": "Chroma smoothing (sky)",
       "star_reduce": "Star reduction",
+      "star_tiers": "Star-presence set",
       "fwhm_sigma": "FWHM reject σ",
       "roundness_floor": "Roundness floor",
       "background_sigma": "Background reject σ",
@@ -2404,6 +2409,7 @@
     "chroma_smooth_px": "Star-protected colour-only smoothing of the linear RGB (px). Flattens residual colour patches; luminance and star colours are untouched. 0 disables.",
     "chroma_bg_smooth_px": "Extra colour smoothing restricted to the sky background (px). Removes large-scale colour mottle; galaxies, nebulae and stars keep their colour. 0 disables.",
     "star_reduce": "StarNet++ star-reduction opacity in the finish: 1 = full stars, 0.5 = halved, 0 = keep all.",
+    "star_tiers": "Also save the finish at five star levels — starless, 25 %, 50 %, 75 % and the full-star final — so the star level is a viewing choice, not a re-process. Needs a StarNet install; it reuses the same star-removal pass as star reduction, so enabling both costs nothing extra.",
     "fwhm_sigma": "Frame rejection: drop subs whose star sharpness (FWHM) is worse than this many σ from the session. Lower rejects harder.",
     "roundness_floor": "Frame rejection: minimum star roundness to keep a sub — drops trailed / wind-shaken frames. Higher keeps only rounder stars.",
     "background_sigma": "Frame rejection: drop subs whose background is this many σ above the median (clouds, moonlight, gradients).",

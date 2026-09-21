@@ -114,8 +114,11 @@ report `just stack` prints from inside the container. Copy-pasteable install com
 [docs/getting-started.md](docs/getting-started.md#2-install-the-prerequisites).
 
 The optional tools are **soft-fail** (missing → warning + fallback; disable with `--no-ai`) and
-are *invoked, never bundled* — their licences stay with your install. StarNet++ is therefore never
-in the image either: mount it and set `STARNET_BIN`. For **offline plate-solving + SPCC**, download
+are *invoked, never bundled* — their licences stay with your install. StarNet is therefore never
+in the image either: under `just stack`, bind-mount your install and set `STARNET_BIN` — without it
+a containerized run keeps full stars and writes no star-presence set (`final-starless.png`,
+`final-{25,50,75}-stars.png`). Either CLI generation works: the positional `starnet++` and the
+flag-style `starnet2` are auto-detected (`STARNET_CLI` overrides). For **offline plate-solving + SPCC**, download
 the Gaia catalogues once: `just download-catalogues` (`just download-catalogues-spcc` adds the
 photometric chunks).
 

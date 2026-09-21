@@ -136,6 +136,10 @@ func RerunFromStage(ctx context.Context, opts Options, runDir string, patch json
 	} else {
 		carryMonoOutputs(prevFinal, prior.Final)
 	}
+	// The star-presence set, unlike the monos, is derived from final.* — which EVERY rerun tier
+	// rewrites — so it is always re-emitted, never carried: stale tiers would show a different image
+	// than the final beside them. Re-running the (slow) star removal is the price of that honesty.
+	emitStarTiers(ctx, opts, prior, outDir)
 	prior.Options = runOptionsFrom(&next)
 	if len(channels) > 0 {
 		prior.Channels = filterChannelRecords(prior.Channels, channels)

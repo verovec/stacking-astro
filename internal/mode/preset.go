@@ -342,6 +342,11 @@ type Preset struct {
 	// without smearing star halos — unlike a gaussian ChromaBlur, which can then be dropped to 0.
 	ColorDenoiseAI bool
 	StarReduce     float64
+	// StarTiers ships the star-presence set next to the final image: the starless render plus the
+	// 25/50/75 % intermediate blends, so the star level becomes a screen-side choice rather than a
+	// re-process. Needs a StarNet install; without one the run warns and keeps the full-stars final
+	// only. It reuses the SAME star-removal pass as StarReduce — enabling both costs nothing extra.
+	StarTiers bool
 
 	// ColorCalibration attempts plate-solve + SPCC for natural color + a neutral background,
 	// falling back to background neutralization. LinkedStretch keeps that neutral balance.
@@ -577,6 +582,10 @@ func presetFor(m Mode) Preset {
 		p.Mode = Comet
 		p.StarReduce = 0.5 // ensure StarNet is wired (used to separate the star layer)
 		p.Saturation = 0   // no satu on the comet composite by default; the supervisor may raise it
+		// Comet finishes in ProcessComet, which does not run the finishAligned star-tier emitter, so
+		// advertising the set here would plan a step that never produces a file. Off until that path
+		// grows its own hook.
+		p.StarTiers = false
 		return p
 	case Nebula:
 		return Preset{
@@ -624,6 +633,7 @@ func presetFor(m Mode) Preset {
 			HaRBF:                     true, // RBF-flatten the Ha layer so its screen can't paint a red gradient
 			Previews:                  true,
 			EmitLuminanceMono:         true, // also save a standalone processed L mono next to the colour final
+			StarTiers:                 true, // ship the star-presence set (starless + 25/50/75 %) with every image
 		}
 	case Milkyway:
 		return Preset{
@@ -807,6 +817,7 @@ func presetFor(m Mode) Preset {
 			HaRBF:                     true, // RBF-flatten the Ha layer so its screen can't paint a red gradient
 			Previews:                  true,
 			EmitLuminanceMono:         true, // also save a standalone processed L mono next to the colour final
+			StarTiers:                 true, // ship the star-presence set (starless + 25/50/75 %) with every image
 		}
 	}
 }

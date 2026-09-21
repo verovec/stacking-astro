@@ -107,7 +107,7 @@ func (d *deepskyRenderer) finalize(ctx context.Context, opts Options, best *supe
 	out := &postprocess.Result{
 		Mode:     compMode(d.re.channels, d.re.opts.Preset),
 		Channels: filterList(d.re.channels),
-		Outputs:  []string{finalBase + ".xcf", finalBase + ".tif", finalBase + ".png"},
+		Outputs:  finalOutputs(finalBase),
 		Notes: append([]string{
 			fmt.Sprintf("local AI agent finish: %d iteration(s), best score %.1f", len(records), best.score),
 		}, best.notes...),
