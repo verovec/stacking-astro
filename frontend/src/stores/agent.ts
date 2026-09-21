@@ -83,7 +83,6 @@ const STORAGE_KEY = "conversations";
 export const useAgentStore = defineStore("agent", () => {
   // --- conversations (persisted in IndexedDB so a supervised transcript survives reloads) ---
   const conversations = ref<Conversation[]>([]);
-  const loaded = ref(false);
 
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
   function persist(): void {
@@ -103,14 +102,11 @@ export const useAgentStore = defineStore("agent", () => {
       conversations.value.forEach((c) => (c.live = false));
     } catch {
       conversations.value = [];
-    } finally {
-      loaded.value = true;
     }
   }
   void load();
 
   // --- a running turn (streamed over SSE) ---
-  const streaming = ref(false);
   const pendingConfirm = ref<PendingConfirm | null>(null);
 
   // streamTurn opens the turn's SSE stream and accumulates each step onto the assistant message
@@ -121,7 +117,6 @@ export const useAgentStore = defineStore("agent", () => {
     assistant: AgentChatMessage,
   ): Promise<void> {
     return new Promise((resolve) => {
-      streaming.value = true;
       const src = new EventSource(agentTurnEventsUrl(turnId));
       const seen = new Set<string>();
       let tick = 0;
@@ -134,7 +129,6 @@ export const useAgentStore = defineStore("agent", () => {
         const e = JSON.parse(ev.data) as AgentEvent;
         if (e.kind === "done") {
           src.close();
-          streaming.value = false;
           pendingConfirm.value = null;
           persist();
           resolve();
@@ -282,8 +276,6 @@ export const useAgentStore = defineStore("agent", () => {
 
   return {
     conversations,
-    loaded,
-    streaming,
     pendingConfirm,
     respondConfirm,
     conversationByTurn,
