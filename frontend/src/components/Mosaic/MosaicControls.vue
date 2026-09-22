@@ -160,13 +160,8 @@ async function update() {
           {{ t("mosaic.controls.objectPa", { pa: objectPa.toFixed(0) }) }}</span
         >
       </p>
-      <router-link
-        :to="{ name: 'tonight' }"
-        class="text-xs text-brand-600 hover:underline dark:text-brand-300"
-        >{{ t("mosaic.controls.changeObject") }}</router-link
-      >
       <button
-        class="ml-3 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+        class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
         @click="showCustom = !showCustom"
       >
         {{ t("mosaic.controls.customToggle") }}

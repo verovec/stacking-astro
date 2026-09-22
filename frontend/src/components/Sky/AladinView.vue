@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { SkyTarget } from "@/types";
+import type { AladinTarget } from "@/types";
 import { MAP_SELECTED } from "@/constants/colors";
 import {
   ellipseCorners,
@@ -26,7 +26,7 @@ import {
 // — pressing outside the grid still pans the sky normally. The drag previews client-side at pointer
 // speed and emits once on release, where the server recomputes the authoritative plan.
 const props = defineProps<{
-  target: SkyTarget | null;
+  target: AladinTarget | null;
   fovWDeg: number;
   fovHDeg: number;
   overlays?: { corners: Corner[]; selected?: boolean }[];
@@ -337,7 +337,7 @@ const googleUrl = computed(
       class="h-64 w-full overflow-hidden rounded-md border border-slate-200 bg-black dark:border-slate-700"
     />
     <p v-if="failed" class="mt-1 text-xs text-slate-400">
-      {{ t("tonight.preview.unavailable") }}
+      {{ t("aladin.unavailable") }}
     </p>
     <p v-else-if="dragHint" class="mt-1 text-xs text-slate-400">
       {{ dragHint }}
@@ -348,14 +348,14 @@ const googleUrl = computed(
         target="_blank"
         rel="noopener"
         class="text-brand-600 hover:underline dark:text-brand-300"
-        >{{ t("tonight.preview.aladin") }}</a
+        >{{ t("aladin.open") }}</a
       >
       <a
         :href="googleUrl"
         target="_blank"
         rel="noopener"
         class="text-brand-600 hover:underline dark:text-brand-300"
-        >{{ t("tonight.preview.google") }}</a
+        >{{ t("aladin.google") }}</a
       >
     </div>
   </div>

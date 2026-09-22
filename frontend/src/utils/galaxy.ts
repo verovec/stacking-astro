@@ -7,8 +7,8 @@
 //
 // What is left is geometry the camera needs: where the Sun stands, how high above the plane, and how
 // big the drawn disc is, so the journey can frame it and the reference rings can be drawn around it.
-// `galaxy.spec.ts` pins these against the Go constants, exactly as `utils/optics.ts` is pinned — one
-// canonical source, one mirror, and a test that fails if they drift.
+// `galaxy.spec.ts` pins these against the Go constants — one canonical source, one mirror, and a
+// test that fails if they drift.
 
 /**
  * R_SUN_KPC is the Sun's distance from the galactic centre.

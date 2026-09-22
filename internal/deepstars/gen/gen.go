@@ -19,8 +19,6 @@ import (
 	"sort"
 	"strconv"
 	"time"
-
-	"github.com/verove-jordan/astronomy/internal/skymapgen"
 )
 
 const (
@@ -31,9 +29,13 @@ const (
 	minRows = 50_000
 )
 
+// defaultHYGURL pins the HYG catalogue snapshot (moved here from the removed frontend sky-map
+// generator, which shared the same pin).
+const defaultHYGURL = "https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv"
+
 // Options configure one generation run.
 type Options struct {
-	URL      string  // HYG CSV source ("" → skymapgen.DefaultHYGURL, the same pin as skymap.json)
+	URL      string  // HYG CSV source ("" → defaultHYGURL)
 	MagLimit float64 // faintest magnitude kept (0 → 9.0)
 	OutPath  string  // output .csv.gz ("" → the embedded catalogue path)
 }
@@ -52,7 +54,7 @@ type row struct {
 // Generate downloads, slims and writes the catalogue.
 func Generate(ctx context.Context, o Options) error {
 	if o.URL == "" {
-		o.URL = skymapgen.DefaultHYGURL
+		o.URL = defaultHYGURL
 	}
 	if o.MagLimit == 0 {
 		o.MagLimit = DefaultMagLimit

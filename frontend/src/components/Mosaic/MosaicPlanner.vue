@@ -8,7 +8,7 @@ import MosaicTileTable from "@/components/Mosaic/MosaicTileTable.vue";
 import PlanListPanel from "@/components/Mosaic/PlanListPanel.vue";
 import { card } from "@/constants/styles";
 import { useMosaicStore } from "@/stores/mosaic";
-import type { SkyTarget } from "@/types";
+import type { AladinTarget } from "@/types";
 
 // The Plan tab: real-sky preview of every tile footprint + the tile table (main pane), the
 // geometry controls and saved plans (aside). Geometry is entirely server-computed; a knob change
@@ -16,16 +16,16 @@ import type { SkyTarget } from "@/types";
 const { t } = useI18n();
 const store = useMosaicStore();
 
-// AladinView centers on a SkyTarget; the planner synthesizes one from the resolved preview echo.
+// AladinView centers on an AladinTarget; the planner synthesizes one from the resolved preview echo.
 // It follows the GRID centre, not the object, so a hand-framed mosaic stays in view.
-const centerTarget = computed<SkyTarget | null>(() => {
+const centerTarget = computed<AladinTarget | null>(() => {
   const q = store.preview?.query;
   if (!q) return null;
   return {
     name: q.target || t("mosaic.controls.customTarget"),
     ra_deg: q.center_ra_deg ?? q.ra_deg,
     dec_deg: q.center_dec_deg ?? q.dec_deg,
-  } as SkyTarget;
+  };
 });
 
 const gridCenter = computed(() => {

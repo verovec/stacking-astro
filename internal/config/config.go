@@ -155,105 +155,6 @@ type Config struct {
 	ReuseConeDeg         float64
 	ReuseDarkRecencyDays int
 	ReuseTempTolC        float64
-
-	// Light pollution. Per-site artificial sky brightness (VIIRS-derived) feeds the visibility scores
-	// (a sky-glow factor parallel to the Moon) and the location-map overlay. Sourcing is hybrid and
-	// soft-failing: the keyed online API (latest data) is primary, a locally-downloaded atlas
-	// (`just update-light-pollution-data`) is the offline fallback, and SkyDefaultSQM is the last
-	// resort — so a score always computes. The API key is read from the environment ONLY (never the
-	// UI, never logged). The URLs are templates: {lat} {lon} {key} for the point API, {z} {x} {y}
-	// {key} for the overlay tiles. SkyDefaultSQM is mag/arcsec² (higher = darker; 21.3 ≈ Bortle 4).
-	LightPollutionAPIURL        string
-	LightPollutionAPIKey        string
-	LightPollutionTileURL       string
-	LightPollutionAtlas         string // offline raster path; empty → <WorkDir>/lightpollution/atlas.bin
-	LightPollutionCacheTTLHours int
-	SkyDefaultSQM               float64
-
-	// Dark-sky finder + horizon openness. The finder grids a map area for low light pollution, then
-	// scores the top candidates' horizon openness from terrain sampled via the keyless Open-Meteo
-	// Elevation API. DarkSkyMaxCells caps the grid scan; the Horizon* knobs tune the terrain ring.
-	ElevationAPIURL         string
-	ElevationCacheTTLHours  int
-	DarkSkyMaxCells         int       // cap on grid cells scanned per area search
-	HorizonCandidates       int       // how many top dark candidates get horizon scoring
-	HorizonAzimuths         int       // azimuth samples around the horizon
-	HorizonRadiiM           []float64 // sample distances (m) along each azimuth
-	HorizonOpenThresholdDeg float64   // an azimuth is "open" below this horizon elevation angle
-
-	// Tree/forest canopy horizon. When a canopy source is active (an ETH canopy-height atlas installed, or
-	// the keyless tree-cover tiles), the dark-sky finder samples canopy height along a NEAR-field ring and
-	// adds it to the terrain elevation, so a site hemmed in by a forest scores its low horizon correctly (a
-	// 20 m treeline 30 m away blocks ~34° of sky). It is opt-in: with no canopy source the horizon is
-	// byte-identical to the terrain-only result. CanopyTileURL is a {z}/{x}/{y} tree-cover-% raster;
-	// CanopyAssumedHeightM is the height assumed where a tile/land-cover cell only reports forest presence.
-	CanopyAtlas          string  // offline canopy-height raster; empty → <WorkDir>/canopy/atlas.bin
-	CanopyTileURL        string  // keyless tree-cover-% XYZ tiles ({z}/{x}/{y}); empty → disabled
-	CanopyAssumedHeightM float64 // canopy height (m) assumed for a "forested" tile/land-cover cell
-	CanopyTreeCoverPct   float64 // a tile pixel counts as forest at/above this tree-cover %
-	CanopyCacheTTLHours  int
-	CanopySourceURL      string  // ETH 3° canopy-height COG URL template ({tile} → e.g. N45E003) for the in-app "download canopy for this area" build
-	CanopyBuildResDeg    float64 // target resolution (deg) of a downloaded canopy atlas (~0.0008 ≈ 90 m)
-
-	// Canopy-mode horizon ring (used ONLY when a canopy source is active; terrain-only keeps HorizonRadiiM /
-	// HorizonAzimuths above). Trees are a near-field effect, so the ring reaches from tens of metres out.
-	// HorizonEyeHeightM is the observer's eye/telescope height, subtracted from each obstruction angle.
-	HorizonCanopyRadiiM   []float64 // sample distances (m) along each azimuth in canopy mode
-	HorizonCanopyAzimuths int       // azimuth samples in canopy mode (finer than terrain-only)
-	HorizonEyeHeightM     float64   // observer eye height (m) subtracted from obstruction angles
-
-	// Dark-site score weights. The place score blends darkness and horizon openness. DarkSkyDarkWeight is
-	// the darkness share (openness gets the remainder). DarkSkySouthWeight blends a south-weighted openness
-	// into the openness term (the low southern horizon matters most for N-hemisphere deep-sky).
-	// DarkSkyMaxSouthBlockDeg (0 = disabled) is a hard gate on southern obstruction.
-	// DarkSkyWeatherWeight is the share of the score taken by the selected night's forecast (0 =
-	// weather off, reproducing the historical 0.6 darkness / 0.4 openness blend); the terrain terms
-	// share the remainder in their usual proportion. DarkSkyWeatherProbes caps how many points one
-	// area forecast samples — Open-Meteo weights a call by its location count, so this is the quota
-	// budget for a search. DarkSkyNights is how many nights ahead the finder offers.
-	DarkSkyDarkWeight       float64
-	DarkSkySouthWeight      float64
-	DarkSkyMaxSouthBlockDeg float64
-	DarkSkyWeatherWeight    float64
-	DarkSkyWeatherProbes    int
-	DarkSkyNights           int
-
-	// Driving distance for the dark-site finder. Road distance + time from the observer to each candidate,
-	// via an OSRM routing server (keyless public demo by default — rate-limited, best-effort). It is
-	// display-only and soft-failing: on any error the finder shows the straight-line distance instead.
-	// Blank RoutingURL to disable.
-	RoutingURL           string
-	RoutingCacheTTLHours int
-
-	// Astronomy weather. Free + key-less by default: Open-Meteo (forecast + air quality), 7Timer! ASTRO
-	// (seeing/transparency) and NOAA SWPC (Kp/aurora) feed the /tonight weather overlays + forecast
-	// panel. Weather stays out of the clear-sky visibility scores — it is shown as map layers + a panel
-	// + a badge — with ONE deliberate exception: the dark-sky finder ranks spots for a chosen night, a
-	// question that is meaningless without it (see DarkSkyWeatherWeight). The grid is one Open-Meteo
-	// multi-point call over ±GridRadiusDeg around the site (GridSize×GridSize cells), cached per
-	// bbox/site+hour. A meteoblue key is optional (server env ONLY, never UI/logged) for a future paid
-	// satellite-map upgrade.
-	WeatherOpenMeteoURL  string
-	WeatherAirQualityURL string
-	WeatherSevenTimerURL string
-	WeatherSWPCURL       string
-	// WeatherOpenMeteoModels is Open-Meteo's optional `models=` selector: empty = best_match, which
-	// already resolves to the finest regional model available (measured: identical to icon_d2 at 2.2 km
-	// over the French Alps). Pinning one costs variables — arome_france_hd returns no total cloud cover
-	// at all — so leave it empty unless you have verified the model serves everything the panel reads.
-	// Set EXACTLY ONE model (a comma list multiplies the per-location call weight).
-	WeatherOpenMeteoModels string
-	// WeatherEnsembleURL/Model drive the forecast-confidence figure: how many members of an ensemble
-	// agree the night is clear. Blank URL disables it; the feature is optional everywhere.
-	WeatherEnsembleURL   string
-	WeatherEnsembleModel string
-	// WeatherForecastDays is how far ahead the per-site timeline reaches, which sets how many nights the
-	// dark-sky finder can offer. Open-Meteo weights a call by its day span, so this is a real cost knob.
-	WeatherForecastDays  int
-	WeatherGridRadiusDeg float64
-	WeatherGridSize      int
-	WeatherCacheTTLMin   int
-	WeatherMeteoblueKey  string
 }
 
 // Load reads configuration from the environment, applying sensible defaults.
@@ -332,7 +233,6 @@ func Load() *Config {
 
 		LatDeg:     envFloat("ASTRO_LAT", 48.8566), // Paris by default; overridable in the UI
 		LonDeg:     envFloat("ASTRO_LON", 2.3522),
-		ElevationM: envFloat("ASTRO_ELEVATION_M", 0),
 		Timezone:   env("ASTRO_TIMEZONE", "Europe/Paris"),
 		ApertureMM: envFloat("ASTRO_APERTURE_MM", 100), // Takahashi FC-100 DF
 		SensorWpx:  envInt("ASTRO_SENSOR_W", 4656),     // ASI1600MM Pro
@@ -346,68 +246,6 @@ func Load() *Config {
 		ReuseConeDeg:         envFloat("ASTRO_REUSE_CONE_DEG", 0.5),
 		ReuseDarkRecencyDays: envInt("ASTRO_REUSE_DARK_RECENCY_DAYS", 0),
 		ReuseTempTolC:        envFloat("ASTRO_REUSE_TEMP_TOL_C", 5.0),
-
-
-
-		LightPollutionAPIURL: env("ASTRO_LIGHTPOLLUTION_API_URL", ""),
-		LightPollutionAPIKey: env("ASTRO_LIGHTPOLLUTION_API_KEY", ""),
-		// Default to NASA GIBS VIIRS Black Marble night-lights — keyless, no download. It serves the map
-		// overlay AND, sampled per-site, the sky-brightness estimate; both work out of the box. Override
-		// or blank it to disable. {z}/{y}/{x} matches GIBS's GoogleMapsCompatible row/col order.
-		LightPollutionTileURL: env("ASTRO_LIGHTPOLLUTION_TILE_URL",
-			"https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png"),
-		LightPollutionAtlas:         env("ASTRO_LIGHTPOLLUTION_ATLAS", ""),
-		LightPollutionCacheTTLHours: envInt("ASTRO_LIGHTPOLLUTION_CACHE_TTL", 720),
-		SkyDefaultSQM:               envFloat("ASTRO_SKY_DEFAULT_SQM", 21.3),
-
-		ElevationAPIURL:         env("ASTRO_ELEVATION_API_URL", "https://api.open-meteo.com/v1/elevation"),
-		ElevationCacheTTLHours:  envInt("ASTRO_ELEVATION_CACHE_TTL", 720),
-		DarkSkyMaxCells:         envInt("ASTRO_DARKSKY_MAX_CELLS", 4000),
-		HorizonCandidates:       envInt("ASTRO_HORIZON_CANDIDATES", 10),
-		HorizonAzimuths:         envInt("ASTRO_HORIZON_AZIMUTHS", 12),
-		HorizonRadiiM:           envFloatList("ASTRO_HORIZON_RADII_M", []float64{1000, 2500}),
-		HorizonOpenThresholdDeg: envFloat("ASTRO_HORIZON_OPEN_THRESHOLD_DEG", 3),
-
-		CanopyAtlas:          env("ASTRO_CANOPY_ATLAS", ""),
-		CanopyTileURL:        env("ASTRO_CANOPY_TILE_URL", ""),
-		CanopyAssumedHeightM: envFloat("ASTRO_CANOPY_ASSUMED_HEIGHT_M", 18),
-		CanopyTreeCoverPct:   envFloat("ASTRO_CANOPY_TREECOVER_PCT", 30),
-		CanopyCacheTTLHours:  envInt("ASTRO_CANOPY_CACHE_TTL", 720),
-		// ETH Global Canopy Height 2020 (Lang et al., 10 m, CC BY 4.0) 3° COG tiles — public, range-readable,
-		// so gdal's /vsicurl/ downloads only the windows a build needs. {tile} = SW-corner token (e.g. N45E003).
-		CanopySourceURL: env("ASTRO_CANOPY_SOURCE_URL",
-			"https://libdrive.ethz.ch/index.php/s/cO8or7iOe5dT2Rt/download?path=%2F3deg_cogs&files=ETH_GlobalCanopyHeight_10m_2020_{tile}_Map.tif"),
-		CanopyBuildResDeg: envFloat("ASTRO_CANOPY_BUILD_RES_DEG", 0.0008),
-
-		HorizonCanopyRadiiM:   envFloatList("ASTRO_HORIZON_CANOPY_RADII_M", []float64{30, 60, 120, 250, 500, 1000, 2500}),
-		HorizonCanopyAzimuths: envInt("ASTRO_HORIZON_CANOPY_AZIMUTHS", 24),
-		HorizonEyeHeightM:     envFloat("ASTRO_HORIZON_EYE_HEIGHT_M", 1.6),
-
-		DarkSkyDarkWeight:       envFloat("ASTRO_DARKSKY_DARK_WEIGHT", 0.6),
-		DarkSkySouthWeight:      envFloat("ASTRO_DARKSKY_SOUTH_WEIGHT", 0),
-		DarkSkyMaxSouthBlockDeg: envFloat("ASTRO_DARKSKY_MAX_SOUTH_BLOCK", 0),
-		DarkSkyWeatherWeight:    envFloat("ASTRO_DARKSKY_WEATHER_WEIGHT", 0.3),
-		DarkSkyWeatherProbes:    envInt("ASTRO_DARKSKY_WEATHER_PROBES", 160),
-		DarkSkyNights:           envInt("ASTRO_DARKSKY_NIGHTS", 7),
-
-		RoutingURL:           env("ASTRO_ROUTING_URL", "https://router.project-osrm.org"),
-		RoutingCacheTTLHours: envInt("ASTRO_ROUTING_CACHE_TTL", 720),
-
-		WeatherOpenMeteoURL:    env("ASTRO_WEATHER_OPENMETEO_URL", "https://api.open-meteo.com/v1/forecast"),
-		WeatherOpenMeteoModels: env("ASTRO_WEATHER_OPENMETEO_MODELS", ""),
-		WeatherAirQualityURL:   env("ASTRO_WEATHER_AIRQUALITY_URL", "https://air-quality-api.open-meteo.com/v1/air-quality"),
-		WeatherSevenTimerURL:   env("ASTRO_WEATHER_SEVENTIMER_URL", "https://www.7timer.info/bin/api.pl"),
-		WeatherSWPCURL:         env("ASTRO_WEATHER_SWPC_URL", "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"),
-		WeatherEnsembleURL:     env("ASTRO_WEATHER_ENSEMBLE_URL", "https://ensemble-api.open-meteo.com/v1/ensemble"),
-		WeatherEnsembleModel:   env("ASTRO_WEATHER_ENSEMBLE_MODEL", "icon_eu"),
-		WeatherForecastDays:    envInt("ASTRO_WEATHER_FORECAST_DAYS", 7),
-		WeatherGridRadiusDeg:   envFloat("ASTRO_WEATHER_GRID_RADIUS_DEG", 4),
-		// 32×32 = 1024 pts over the default 8° box ≈ 0.25°/cell ≈ 27 km — about the forecast model's own
-		// resolution, so the overlay is as sharp as the data allows (was 22). Fetched as 3 chunked
-		// Open-Meteo GETs of ≤400 coords each, trimmed to 3 decimals (see fetchOpenMeteoGrid/joinFloats).
-		WeatherGridSize:     envInt("ASTRO_WEATHER_GRID_SIZE", 32),
-		WeatherCacheTTLMin:  envInt("ASTRO_WEATHER_CACHE_TTL_MIN", 30),
-		WeatherMeteoblueKey: env("ASTRO_WEATHER_METEOBLUE_KEY", ""),
 	}
 }
 

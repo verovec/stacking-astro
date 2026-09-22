@@ -56,7 +56,7 @@ describe("tour registry", () => {
   });
 
   it("reports availability honestly", () => {
-    expect(hasTour("tonight")).toBe(true);
+    expect(hasTour("mosaic")).toBe(true);
     expect(hasTour("no-such-page")).toBe(false);
     expect(hasTour("")).toBe(false);
     expect(hasTour(undefined)).toBe(false);

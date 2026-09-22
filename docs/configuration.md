@@ -112,22 +112,16 @@ See [agent.md](agent.md). The model server is never started implicitly.
 | `ASTRO_SPCC_CATALOG` | — | `gaia` \| `localgaia`; empty prefers local when installed |
 | `ASTRO_DEEPSTAR_CAT` | `<library>/catalogues/athyg_v32.bin` | Deep star-name catalogue (`just download-deepstars`); absent → the embedded mag-9 extract |
 
-## Observing site + rig (planner)
+## Observing site + rig (mosaic planner)
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASTRO_LAT` / `ASTRO_LON` / `ASTRO_ELEVATION_M` | `48.8566` / `2.3522` / `0` | Observer location |
 | `ASTRO_TIMEZONE` | `Europe/Paris` | IANA timezone |
 | `ASTRO_APERTURE_MM` | `100` | Telescope aperture |
 | `ASTRO_SENSOR_W` / `ASTRO_SENSOR_H` | `4656` / `3520` | Sensor size (px) |
 | `ASTRO_EYEPIECES` | `30:68:30mm,…` | Eyepiece kit `focalMM:aFOV[:label]` |
 | `ASTRO_BARLOW` | `1` | Barlow factor |
 | `ASTRO_REDUCER` | `1` | Focal reducer (e.g. `0.66`); multiplies on top of the Barlow |
-
-The planner's data-provider variables (weather, light pollution, canopy, dark-sky scoring,
-routing, elevation) are documented in [planner.md](planner.md) and, exhaustively commented, in
-`.env.example`; they all soft-fail to sensible defaults when unset or offline. What each default URL
-actually points at, and under what licence, is in [third-party.md](third-party.md).
 
 ## Cross-session reuse
 
@@ -149,5 +143,3 @@ upstream; `just stack` sets `engine:8080`), `ENGINE_PORT` (8080), `WEB_PORT_PROD
 
 Host-orchestration variables used by scripts/recipes rather than the engine: `ASTRO_LLM_PORT`
 (model server port for `just run-ia-model`), `HF_TOKEN` (gated model downloads),
-`ASTRO_GRAXPERT_PORT` (host GraXpert service), and the `ASTRO_LIGHTPOLLUTION_*_URL` /
-`ASTRO_CANOPY_*` atlas-refresh inputs consumed by `scripts/update-*.sh`.

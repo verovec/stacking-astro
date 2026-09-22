@@ -42,10 +42,6 @@ func main() {
 		err = runMigrate(os.Args[2:])
 	case "doctor":
 		err = runDoctor(os.Args[2:])
-	case "lightpollution-atlas":
-		err = runLightPollutionAtlas(os.Args[2:])
-	case "skymap-data":
-		err = runSkymapData(os.Args[2:])
 	case "deepstars-data":
 		err = runDeepstarsData(os.Args[2:])
 	case "deepstars-athyg":
@@ -77,8 +73,6 @@ Usage:
   astrostack serve                   run the HTTP API server
   astrostack migrate                 apply database migrations
   astrostack doctor                  report which external tools are present, and what degrades without them
-  astrostack lightpollution-atlas    build the offline light-pollution atlas (djlorenz model)
-  astrostack skymap-data             build the frontend star + constellation dataset (skymap.json)
   astrostack deepstars-data          build the embedded deep star catalogue (internal/deepstars)
   astrostack deepstars-athyg         download + build the DEEP star catalogue (ATHYG v3.2) into the library
   astrostack version                 print the version

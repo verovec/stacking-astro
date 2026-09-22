@@ -10,7 +10,6 @@ import type {
   MosaicRequestBody,
   MosaicTileStatus,
   SkySearchResult,
-  SkyTarget,
   StarfieldStar,
 } from "@/types";
 
@@ -162,26 +161,20 @@ export const useMosaicStore = defineStore("mosaic", () => {
     return { setupId: draft.value.setupId, optics: draft.value.optics };
   }
 
-  // seedFromObject points the draft at a Tonight object (custom overrides cleared — the server
-  // resolves everything from the catalogue) and pre-aims the camera along the object when its
-  // position angle is known.
-  function seedFromObject(target: SkyTarget | string) {
-    const name = typeof target === "string" ? target : target.name;
-    const pa =
-      typeof target === "string" ? undefined : target.position_angle_deg;
+  // seedFromObject points the draft at a catalogue object by name (custom overrides cleared — the
+  // server resolves everything from the catalogue), e.g. from a /mosaic?object= deep link.
+  function seedFromObject(name: string) {
     draft.value = {
       ...defaultDraft(),
       ...keptRig(),
       targetName: name,
-      cameraPaDeg:
-        pa !== undefined ? Math.round(((pa + 90) % 360) * 10) / 10 : 0,
+      cameraPaDeg: 0,
     };
     void computePreview().then(() => {
       // Seeded by name only: once the server resolved the object's position angle, pre-aim the
       // camera along it (the fewest-tiles orientation) — unless the user already turned the knob.
       const resolvedPa = preview.value?.query.object_pa_deg;
       if (
-        pa === undefined &&
         resolvedPa !== undefined &&
         draft.value.targetName === name &&
         draft.value.cameraPaDeg === 0

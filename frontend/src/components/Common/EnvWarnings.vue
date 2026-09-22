@@ -4,10 +4,10 @@
 // nothing when the environment is clean or the user dismissed it (session-wide, via the store).
 import { ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { useEnvironmentStore } from "@/stores/environment";
+import { useToolHealthStore } from "@/stores/toolhealth";
 
 const { t } = useI18n();
-const env = useEnvironmentStore();
+const env = useToolHealthStore();
 const expanded = ref(false);
 onMounted(() => void env.load());
 </script>

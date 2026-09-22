@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/verove-jordan/astronomy/internal/config"
-	"github.com/verove-jordan/astronomy/internal/skyplan"
 )
 
 func skyTestServer(t *testing.T) *Server {
@@ -22,130 +21,46 @@ func skyTestServer(t *testing.T) *Server {
 		[]byte("name,ra,dec,diameter,mag,alias\nM81,148.888,69.065,26.9,6.9,Bode's Galaxy/NGC3031\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "ngc.csv"),
 		[]byte("name,ra,dec,diameter,mag,alias\nNGC104,6.0238,-72.081,50,4.0,47 Tucanae\n"), 0o644))
-	cfg := &config.Config{
-		SirilCatalogDir: dir,
-		LatDeg:          48.8566,
-		LonDeg:          2.3522,
-		Timezone:        "UTC",
-		FocalLenMM:      740,
-		ApertureMM:      100,
-		PixelSizeUm:     3.8,
-		SensorWpx:       4656,
-		SensorHpx:       3520,
-	}
-	return &Server{cfg: cfg, planner: skyplan.New(dir)}
+	return &Server{cfg: &config.Config{SirilCatalogDir: dir}}
 }
 
-func TestSkyTargets(t *testing.T) {
+// GET /api/sky/search is the Mosaic planner's target search — the one sky endpoint that survives the
+// planner removal (E01 card 0015).
+func TestSkySearch(t *testing.T) {
 	h := skyTestServer(t).Handler()
 
-	t.Run("ranks targets and echoes the setup", func(t *testing.T) {
+	search := func(t *testing.T, query string) []skySearchResult {
+		t.Helper()
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/targets?at=2026-03-15T23:00:00Z", nil))
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/search?q="+query, nil))
 		require.Equal(t, http.StatusOK, rec.Code)
-
-		var resp skyResponse
-		require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-		assert.Equal(t, 2, resp.Count)
-		assert.Equal(t, "config", resp.Query.Location.Source)
-		assert.InDelta(t, 7.4, resp.Query.Equipment.FRatio, 0.01)
-		assert.Greater(t, resp.Darkness.DawnUTCMs, resp.Darkness.DuskUTCMs)
-
-		// Sorted by score descending.
-		for i := 1; i < len(resp.Targets); i++ {
-			assert.GreaterOrEqual(t, resp.Targets[i-1].Score, resp.Targets[i].Score)
+		var resp struct {
+			Results []skySearchResult `json:"results"`
 		}
-		assert.Equal(t, "M81", resp.Targets[0].Name)
-	})
-
-	t.Run("focal reducer rescales the whole echo", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-			"/api/sky/targets?at=2026-03-15T23:00:00Z&reducer=0.66", nil))
-		require.Equal(t, http.StatusOK, rec.Code)
-
-		var resp skyResponse
 		require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-		eq := resp.Query.Equipment
-		// 740 × 0.66 = 488.4 mm: the native focal is echoed untouched, every derived value moves.
-		assert.InDelta(t, 740.0, eq.FocalMM, 1e-9)
-		assert.InDelta(t, 0.66, eq.ReducerX, 1e-9)
-		assert.InDelta(t, 4.88, eq.FRatio, 0.01)
-		assert.InDelta(t, 1.60, eq.ImageScaleArcsecPx, 0.01)
-		assert.InDelta(t, 2.075, eq.FovWDeg, 0.01)
+		return resp.Results
+	}
 
-		// A Barlow on top multiplies with it rather than replacing it: 740 × 2 × 0.66 = 976.8 mm.
-		rec = httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-			"/api/sky/targets?at=2026-03-15T23:00:00Z&reducer=0.66&barlow=2", nil))
-		require.Equal(t, http.StatusOK, rec.Code)
-		require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-		assert.InDelta(t, 9.77, resp.Query.Equipment.FRatio, 0.01)
-	})
+	tests := []struct {
+		name, query, wantFirst string
+	}{
+		{"catalogue id", "M81", "M81"},
+		{"case insensitive", "m81", "M81"},
+		{"common name", "Bode", "M81"},
+		{"other catalogue", "NGC104", "NGC104"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := search(t, tt.query)
+			require.NotEmpty(t, results)
+			assert.Equal(t, tt.wantFirst, results[0].Name)
+			assert.NotZero(t, results[0].RADeg)
+		})
+	}
 
-	t.Run("no reducer param leaves the rig at its native focal", func(t *testing.T) {
+	t.Run("missing query is a 400", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/targets", nil))
-		require.Equal(t, http.StatusOK, rec.Code)
-		var resp skyResponse
-		require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-		assert.Zero(t, resp.Query.Equipment.ReducerX)
-		assert.InDelta(t, 7.4, resp.Query.Equipment.FRatio, 0.01)
-	})
-
-	t.Run("query location overrides config", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/targets?lat=40&lon=-74", nil))
-		require.Equal(t, http.StatusOK, rec.Code)
-		var resp skyResponse
-		require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-		assert.Equal(t, "query", resp.Query.Location.Source)
-		assert.InDelta(t, 40.0, resp.Query.Location.Lat, 1e-9)
-	})
-
-	t.Run("visual mode recommends an eyepiece per target", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-			"/api/sky/targets?at=2026-03-15T23:00:00Z&mode=visual&eyepieces=30:68:30mm,10:60:10mm", nil))
-		require.Equal(t, http.StatusOK, rec.Code)
-
-		var resp skyResponse
-		require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-		assert.Equal(t, "visual", resp.Query.Equipment.Mode)
-		require.Len(t, resp.Query.Equipment.Eyepieces, 2)
-
-		var m81 *skyplan.Target
-		for i := range resp.Targets {
-			if resp.Targets[i].Name == "M81" {
-				m81 = &resp.Targets[i]
-			}
-		}
-		require.NotNil(t, m81)
-		assert.NotEmpty(t, m81.ChosenEyepiece)
-		assert.Greater(t, m81.MagX, 0.0)
-		assert.Greater(t, m81.TrueFOVDeg, 0.0)
-		assert.Greater(t, m81.ExitPupilMM, 0.0)
-	})
-
-	t.Run("camera mode JSON omits the visual fields", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/targets?at=2026-03-15T23:00:00Z", nil))
-		require.Equal(t, http.StatusOK, rec.Code)
-		body := rec.Body.String()
-		assert.NotContains(t, body, "chosen_eyepiece")
-		assert.NotContains(t, body, "\"mode\"")
-		assert.NotContains(t, body, "eyepiece")
-	})
-
-	t.Run("out-of-range latitude is rejected", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/targets?lat=200", nil))
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-	})
-
-	t.Run("invalid 'at' is rejected", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/targets?at=not-a-time", nil))
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/sky/search", nil))
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 }
