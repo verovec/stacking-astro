@@ -91,22 +91,10 @@ type Config struct {
 	// on. 478 s is Celestron's figure for the Advanced VX; other mounts differ, and the fit searches
 	// around this value rather than trusting it.
 	MountWormPeriodSec float64
-	// SimSolver answers plate solves from the simulator's own truth cards instead of running Siril.
-	//
-	// It exists because simulated frames CANNOT be plate-solved — the bundled catalogue is far too
-	// sparse for Siril to match — so without it every feature built on solving (centring, tracking
-	// measurement, polar alignment from the camera) can only ever be exercised on a real clear night.
-	// Development scaffolding, off by default, and it refuses any frame the simulator did not draw.
-	SimSolver bool
 
 	// TrackingSolveEveryNth solves one light in N to measure tracking. 1 is affordable at minute-long
 	// subs; raise it for short subs so the solves cannot fall behind the capture cadence.
 	TrackingSolveEveryNth int
-	// ConditionsIntervalMin is how often a running capture session records the sky it is shooting
-	// under (internal/skylog). Hourly by default because the weather feeds are themselves hourly —
-	// sampling faster repeats the same numbers while spending a free-tier request budget a long night
-	// can exhaust. Lower it to watch the recording work without waiting an hour; 0 restores hourly.
-	ConditionsIntervalMin int
 	SpccMonoSensor        string
 	SpccRFilter           string
 	SpccGFilter           string
@@ -119,10 +107,6 @@ type Config struct {
 	PlateSolveCatalog   string
 	SirilCatalogDir     string // Siril's bundled object catalogues (for name→coords resolution)
 
-	// DeviceAddr is where the device server (camera / filter wheel / mount) listens, and where the
-	// engine proxies /api/device/* to. It runs as its own process so an engine restart — air does
-	// one on every source save — cannot drop a USB connection mid-sequence.
-	DeviceAddr string
 	// Local Gaia DR3 catalogues (downloaded once via `just download-catalogues[-spcc]`) make
 	// plate-solving and SPCC work fully offline. GaiaAstroCat is the astrometric extract FILE;
 	// GaiaXpsampDir is the DIRECTORY holding the xp_sampled chunk files. Use the LocalGaia*()
@@ -327,9 +311,7 @@ func Load() *Config {
 
 		MountWormPeriodSec:    envFloat("ASTRO_WORM_PERIOD_SEC", 478), // Celestron Advanced VX
 		TrackingSolveEveryNth: envInt("ASTRO_TRACKING_SOLVE_EVERY", 1),
-		SimSolver:             envBool("ASTRO_SIM_SOLVER", false),
 
-		ConditionsIntervalMin: envInt("ASTRO_CAPTURE_CONDITIONS_INTERVAL_MIN", 60),
 		// SPCC names MUST match Siril's spcc-database exactly (case/spacing). The ASI1600MM Pro's
 		// sensor entry is "ZWO ASI1600MM" (no " Pro" — that name does not exist in the DB and makes
 		// SPCC abort, silently falling back to green-only neutralization → a brown sky). For a mono
@@ -342,7 +324,6 @@ func Load() *Config {
 		NightscapeOSCSensor: env("ASTRO_NIGHTSCAPE_OSC_SENSOR", ""),
 		PlateSolveCatalog:   env("ASTRO_PLATESOLVE_CATALOG", ""),
 		SirilCatalogDir:     catalogDir,
-		DeviceAddr:          env("ASTRO_DEVICE_ADDR", "127.0.0.1:8084"),
 		GaiaAstroCat:        env("ASTRO_GAIA_ASTRO_CAT", filepath.Join(libraryDir, "catalogues", "siril_cat_healpix8_astro.dat")),
 		GaiaXpsampDir:       env("ASTRO_GAIA_XPSAMP_DIR", filepath.Join(libraryDir, "catalogues")),
 		DeepStarCat:         env("ASTRO_DEEPSTAR_CAT", filepath.Join(libraryDir, "catalogues", "athyg_v32.bin")),

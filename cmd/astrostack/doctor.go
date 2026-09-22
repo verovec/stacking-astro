@@ -135,7 +135,6 @@ func printReport(rep *toolhealth.Report, db toolhealth.Tool, cfg *config.Config)
 	line("GraXpert", rep.Graxpert, cfg.GraxpertBin)
 	line("StarNet++", rep.Starnet, cfg.StarnetBin)
 	line("local AI model", rep.LLM, cfg.LLMBaseURL)
-	line("device server", rep.Devices, cfg.DeviceAddr)
 
 	fmt.Println()
 	fmt.Println("Plate solving")
