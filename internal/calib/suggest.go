@@ -113,7 +113,7 @@ func SuggestForInventory(inv *inspect.Inventory, masters []Master, force bool) C
 		// cannot apply a master of the wrong size at all, so forcing one would promise a correction
 		// that silently never happens.
 		usable, dimNote := poolFor(set, masters)
-		sel := matchForLight(set.Key, usable, force)
+		sel := matchForRef(LightRef{Key: set.Key, FilterSet: set.FilterSet}, usable, force)
 		if dimNote != "" {
 			sel.Notes = append(sel.Notes, dimNote)
 		}
@@ -146,7 +146,12 @@ func appendSuggestion(list []CalibSuggestion, light inspect.SetKey, role string,
 // light set (by its SuggestID). The remaining selection is what the run applies — so an exclusion is
 // honored whether the masters were rebuilt from raw frames or reused from the library.
 func MatchForLightExcluding(light inspect.SetKey, masters []Master, excluded []string, force bool) Selection {
-	sel := matchForLight(light, masters, force)
+	return dropExcluded(light, matchForLight(light, masters, force), excluded)
+}
+
+// dropExcluded removes the roles the user unchecked for this exact light set (by SuggestID), so an
+// exclusion is honored whether the masters were rebuilt from raw frames or reused from the library.
+func dropExcluded(light inspect.SetKey, sel Selection, excluded []string) Selection {
 	if len(excluded) == 0 {
 		return sel
 	}
