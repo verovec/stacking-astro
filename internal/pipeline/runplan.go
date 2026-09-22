@@ -143,10 +143,9 @@ func planGroupFor(ctx context.Context, provider ReuseProvider, g lightGroup, can
 		ExposureMs: g.Key.ExposureMs, Gain: g.Key.Gain, Offset: g.Key.Offset,
 		TempBucketC: g.Key.TempBucket, Bin: g.Key.Bin, Frames: len(g.Frames),
 	}
-	if fs := g.ref().FilterSet; fs.Known() {
-		pg.FilterSet = fs
-	}
-	sel := calib.MatchForRef(g.ref(), candidates, nil, force)
+	ref := g.ref()
+	pg.FilterSet = ref.FilterSet
+	sel := calib.MatchForRef(ref, candidates, nil, force)
 	pg.Notes = sel.Notes
 	pg.Dark = planMasterFor(g.Key, calib.RoleDark, sel.Dark)
 	pg.Bias = planMasterFor(g.Key, calib.RoleBias, sel.Bias)
@@ -156,7 +155,7 @@ func planGroupFor(ctx context.Context, provider ReuseProvider, g lightGroup, can
 		flat, notes := planPriorFlat(ctx, provider, g)
 		pg.Flat, pg.Notes = flat, append(pg.Notes, notes...)
 	}
-	pg.FlatFallback = flatFallback(g, pg.Flat)
+	pg.FlatFallback = pg.flatIsFallback()
 	return pg
 }
 
@@ -190,24 +189,26 @@ func planPriorFlat(ctx context.Context, provider ReuseProvider, g lightGroup) (*
 	return nil, notes
 }
 
-// flatFallback reports whether the planned FLAT departs from the clean case — no flat at all, one
+// flatIsFallback reports whether the planned FLAT departs from the clean case — no flat at all, one
 // borrowed from a different capture night (dust moves), or one shot through a different clip filter
 // than the lights (which only survives the match under force_calibration_frames).
 //
-// It reads the resolved plan rather than the notes: the notes are prose meant for a human, and a UI
-// that decided when to warn by matching substrings in them would break the first time one is reworded.
-func flatFallback(g lightGroup, flat *PlanMaster) bool {
-	if flat == nil {
+// It reads the RESOLVED plan — the same fields the UI renders — rather than the notes or the group
+// it came from. The notes are prose meant for a human, and a UI that decided when to warn by
+// matching substrings in them would break the first time one is reworded; reading the plan also
+// means the chip can never disagree with the row printed next to it.
+func (pg PlanGroup) flatIsFallback() bool {
+	if pg.Flat == nil {
 		return true
 	}
-	m := flat.Master
+	m := pg.Flat.Master
 	if m == nil {
 		return false // a session rebuild IS that night's own raw flats — the clean case for prior data
 	}
-	if m.Session != "" && g.Session != "" && m.Session != g.Session {
+	if m.Session != "" && pg.Session != "" && m.Session != pg.Session {
 		return true
 	}
-	return g.FilterSet.Known() && m.FilterSet.Known() && g.FilterSet != m.FilterSet
+	return pg.FilterSet.Known() && m.FilterSet.Known() && pg.FilterSet != m.FilterSet
 }
 
 // planMasterFor wraps one matched master with its provenance; nil in → nil out (role skipped).

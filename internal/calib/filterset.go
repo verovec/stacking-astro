@@ -29,11 +29,15 @@ type LightRef struct {
 // structs with no projected FilterSet, and a light group assembled that way would otherwise read
 // unknown and quietly re-open the gate it is supposed to close.
 func RefFor(inv *inspect.Inventory, set inspect.Set) LightRef {
-	ref := LightRef{Key: set.Key, FilterSet: set.FilterSet}
-	if !ref.FilterSet.Known() {
-		ref.FilterSet = inv.NightFilterSet(set.Key.Session)
+	if set.FilterSet.Known() {
+		return LightRef{Key: set.Key, FilterSet: set.FilterSet}
 	}
-	return ref
+	if night := inv.NightFilterSet(set.Key.Session); night.Known() {
+		return LightRef{Key: set.Key, FilterSet: night}
+	}
+	// Left EMPTY rather than the "unknown" literal: both read !Known(), and carrying one spelling
+	// keeps every consumer — and every test — from having to know which one it will get.
+	return LightRef{Key: set.Key}
 }
 
 // stampFlatFilterSet gives a FLAT master the clip filter of the night it was shot on. It is the only
@@ -84,6 +88,13 @@ func keepSameFilterSet(ref LightRef, masters []Master, force bool) ([]Master, in
 		return masters, 0
 	}
 	return kept, dropped
+}
+
+// flatExclusionCost reports whether refusing the cross-set flats actually cost this light set
+// something: it ended up with no flat, or with one borrowed from a different capture night. When its
+// own night supplied a same-set flat, the exclusion changed nothing and there is nothing to report.
+func flatExclusionCost(light inspect.SetKey, flat *Master) bool {
+	return flat == nil || flat.Session != light.Session
 }
 
 // otherSet names the opposite filter set, for the exclusion note.

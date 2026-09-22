@@ -46,6 +46,7 @@ func TestPickFlat_FilterSet(t *testing.T) {
 		masters    []Master
 		wantPath   string // "" = no flat at all
 		wantNote   string // substring required in the notes ("" = none required)
+		wantNoNote string // substring that must NOT appear ("" = nothing forbidden)
 		forceCalib bool
 	}{
 		{
@@ -57,6 +58,20 @@ func TestPickFlat_FilterSet(t *testing.T) {
 				oscFlat(nightB, filters.FilterSetDualband, 20),
 			},
 			wantPath: "flat_2026-08-02_dualband.fits",
+		},
+		{
+			// The user already shoots flats per filter set — that is exactly what we want them to
+			// do. Telling them to do it, because the gate quietly dropped the OTHER set's flat it was
+			// never going to use, is noise that trains people to ignore the notes.
+			name:     "the correct same-night flat wins — no advice the user does not need",
+			light:    oscLight(nightA),
+			lightSet: filters.FilterSetDualband,
+			masters: []Master{
+				oscFlat(nightA, filters.FilterSetBroadband, 50),
+				oscFlat(nightA, filters.FilterSetDualband, 20),
+			},
+			wantPath:   "flat_2026-07-29_dualband.fits",
+			wantNoNote: "excluded",
 		},
 		{
 			name:     "a cross-set flat is not a candidate, even when it is the only one",
@@ -120,8 +135,12 @@ func TestPickFlat_FilterSet(t *testing.T) {
 				require.NotNil(t, sel.Flat, "expected %s", tt.wantPath)
 				assert.Equal(t, tt.wantPath, sel.Flat.Path)
 			}
+			notes := strings.ToLower(strings.Join(sel.Notes, " | "))
 			if tt.wantNote != "" {
-				assert.Contains(t, strings.ToLower(strings.Join(sel.Notes, " | ")), tt.wantNote)
+				assert.Contains(t, notes, tt.wantNote)
+			}
+			if tt.wantNoNote != "" {
+				assert.NotContains(t, notes, tt.wantNoNote)
 			}
 		})
 	}

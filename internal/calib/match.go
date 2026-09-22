@@ -121,10 +121,14 @@ func matchForRef(ref LightRef, masters []Master, force bool) Selection {
 	} else {
 		sel.Notes = append(sel.Notes, "no flat available — flat correction skipped")
 	}
-	// Name both sets when the only flats on offer were shot through a different clip filter. Without
-	// this the run just says "no flat available", and the user cannot tell a missing flat from one
-	// that was deliberately refused.
-	if crossSet > 0 {
+	// Name both sets when dropping the cross-set flats COST something — no flat at all, or one
+	// borrowed from another night. Without it the run just says "no flat available", and the user
+	// cannot tell a missing flat from one that was deliberately refused.
+	//
+	// Silent when the light's own night supplied a same-set flat: the exclusion changed nothing, the
+	// user is already shooting flats per filter set, and advising them to do so is the kind of note
+	// that teaches people to stop reading notes.
+	if crossSet > 0 && flatExclusionCost(light, sel.Flat) {
 		sel.Notes = append(sel.Notes, fmt.Sprintf(
 			"%d flat(s) excluded — these are %s lights and those flats are %s; shoot flats per filter set",
 			crossSet, ref.FilterSet, otherSet(ref.FilterSet)))

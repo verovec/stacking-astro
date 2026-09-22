@@ -51,7 +51,9 @@ func TestBuildReusePlan_CurrentGroupsCarryTheFilterSet(t *testing.T) {
 	}{
 		{"a dual-band night reaches the matcher", filters.FilterSetDualband, filters.FilterSetDualband},
 		{"a broadband night reaches the matcher", filters.FilterSetBroadband, filters.FilterSetBroadband},
-		{"an unmeasured night stays unknown", filters.FilterSetUnknown, filters.FilterSetUnknown},
+		// The EMPTY value, not the "unknown" literal: calib.RefFor carries one spelling of "no
+		// verdict" so no consumer has to know which of the two it will be handed.
+		{"an unmeasured night carries no verdict", filters.FilterSetUnknown, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -64,6 +66,7 @@ func TestBuildReusePlan_CurrentGroupsCarryTheFilterSet(t *testing.T) {
 			groups := plan.byFilter[filters.Color]
 			require.Len(t, groups, 1)
 			assert.Equal(t, tt.want, groups[0].ref().FilterSet)
+			assert.Equal(t, tt.want.Known(), groups[0].ref().FilterSet.Known())
 			assert.Equal(t, inv.Sets[0].Key, groups[0].ref().Key, "the key is untouched")
 		})
 	}
