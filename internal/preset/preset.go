@@ -48,11 +48,15 @@ type Payload struct {
 // UI translates via i18n) or a user-saved row (Builtin false, Name the user's own text, Category empty).
 // Payload is carried opaquely as JSON so built-ins and DB rows share one wire shape.
 type Item struct {
-	ID        int64           `json:"id"`
-	Name      string          `json:"name"`
-	Category  string          `json:"category,omitempty"`
-	Builtin   bool            `json:"builtin"`
-	Favorite  bool            `json:"favorite,omitempty"` // user rows only; built-ins are never starred
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Category string `json:"category,omitempty"`
+	Builtin  bool   `json:"builtin"`
+	Favorite bool   `json:"favorite,omitempty"` // user rows only; built-ins are never starred
+	// Objects is what this recipe is FOR — the target types it suits (see objects.go). Built-ins carry
+	// at least one; user-saved presets carry none and are never filtered out by the picker's chips,
+	// because the user already knows what their own preset is for.
+	Objects   []ObjectType    `json:"objects,omitempty"`
 	Payload   json.RawMessage `json:"payload"`
 	CreatedAt int64           `json:"created_at,omitempty"`
 	UpdatedAt int64           `json:"updated_at,omitempty"`
@@ -71,11 +75,14 @@ func mustParams(m map[string]any) json.RawMessage {
 	return raw
 }
 
-// builtin assembles a built-in Item from a slug, category and payload recipe, marshaling the payload once.
-func builtin(name, category string, p Payload) Item {
+// builtin assembles a built-in Item from a slug, category, taxonomy tags and payload recipe,
+// marshaling the payload once. objs is required rather than variadic: a forgotten tag drops the
+// preset out of every chip filter, which reads as "there is no recipe for this" — so the compiler
+// asks for it, and TestBuiltins_AllTaggedWithObjects rejects an empty one.
+func builtin(name, category string, objs []ObjectType, p Payload) Item {
 	raw, err := json.Marshal(p)
 	if err != nil {
 		panic("preset: bad built-in payload " + name + ": " + err.Error())
 	}
-	return Item{Name: name, Category: category, Builtin: true, Payload: raw}
+	return Item{Name: name, Category: category, Builtin: true, Objects: objs, Payload: raw}
 }

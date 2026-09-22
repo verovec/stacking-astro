@@ -8,17 +8,23 @@ import type { PresetItem, PresetPayload } from "@/types";
 // view re-applies to the launch form. All API calls live here (Vue convention); components read state and
 // dispatch actions. The list is fetched once and shared (cache + in-flight dedup), refreshed after a write.
 
+// Picker group order. It must list EVERY category the engine serves (internal/preset: Category*),
+// because a category missing here is not degraded — it is invisible: the five sun_* builtins were
+// served and fully translated yet never rendered, for exactly that reason.
 const CATEGORY_ORDER = [
   "deepsky",
   "nebula",
   "narrowband",
   "solar",
+  "sun",
   "comet",
   "milkyway",
 ];
 
 export const usePresetsStore = defineStore("presets", () => {
   const presets = ref<PresetItem[]>([]);
+  // The object-type taxonomy, in the engine's display order (GET /api/presets → object_types).
+  const objectTypes = ref<string[]>([]);
   const loading = ref(false);
   const error = ref("");
   let loaded = false;
@@ -31,8 +37,13 @@ export const usePresetsStore = defineStore("presets", () => {
     error.value = "";
     inflight = (async () => {
       try {
-        const d = await apiGet<{ presets: PresetItem[] }>("/api/presets");
+        const d = await apiGet<{
+          presets: PresetItem[];
+          object_types?: string[];
+        }>("/api/presets");
         presets.value = d.presets || [];
+        // Served in display order by the engine (internal/preset.ObjectTypes) — rendered as-is.
+        objectTypes.value = d.object_types || [];
         loaded = true;
       } catch (e) {
         error.value = (e as Error).message;
@@ -84,10 +95,43 @@ export const usePresetsStore = defineStore("presets", () => {
     return groups;
   });
 
+  // The object-type chips the user picked ("what did you shoot?"). Empty = no opinion, which is the
+  // default and leaves the picker exactly as it was before the taxonomy existed.
+  const selectedObjects = ref<string[]>([]);
+
+  // groups is what the picker renders. With no chips picked it IS byCategory. With chips picked it
+  // RE-ORDERS rather than filters: matching recipes are promoted to the top, everything else keeps
+  // its place under "other", and the user's own presets always get their group. Culling would be the
+  // wrong behaviour twice over — a built-in is tagged with what it is BEST for, not exclusively for,
+  // and a user preset carries no tags at all, so a filter that hides would hide precisely the recipes
+  // the engine had no way to label.
+  const groups = computed(() => {
+    if (!selectedObjects.value.length) return byCategory.value;
+    const wanted = new Set(selectedObjects.value);
+    const matches = (p: PresetItem) =>
+      (p.objects ?? []).some((o) => wanted.has(o));
+
+    const out: { key: string; items: PresetItem[] }[] = [];
+    const matching = builtins.value.filter(matches);
+    const other = builtins.value.filter((p) => !matches(p));
+    if (matching.length) out.push({ key: "matching", items: matching });
+    if (other.length) out.push({ key: "other", items: other });
+    if (userPresets.value.length) {
+      const mine = [...userPresets.value].sort(
+        (a, b) => Number(!!b.favorite) - Number(!!a.favorite),
+      );
+      out.push({ key: "mine", items: mine });
+    }
+    return out;
+  });
+
   return {
     presets,
     loading,
     error,
+    objectTypes,
+    selectedObjects,
+    groups,
     list,
     save,
     rename,

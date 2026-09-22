@@ -13,6 +13,7 @@ import (
 	"github.com/verove-jordan/astronomy/internal/mode"
 	"github.com/verove-jordan/astronomy/internal/pipeline"
 	"github.com/verove-jordan/astronomy/internal/preset"
+	"github.com/verove-jordan/astronomy/internal/store"
 )
 
 // This file is the processing-preset manager: the built-in "best params per situation" catalog
@@ -38,17 +39,31 @@ func (s *Server) listPresets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, row := range rows {
-		items = append(items, preset.Item{
-			ID:        row.ID,
-			Name:      row.Name,
-			Builtin:   false,
-			Favorite:  row.Favorite,
-			Payload:   json.RawMessage(row.Payload),
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-		})
+		items = append(items, userPresetItem(row))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"presets": items})
+	// object_types is the taxonomy the picker renders as chips, IN DISPLAY ORDER. It is served rather
+	// than re-declared in the frontend for the internal/filters reason: a second copy of a vocabulary
+	// drifts, and here even the ORDER is a decision the catalog owns. The UI never sorts it.
+	writeJSON(w, http.StatusOK, map[string]any{
+		"presets":      items,
+		"object_types": preset.ObjectTypes(),
+	})
+}
+
+// userPresetItem projects a saved row onto the API-facing preset shape. It deliberately leaves
+// Objects empty: the object-type taxonomy describes what a CURATED recipe is for, and a preset the
+// user wrote themselves needs no such hint — the picker therefore never filters user presets away
+// behind a chip the engine could not have tagged them with.
+func userPresetItem(row store.Preset) preset.Item {
+	return preset.Item{
+		ID:        row.ID,
+		Name:      row.Name,
+		Builtin:   false,
+		Favorite:  row.Favorite,
+		Payload:   json.RawMessage(row.Payload),
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
 }
 
 // savePreset upserts a user preset by name (re-saving the same name overwrites). POST /api/presets

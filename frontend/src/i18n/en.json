@@ -65,7 +65,9 @@
       "solar": "Solar system",
       "comet": "Comet",
       "milkyway": "Milky Way",
-      "sun": "The Sun"
+      "sun": "The Sun",
+      "matching": "Best for what you shot",
+      "other": "Other recipes"
     },
     "builtin": {
       "galaxy-lrgb": {
@@ -163,8 +165,46 @@
       "stack-few-frames": {
         "label": "Only a few subs",
         "desc": "For a handful of dissimilar frames, where no measured sigma is trustworthy: percentile clipping and no weighting, so nothing is thrown away twice."
+      },
+      "oxygen-cloud": {
+        "label": "Oxygen cloud (OIII)",
+        "desc": "OIII-dominant shell or filament. Frames weighted on sky cleanliness rather than sharpness — OIII is the faintest, most light-pollution-sensitive channel. With Ha frames too, prefer Narrowband HOO."
+      },
+      "supernova-remnant": {
+        "label": "Supernova remnant",
+        "desc": "Veil-class remnant: both Ha and OIII screens, heavy star reduction so the filaments read, and linear-fit rejection for the gradients a wide field brings."
+      },
+      "dark-nebula": {
+        "label": "Dark nebula",
+        "desc": "LDN/Barnard dust lanes — the lowest-stretch recipe in the catalog. The subject is an absence of light, so the sky stays dark and the faint dust comes from denoise, not from lifting the black point."
+      },
+      "osc-broadband": {
+        "label": "One-shot colour — thin broadband night",
+        "desc": "A colour camera, few hours, shot for star colour rather than depth. The four chroma-reducing stages are switched off (they halve the colour on a thin stack) and only well-guided subs are kept."
+      },
+      "wide-field-lens": {
+        "label": "Camera lens (very wide field)",
+        "desc": "A photo lens rather than a telescope. Both AI stages are off — at this focal length they read the sky itself as structure (clumping, magenta cast) — and the gradient is modelled as a simple plane. Note that a field this wide may exceed the plate solver's range."
       }
-    }
+    },
+    "objects": {
+      "galaxy": "Galaxy",
+      "emission-nebula": "Emission nebula",
+      "planetary-nebula": "Planetary nebula",
+      "reflection-nebula": "Reflection nebula",
+      "dark-nebula": "Dark nebula",
+      "supernova-remnant": "Supernova remnant",
+      "oxygen-cloud": "Oxygen (OIII) cloud",
+      "star-cluster": "Star cluster",
+      "comet": "Comet",
+      "moon": "Moon",
+      "planet": "Planet",
+      "sun": "Sun",
+      "milkyway": "Milky Way"
+    },
+    "objectsLabel": "What did you shoot?",
+    "objectsHint": "Optional — picks the recipes suited to your target and puts them first. Nothing is hidden.",
+    "objectsClear": "Clear"
   },
   "run": {
     "mode": "Mode",
