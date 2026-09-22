@@ -2,7 +2,7 @@ package mosaic
 
 // Panel → canvas reprojection.
 //
-// ROW-ORDER CONVENTION (verified against internal/fits and internal/annotate): fits.Image stores
+// ROW-ORDER CONVENTION (verified against internal/fits): fits.Image stores
 // rows in FILE order (Pix[c][y*W+x], row 0 = the file's first row), and the FITS WCS standard
 // addresses pixels in that same storage order — the axis-2 pixel coordinate IS the array row index
 // (+1 for the 1-based FITS origin). WCS.SkyToPix/PixToSky already speak 0-based axis coordinates,
@@ -11,8 +11,7 @@ package mosaic
 // repo's WriteFITS stamps TOP-DOWN) and does not move the WCS. As long as every panel was solved
 // by the same Siril against the same storage convention, identity keeps the panels mutually
 // consistent — and the canvas header the pipeline emits (WriteFITSWith + canvas WCS.Cards)
-// describes exactly the array AssembleChannel wrote. internal/annotate's chooseFlip stays the
-// empirical guard for absolute orientation downstream.
+// describes exactly the array AssembleChannel wrote.
 
 import (
 	"context"

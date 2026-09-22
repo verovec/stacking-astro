@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { ApiError, apiGet, apiPost, health } from "@/services/api";
+import { apiGet, apiPost, health } from "@/services/api";
 import type {
   AlignPointsEstimate,
   Inventory,
@@ -9,9 +9,7 @@ import type {
   CalibPreview,
   RunPlanPreview,
   RunSummary,
-  Scene3DManifest,
   SetQaReport,
-  StarAnnotations,
 } from "@/types";
 
 export interface CreateOpts {
@@ -166,15 +164,6 @@ export const useJobsStore = defineStore("jobs", () => {
   // Conversation turn id stashed at create/refine-time (supervised jobs only) so JobView can open the
   // live steerable conversation for the run it just started.
   const turnByJob = ref<Record<number, string>>({});
-  // Star annotations (stars.json) cached per job, so a computed count/overlay survives navigation.
-  const starsByJob = ref<Record<number, StarAnnotations>>({});
-  // POST in flight per job — survives a JobView remount so the button can't double-submit.
-  const starsBusy = ref<Record<number, boolean>>({});
-  // 3D field-map manifests, cached per job alongside the annotation they are built from. The star
-  // field itself is a binary blob fetched separately and only when the 3D view is actually opened —
-  // it is the one payload big enough to be worth not loading for someone who never asks for it.
-  const sceneByJob = ref<Record<number, Scene3DManifest>>({});
-
   // list refreshes the currently-loaded window (newest first). It re-fetches from offset 0 with a limit of
   // however many are already shown (min one page), so the Tasks poll updates live status without discarding
   // "load more" pages — and a fresh visit loads just the first page.
@@ -424,78 +413,6 @@ export const useJobsStore = defineStore("jobs", () => {
     return data.id;
   }
 
-  // normalizeStars makes the annotation safe for the overlay: labels never null, importance-sorted
-  // once (DSOs slightly boosted so the target's name wins ties against anonymous field stars).
-  function normalizeStars(a: StarAnnotations): StarAnnotations {
-    const labels = (a.labels ?? [])
-      .slice()
-      .sort(
-        (x, y) =>
-          (x.kind === "dso" ? x.mag - 2 : x.mag) -
-          (y.kind === "dso" ? y.mag - 2 : y.mag),
-      );
-    return { ...a, labels };
-  }
-
-  function starsFor(id: number): StarAnnotations | null {
-    return starsByJob.value[id] ?? null;
-  }
-
-  // fetchStars loads the cached annotation (GET). 404 = never computed → null, silently; other
-  // failures also yield null so the count button simply remains available.
-  async function fetchStars(id: number): Promise<StarAnnotations | null> {
-    const cached = starsByJob.value[id];
-    if (cached) return cached;
-    try {
-      const data = await apiGet<StarAnnotations>(`/api/jobs/${id}/stars`);
-      starsByJob.value[id] = normalizeStars(data);
-      return starsByJob.value[id];
-    } catch {
-      return null;
-    }
-  }
-
-  // countStars computes the annotation (POST — may take up to ~1 min when the field needs a fresh
-  // plate-solve). Rethrows the ApiError for inline display; guards double-submit via starsBusy.
-  async function countStars(id: number): Promise<StarAnnotations> {
-    if (starsBusy.value[id]) {
-      const cached = starsByJob.value[id];
-      if (cached) return cached;
-      throw new ApiError(409, "count already running");
-    }
-    starsBusy.value[id] = true;
-    try {
-      const data = await apiPost<StarAnnotations>(`/api/jobs/${id}/stars`);
-      starsByJob.value[id] = normalizeStars(data);
-      // The same pass rebuilds the 3D scene, so the cached manifest is now stale by construction —
-      // dropping it is what makes "recompute" visibly fix a run whose scene could not be built.
-      delete sceneByJob.value[id];
-      void fetchScene3D(id);
-      return starsByJob.value[id];
-    } finally {
-      starsBusy.value[id] = false;
-    }
-  }
-
-  function sceneFor(id: number): Scene3DManifest | null {
-    return sceneByJob.value[id] ?? null;
-  }
-
-  // fetchScene3D loads the cached 3D manifest (GET). 404 = the stars were never computed, which is
-  // the normal state before the user asks for them; both that and any other failure yield null so
-  // the 3D chip simply stays hidden.
-  async function fetchScene3D(id: number): Promise<Scene3DManifest | null> {
-    const cached = sceneByJob.value[id];
-    if (cached) return cached;
-    try {
-      const data = await apiGet<Scene3DManifest>(`/api/jobs/${id}/scene3d`);
-      sceneByJob.value[id] = data;
-      return data;
-    } catch {
-      return null;
-    }
-  }
-
   // refine re-finishes a completed run under the AI supervisor (no re-stack unless allowRestack) as a
   // new job, returning its id so the caller can navigate to the live iteration stream.
   async function refine(id: number, opts: RefineOpts = {}): Promise<number> {
@@ -611,12 +528,6 @@ export const useJobsStore = defineStore("jobs", () => {
     continueJob,
     restart,
     denoiseFinal,
-    starsBusy,
-    starsFor,
-    fetchStars,
-    countStars,
-    sceneFor,
-    fetchScene3D,
     refine,
     rerun,
     listRuns,

@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/gzhttp"
-	"golang.org/x/sync/singleflight"
 
 	"github.com/verove-jordan/astronomy/internal/buildinfo"
 	"github.com/verove-jordan/astronomy/internal/config"
@@ -23,7 +22,6 @@ import (
 	"github.com/verove-jordan/astronomy/internal/mode"
 	"github.com/verove-jordan/astronomy/internal/pipeline"
 	"github.com/verove-jordan/astronomy/internal/preview"
-	"github.com/verove-jordan/astronomy/internal/siril"
 	"github.com/verove-jordan/astronomy/internal/store"
 	"github.com/verove-jordan/astronomy/internal/thumb"
 	"github.com/verove-jordan/astronomy/internal/toolhealth"
@@ -32,27 +30,24 @@ import (
 
 // Server holds the API dependencies.
 type Server struct {
-	mgr         *job.Manager
-	store       *store.Store
-	cfg         *config.Config
-	scanCache   *inspect.ScanCache
-	agentTurns  *turns.Sessions     // live turns (supervised-job conversations), streamed over SSE
-	toolHealth  *toolhealth.Checker // environment health (tool deep probes + catalogue presence)
-	sirilRunner *siril.Runner       // one-off synchronous Siril work (star-annotation re-solve); nil-safe for tests
-	starsFlight singleflight.Group  // dedupes concurrent star-annotation computes per run dir
+	mgr        *job.Manager
+	store      *store.Store
+	cfg        *config.Config
+	scanCache  *inspect.ScanCache
+	agentTurns *turns.Sessions     // live turns (supervised-job conversations), streamed over SSE
+	toolHealth *toolhealth.Checker // environment health (tool deep probes + catalogue presence)
 }
 
 // New builds the API server. hub is the shared turn transport (also handed to the job manager) so a
 // supervised finish streams over one SSE mechanism.
 func New(mgr *job.Manager, st *store.Store, cfg *config.Config, hub *turns.Sessions) *Server {
 	s := &Server{
-		mgr:         mgr,
-		store:       st,
-		cfg:         cfg,
-		scanCache:   inspect.NewScanCache(),
-		agentTurns:  hub,
-		toolHealth:  toolhealth.New(cfg),
-		sirilRunner: siril.New(cfg.SirilBin, siril.Limits{MaxCPUs: cfg.MaxCPUs, MemRatio: cfg.SirilMemRatio, Nice: cfg.SirilNice}),
+		mgr:        mgr,
+		store:      st,
+		cfg:        cfg,
+		scanCache:  inspect.NewScanCache(),
+		agentTurns: hub,
+		toolHealth: toolhealth.New(cfg),
 	}
 	return s
 }
@@ -90,10 +85,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/jobs/{id}/stages", s.listJobStages)
 	mux.HandleFunc("POST /api/jobs/{id}/stages/export", s.exportJobStage)
 	mux.HandleFunc("POST /api/jobs/{id}/denoise-final", s.denoiseFinalJob)
-	mux.HandleFunc("POST /api/jobs/{id}/stars", s.computeStars)
-	mux.HandleFunc("GET /api/jobs/{id}/stars", s.getStars)
-	mux.HandleFunc("GET /api/jobs/{id}/scene3d", s.getScene3D)
-	mux.HandleFunc("GET /api/galaxy/points", s.getGalaxyPoints)
 	mux.HandleFunc("GET /api/jobs/{id}/iterations", s.jobIterations)
 	mux.HandleFunc("GET /api/jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /api/series", s.createSeries)

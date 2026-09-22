@@ -12,7 +12,7 @@ export const btnGhost = `${btn} bg-slate-200 text-slate-800 hover:bg-slate-300 d
 export const btnDanger = `${btn} bg-danger-600 text-white hover:bg-danger-500`;
 
 // Segmented control (a row of mutually-exclusive toggle buttons): the wrapper, each button, and the
-// active/idle states. Shared by TabBar and the StarField3D view switch.
+// active/idle states. Used by TabBar.
 export const segWrap =
   "flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-600";
 export const segBtn = "px-2 py-1 text-xs transition-colors";

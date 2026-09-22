@@ -48,7 +48,7 @@ function mountIt(result: RunResult) {
     props: { result },
     global: {
       plugins: [testI18n(), createTestingPinia({ createSpy: vi.fn })],
-      stubs: { StarField3D: true, MetricsChart: true },
+      stubs: { MetricsChart: true },
     },
   });
 }

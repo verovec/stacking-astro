@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import en from "@/i18n/en.json";
-import { MODES, STAR_MODES } from "./modes";
+import { MODES } from "./modes";
 import { groupsForMode } from "./paramDocs";
 
 describe("canonical mode set", () => {
@@ -33,11 +33,5 @@ describe("canonical mode set", () => {
     for (const m of MODES) {
       expect(groupsForMode(m).length, `groupsForMode(${m})`).toBeGreaterThan(0);
     }
-  });
-
-  it("star analysis is limited to modes that have stars", () => {
-    expect(STAR_MODES).not.toContain("sun");
-    expect(STAR_MODES).not.toContain("eclipse");
-    expect(STAR_MODES).not.toContain("planetary");
   });
 });
