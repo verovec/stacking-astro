@@ -274,7 +274,25 @@
     "mosaic": "Canevas union (multi-nuits, garder tout le champ de chaque nuit)",
     "mosaicHint": "Les traitements multi-nuits couvrent l'UNION des champs de toutes les sessions au lieu de rogner au cadre de la nuit d'ancrage — une image plus grande, aucun pixel perdu. Le final est rogné à la zone où chaque canal a de vraies données (params : mosaic_fill).",
     "sunHint": "Indiquez le dossier de capture complet. Le traitement mesure le disque solaire dans chaque fichier et regroupe ce qui peut réellement être empilé — zooms, résolutions et expositions différents sont triés automatiquement, et le regroupement est enregistré dans triage.json à côté du résultat.",
-    "eclipseHint": "Un Soleil partiellement éclipsé. La Lune est mesurée comme un second cercle puis exclue de l'empilement, afin que le croissant soit recalé sur le Soleil et non sur l'astre que l'ajustement aurait choisi. Visez un seul clip ou le dossier entier."
+    "eclipseHint": "Un Soleil partiellement éclipsé. La Lune est mesurée comme un second cercle puis exclue de l'empilement, afin que le croissant soit recalé sur le Soleil et non sur l'astre que l'ajustement aurait choisi. Visez un seul clip ou le dossier entier.",
+    "colorModel": "Capteur",
+    "colorModelHint": "Comment cette capture enregistre la couleur. Laissez la valeur détectée sauf si l'analyse s'est trompée.",
+    "colorModelAuto": "Détecté — {detected}",
+    "colorModelMono": "Monochrome (roue à filtres)",
+    "colorModelOsc": "Couleur (one-shot)",
+    "colorModelDetected": {
+      "mono": "monochrome, empilé par filtre",
+      "osc": "couleur one-shot, empilé en un seul canal RVB",
+      "mixed": "mixte — ce dossier contient les deux, et un seul traitement ne peut pas les empiler ensemble ; les poses monochromes sont conservées et les poses couleur écartées",
+      "unknown": "pas encore analysé"
+    },
+    "optics": "Optique de cette session",
+    "opticsHint": "Focale et taille de pixel pour l'astrométrie (et donc la calibration colorimétrique).",
+    "opticsFocal": "Focale (mm)",
+    "opticsPixel": "Taille de pixel (µm)",
+    "opticsWarning": "Si vous laissez ces champs vides, le moteur retombe sur le télescope configuré. Une session à l'objectif photo résolue à la mauvaise échelle ne peut pas être astrométrée du tout.",
+    "opticsRig": "Pré-remplir depuis un équipement enregistré",
+    "opticsRigPlaceholder": "Choisir un équipement…"
   },
   "reuse": {
     "title": "Réutiliser des données antérieures",

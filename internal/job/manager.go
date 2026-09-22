@@ -21,6 +21,7 @@ import (
 	"github.com/verove-jordan/astronomy/internal/config"
 	"github.com/verove-jordan/astronomy/internal/gimp"
 	"github.com/verove-jordan/astronomy/internal/graxpert"
+	"github.com/verove-jordan/astronomy/internal/inspect"
 	"github.com/verove-jordan/astronomy/internal/llm"
 	"github.com/verove-jordan/astronomy/internal/mode"
 	"github.com/verove-jordan/astronomy/internal/photom"
@@ -223,6 +224,12 @@ type RunRequest struct {
 	FlatDir    string `json:"flat_dir,omitempty"`
 	BiasDir    string `json:"bias_dir,omitempty"`
 
+	// ColorModel is the user's answer to "monochrome or colour stack?" — "auto" (or absent) defers to
+	// the inventory's own verdict, which is what every run did before the knob existed; "mono"/"osc"
+	// assert it and drop the lights that contradict the assertion. Validated at the API against
+	// inspect.ParseColorChoice. See inspect.ResolveColorModel for why an assertion is needed at all.
+	ColorModel string `json:"color_model,omitempty"`
+
 	// FocalMM / PixelUm are THIS session's optics, overriding the engine's configured rig for plate
 	// solving (and therefore SPCC colour calibration). Needed whenever the frames were not shot on
 	// the configured telescope: a camera lens has no focal length in the FITS header, so without
@@ -354,6 +361,17 @@ func (r RunRequest) inputRoots() []string {
 // inherited one it checks against the frames' own header (pipeline/solveoptics.go).
 func (r RunRequest) opticsExplicit() bool { return r.FocalMM > 0 || r.PixelUm > 0 }
 
+// colorChoice is the validated colour knob. An unparsable value cannot reach the pipeline — the API
+// rejects it with 400 and Enqueue refuses it again for the paths that bypass the API (CLI, Restart) —
+// so falling back to auto here is a belt-and-braces default, never a silent reinterpretation.
+func (r RunRequest) colorChoice() inspect.ColorChoice {
+	c, err := inspect.ParseColorChoice(r.ColorModel)
+	if err != nil {
+		return inspect.ChoiceAuto
+	}
+	return c
+}
+
 // reuseSessions converts the request's session allow-list to the set the planner expects: nil means
 // "all discovered sessions", a populated set restricts to the chosen ids.
 func (r RunRequest) reuseSessions() map[int64]bool {
@@ -476,6 +494,11 @@ func (m *Manager) Enqueue(ctx context.Context, req RunRequest) (int64, error) {
 				return 0, fmt.Errorf("invalid params: %w", perr)
 			}
 		}
+	}
+	// The colour knob is a closed enum. The API already rejects a bad value with 400; this also covers
+	// the paths that never pass through it (the CLI, and Restart replaying a stored request).
+	if _, err := inspect.ParseColorChoice(req.ColorModel); err != nil {
+		return 0, err
 	}
 	// A referenced mosaic plan must exist NOW — a stale id must fail the request, not the worker.
 	if req.MosaicPlanID != 0 {
@@ -1241,7 +1264,8 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: graxRunner, Starnet: starRunner, DenoiseScale: m.cfg.DenoiseScale, ChannelParallel: m.cfg.ChannelParallel,
 			Supervisor: superRunner, JobID: id, FinishIterStore: m.store, FinishPriors: m.priors(), Goal: p.Goal, // opt-in local-AI-agent finish
 			Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), CatalogDir: m.cfg.SirilCatalogDir, FilterMapping: p.FilterMap,
-			Catalog: m.store, CalibExclude: p.CalibExclude, ForceCalibration: p.ForceCalibration,
+			ColorChoice: p.colorChoice(),
+			Catalog:     m.store, CalibExclude: p.CalibExclude, ForceCalibration: p.ForceCalibration,
 			OnProgress: pipeProg, Steer: steer, Confirm: confirm,
 		})
 		if err != nil {
@@ -1282,7 +1306,7 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: graxRunner, Starnet: starRunner, DenoiseScale: m.cfg.DenoiseScale, ChannelParallel: m.cfg.ChannelParallel,
 			Supervisor: superRunner, JobID: id, FinishIterStore: m.store, FinishPriors: m.priors(), Goal: p.Goal,
 			Library: m.store, LibraryDir: m.cfg.LibraryDir,
-			FilterMapping: p.FilterMap, Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
+			FilterMapping: p.FilterMap, ColorChoice: p.colorChoice(), Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
 			Catalog: m.store, CalibExclude: p.CalibExclude, ExcludeSets: p.ExcludeSets, ForceCalibration: p.ForceCalibration,
 			OnProgress: pipeProg, Steer: steer, Confirm: confirm,
 		}
@@ -1309,7 +1333,7 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			Supervisor: superRunner,                                                          // opt-in local-AI-agent finish (nil → standard finish)
 			JobID:      id, FinishIterStore: m.store, FinishPriors: m.priors(), Goal: p.Goal, // persist supervised iterations against this job
 			Library: m.store, LibraryDir: m.cfg.LibraryDir, OnProgress: pipeProg, Steer: steer, Confirm: confirm,
-			FilterMapping: p.FilterMap, Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
+			FilterMapping: p.FilterMap, ColorChoice: p.colorChoice(), Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
 			Catalog:          m.store, // always record the run so its frames become reusable
 			CalibExclude:     p.CalibExclude,
 			ExcludeSets:      p.ExcludeSets,
@@ -1407,7 +1431,7 @@ func (m *Manager) executeRerun(ctx context.Context, id int64, p RunRequest, pres
 		InputDir: p.Path, InputDirs: p.inputRoots(), OutputDir: m.cfg.OutputDir, WorkDir: m.cfg.WorkDir, Runner: m.runner,
 		Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: grax, Starnet: star, DenoiseScale: m.cfg.DenoiseScale,
 		JobID: id, Library: m.store, LibraryDir: m.cfg.LibraryDir, OnProgress: pipeProg,
-		FilterMapping: p.FilterMap, Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
+		FilterMapping: p.FilterMap, ColorChoice: p.colorChoice(), Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
 		Catalog: m.store, CalibExclude: p.CalibExclude, ForceCalibration: p.ForceCalibration,
 	}
 	if m.cfg.ReuseEnabled && !p.ReuseDisabled {

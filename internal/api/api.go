@@ -398,6 +398,12 @@ func (s *Server) createJob(w http.ResponseWriter, r *http.Request) {
 			badRequest(w, err.Error())
 			return
 		}
+		// The colour knob is a closed enum: a typo must fail the request rather than silently falling
+		// back to auto and stacking the half of the folder the user did not ask for.
+		if _, err := inspect.ParseColorChoice(req.ColorModel); err != nil {
+			badRequest(w, err.Error())
+			return
+		}
 	}
 	id, err := s.mgr.Enqueue(r.Context(), req)
 	if err != nil {

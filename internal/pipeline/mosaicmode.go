@@ -46,6 +46,10 @@ func ProcessMosaic(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The user's explicit mono/colour assertion narrows the lights first (no-op for auto).
+	if err := inspect.ResolveColorModel(inv, opts.ColorChoice); err != nil {
+		return nil, err
+	}
 	// Each panel is stacked by the deep-sky machinery, so a one-shot-color mosaic works the same way a
 	// colour deep-sky run does: every panel becomes one RGB channel. Reprojection and the feathered
 	// blend operate on whole images and never look at the filter. Only a MIXED folder still drops

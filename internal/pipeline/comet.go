@@ -38,6 +38,11 @@ func ProcessComet(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The user's explicit mono/colour assertion narrows the lights first (no-op for auto). Comet is the
+	// one mode that keeps a mixed folder whole, so the knob is also the only way to split one here.
+	if err := inspect.ResolveColorModel(inv, opts.ColorChoice); err != nil {
+		return nil, err
+	}
 	// Comet mode keeps every light, mono or colour. It never needed the deep-sky path's Bayer veto:
 	// the spurious-BAYERPAT case (an older ASICAP capture of a MONO camera behind a filter wheel) is
 	// resolved during inspection, so a pattern that survives to here is real. A one-shot-color comet

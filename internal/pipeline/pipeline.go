@@ -129,6 +129,10 @@ type Options struct {
 	// FilterMapping is an optional user override (detected/known filter → chosen channel; "" or
 	// "ignore" excludes it), applied during the scan.
 	FilterMapping map[string]string
+	// ColorChoice is the user's answer to "monochrome or colour stack?", asserted on the run request.
+	// The zero value ("") and inspect.ChoiceAuto both defer to the scan's own verdict, which is what
+	// every run did before the knob existed. See inspect.ResolveColorModel.
+	ColorChoice inspect.ColorChoice
 	// Solve / Spcc are the plate-solve + SPCC inputs for color calibration (from config).
 	Solve siril.SolveOptions
 	Spcc  siril.SpccOptions
@@ -429,6 +433,11 @@ func Process(ctx context.Context, opts Options) (*Result, error) {
 	scanOpts.ExcludeSets = opts.ExcludeSets
 	inv, err := opts.scanInputs(ctx, scanOpts) // remote (no downloads) when a low-disk Stager is set, else local
 	if err != nil {
+		return nil, err
+	}
+	// The user's explicit mono/colour assertion narrows the lights first (no-op for auto), so the
+	// verdict below is never Mixed when they answered the question. See inspect.ResolveColorModel.
+	if err := inspect.ResolveColorModel(inv, opts.ColorChoice); err != nil {
 		return nil, err
 	}
 	// One-shot-color captures stack through this same pipeline as a SINGLE channel named RGB (inspect

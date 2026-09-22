@@ -212,6 +212,12 @@ func reconstructStackContext(ctx context.Context, opts Options, outDir, workRun 
 	if err != nil {
 		return nil, fmt.Errorf("scan inputs: %w", err)
 	}
+	// Mirror Process's colour handling exactly, starting with the run's own mono/colour assertion —
+	// a re-run that resolved the knob differently would rebuild the context from the other half of
+	// the folder. No-op for auto.
+	if err := inspect.ResolveColorModel(inv, opts.ColorChoice); err != nil {
+		return nil, fmt.Errorf("resolve color model: %w", err)
+	}
 	// Mirror Process's colour handling exactly: a one-shot-color run re-stacks as its single RGB
 	// channel, and only a mixed folder drops frames. Dropping unconditionally here meant a per-stage
 	// re-run of a colour run rebuilt its context with NO frames at all.

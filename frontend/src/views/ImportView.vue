@@ -6,6 +6,7 @@ import { useBrowseStore } from "@/stores/browse";
 import { useJobsStore } from "@/stores/jobs";
 import { usePresetsStore } from "@/stores/presets";
 import { useMosaicStore } from "@/stores/mosaic";
+import { useEquipmentStore } from "@/stores/equipment";
 import { MODES } from "@/constants/modes";
 import { useCaptureSummary } from "@/composables/useCaptureSummary";
 import { useChannelMapping } from "@/composables/useChannelMapping";
@@ -16,6 +17,7 @@ import FilterChip from "@/components/Common/FilterChip.vue";
 import FileBrowser from "@/components/Common/FileBrowser.vue";
 import Spinner from "@/components/Common/Spinner.vue";
 import CaptureSummary from "@/components/Common/CaptureSummary.vue";
+import RigPanel from "@/components/Common/RigPanel.vue";
 import FilterMappingEditor from "@/components/Common/FilterMappingEditor.vue";
 import ReusePanel from "@/components/Common/ReusePanel.vue";
 import CalibrationPanel from "@/components/Common/CalibrationPanel.vue";
@@ -58,6 +60,7 @@ const router = useRouter();
 const { t } = useI18n();
 const browseStore = useBrowseStore();
 const jobsStore = useJobsStore();
+const equipmentStore = useEquipmentStore();
 
 // Inspect feedback: inspecting = the frame scan over the selected folders (drives the browser's
 // disabled/busy button + banner); inspectError surfaces a failure.
@@ -95,6 +98,11 @@ const formats = ["image", "video", "both"];
 // Milky-Way nightscape render style (foreground composite + linear grade); only shown for milkyway.
 const look = ref("natural");
 const looks = ["natural", "iphone", "deepsky"];
+// Is this a monochrome or a one-shot-colour stack, and through what optics? Both default to "let the
+// engine decide", which is what every run did before these controls existed — see RigPanel.vue.
+const colorModel = ref<"auto" | "mono" | "osc">("auto");
+const focalMm = ref<number | undefined>(undefined);
+const pixelUm = ref<number | undefined>(undefined);
 const palette = ref("natural");
 // Deep-sky colour palettes + the filters each needs. Narrowband palettes are shown but disabled until
 // their OIII/SII data exists (the engine also soft-falls back); natural/mono always apply.
@@ -334,6 +342,7 @@ onMounted(async () => {
   await browseStore.browse();
   rootPath.value = browseStore.path;
   browseStore.loadProcessed(); // mark folders already used in a past processing
+  equipmentStore.load(); // saved rigs prefill this session's optics (cached; no refetch)
 });
 
 async function openDir(path: string) {
@@ -435,6 +444,17 @@ async function onInspect(emitted: string[]) {
 }
 
 const inv = computed(() => browseStore.inventory);
+// A fresh scan carries a fresh verdict, so a choice made against the previous folder must not stick.
+watch(inv, () => {
+  colorModel.value = "auto";
+});
+// Only an assertion that CONTRADICTS the scan is worth sending: agreeing with the verdict changes
+// nothing, and leaving the field off the request keeps the run byte-identical to a pre-knob one.
+const colorModelOverride = computed(() =>
+  colorModel.value !== "auto" && colorModel.value !== inv.value?.color_model
+    ? colorModel.value
+    : undefined,
+);
 const summary = useCaptureSummary(inv);
 const { detectedFilters, mapping, overrides } = useChannelMapping(inv);
 const isDeepskyFamily = computed(
@@ -983,6 +1003,11 @@ function runOpts(): CreateOpts {
     // Freeze the matched-calibration preview with the job so its page can show the included darks/flats/
     // bias and their params (the pipeline still re-matches independently, honoring calibExclude).
     calibPlan: calibPreview.value,
+    // Monochrome-vs-colour assertion (only when it overrides the scan verdict) and THIS session's
+    // optics — without the latter the engine plate-solves at its configured rig's scale.
+    colorModel: colorModelOverride.value,
+    focalMm: focalMm.value,
+    pixelUm: pixelUm.value,
     // Tiled-mosaic run: reference the saved plan (panel labels, expected centers, solve hints).
     mosaicPlanId:
       isMosaicMode.value && mosaicPlanId.value ? mosaicPlanId.value : undefined,
@@ -1315,6 +1340,14 @@ function histChip(exists: boolean): string {
         v-model="mapping"
         :detection="inv.channel_detection"
         :detected-filters="detectedFilters"
+      />
+      <!-- Sensor + optics: the two things the engine otherwise guesses, answerable before launch. -->
+      <RigPanel
+        v-model:color-model="colorModel"
+        v-model:focal-mm="focalMm"
+        v-model:pixel-um="pixelUm"
+        :detected="inv.color_model"
+        :rigs="equipmentStore.setups"
       />
     </div>
 
