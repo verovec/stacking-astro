@@ -50,6 +50,10 @@ export interface FrameSet {
   key: SetKey;
   count: number;
   total_integration_ms: number;
+  // Which clip filter a ONE-SHOT-COLOUR light set was shot through, measured from the pixels by the
+  // engine (internal/inspect/filterset.go) or asserted by the user. Absent on mono sets and wherever
+  // the two measured signals disagreed — see FILTER_SETS in constants/filters.ts.
+  filter_set?: string;
 }
 
 // DetectedRun is one contiguous same-filter block found by signal-based channel detection.
@@ -79,6 +83,9 @@ export interface Inventory {
   // filter and combined), "osc" (one-shot color, stacked as a single RGB channel), or "mixed" (both
   // in one folder, which no single run can stack).
   color_model?: "mono" | "osc" | "mixed";
+  // Per-light-set filter-set verdicts, keyed by the canonical SetKey.ID token. The durable record:
+  // FrameSet.filter_set is its projection and is lost whenever the engine rebuilds its sets.
+  filter_sets?: Record<string, string>;
   // Per-capture-night summary (sorted by night, undated bucket last); absent when nothing is dated.
   sessions?: SessionInfo[];
 }
