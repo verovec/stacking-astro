@@ -3,7 +3,6 @@ import { ref, computed, type Component } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { setLocale } from "@/i18n";
-import { useAgentStore } from "@/stores/agent";
 import AppLogo from "@/components/Common/AppLogo.vue";
 import IconMoon from "@/components/Icons/IconMoon.vue";
 import IconCompassArrow from "@/components/Icons/IconCompassArrow.vue";
@@ -13,7 +12,6 @@ import IconTelescope from "@/components/Icons/IconTelescope.vue";
 import IconCalendar from "@/components/Icons/IconCalendar.vue";
 import IconSolarSystem from "@/components/Icons/IconSolarSystem.vue";
 import IconCamera from "@/components/Icons/IconCamera.vue";
-import IconAgent from "@/components/Icons/IconAgent.vue";
 import IconChevronRight from "@/components/Icons/IconChevronRight.vue";
 import IconX from "@/components/Icons/IconX.vue";
 
@@ -24,10 +22,8 @@ const emit = defineEmits<{ navigate: []; close: [] }>();
 
 const { t, locale } = useI18n();
 const route = useRoute();
-const agent = useAgentStore();
 
-// Top-level destinations. "Processing" stays active for any /processing/* route; the AstroAgent entry is
-// appended only while the local model server is up (mirrors the old top-nav behaviour).
+// Top-level destinations. "Processing" stays active for any /processing/* route.
 type NavLink = { to: string; key: string; prefix?: string; icon: Component };
 const links = computed<NavLink[]>(() => {
   const base: NavLink[] = [
@@ -50,8 +46,6 @@ const links = computed<NavLink[]>(() => {
       icon: IconCamera,
     },
   ];
-  if (agent.available)
-    base.push({ to: "/astroagent", key: "nav.astroAgent", icon: IconAgent });
   return base;
 });
 function isActive(l: NavLink): boolean {

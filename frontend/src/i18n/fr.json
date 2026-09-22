@@ -18,48 +18,11 @@
     "runs": "Traitements",
     "library": "Bibliothèque de calibration",
     "processing": "Traitement",
-    "astroAgent": "AstroAgent",
     "collapse": "Réduire",
     "expand": "Agrandir",
     "mosaic": "Mosaïque",
     "capture": "Capture",
     "logbook": "Journal"
-  },
-  "astroAgent": {
-    "title": "AstroAgent",
-    "subtitle": "Votre copilote d'astrophotographie — interrogez-le sur vos données, le ciel et votre matériel, et laissez-le exécuter des tâches pour vous (vous approuvez chaque action).",
-    "modelLabel": "Modèle",
-    "modelMissing": "Aucun modèle configuré. Définissez ASTRO_LLM_MODEL (ou choisissez-en un ci-dessus) pour discuter.",
-    "placeholder": "Posez une question au modèle, ou joignez une image et décrivez ce que vous voulez…",
-    "attach": "Joindre une image",
-    "removeImage": "Retirer l'image",
-    "send": "Envoyer",
-    "sending": "Envoi…",
-    "sendHint": "⌘/Ctrl + Entrée pour envoyer",
-    "thinking": "AstroAgent réfléchit…",
-    "clear": "Effacer",
-    "empty": "Aucun message pour l'instant. Posez une question ou joignez une image pour tester le modèle.",
-    "notRunning": "L'agent local n'est pas démarré.",
-    "notRunningHint": "Démarrez le serveur du modèle de vision local, puis cette page se reconnecte automatiquement :",
-    "newChat": "Nouvelle discussion",
-    "history": "Conversations",
-    "noChats": "Aucune conversation.",
-    "deleteChat": "Supprimer la conversation",
-    "copy": "Copier",
-    "copied": "Copié",
-    "stats": {
-      "title": "Statistiques mesurées",
-      "background": "Fond de ciel",
-      "cast": "Dominante",
-      "clipping": "Écrêtage (noir/blanc)",
-      "gradient": "Gradient",
-      "trail": "Traînée",
-      "neutral": "neutre",
-      "green": "verte",
-      "magenta": "magenta",
-      "detected": "détectée",
-      "none": "aucune"
-    }
   },
   "agent": {
     "activity": {
@@ -1417,23 +1380,6 @@
         "backup": {
           "title": "Sauvegarde et restauration",
           "body": "Sauvegarde la base et l’état côté navigateur (favoris, configurations, conversations). Les secrets de votre .env sont volontairement exclus. Restaurer la base est destructif : cela remplace ce qui s’y trouve."
-        }
-      }
-    },
-    "astroagent": {
-      "title": "AstroAgent",
-      "steps": {
-        "chat": {
-          "title": "Un modèle local sur vos données",
-          "body": "Posez des questions sur vos acquisitions, vos traitements, le ciel et votre matériel. Le modèle tourne sur votre machine — rien n’est envoyé ailleurs."
-        },
-        "tools": {
-          "title": "Il peut aller voir",
-          "body": "Il peut lire vos inventaires et vos traitements, consulter le ciel de ce soir, et analyser une image que vous lui joignez pour en faire une critique mesurée plutôt qu’un avis vague."
-        },
-        "confirm": {
-          "title": "Rien ne se fait sans vous",
-          "body": "Toute action qui modifierait quelque chose — lancer un traitement, réajuster une finition — demande confirmation. Les traitements supervisés apparaissent aussi ici comme des conversations que vous pouvez orienter pendant qu’ils travaillent."
         }
       }
     }

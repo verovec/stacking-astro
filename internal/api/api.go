@@ -18,7 +18,6 @@ import (
 	"github.com/klauspost/compress/gzhttp"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/verove-jordan/astronomy/internal/agent"
 	"github.com/verove-jordan/astronomy/internal/buildinfo"
 	"github.com/verove-jordan/astronomy/internal/canopy"
 	"github.com/verove-jordan/astronomy/internal/capture"
@@ -60,8 +59,7 @@ type Server struct {
 	darksky        *darksky.Finder
 	weather        *weather.Provider
 	s3conn         *s3conn.Service       // UI-managed S3 connections; nil when encryption is unavailable
-	agent          *agent.Runner         // tool-using AstroAgent (drives the local model over the app's tools)
-	agentTurns     *turns.Sessions       // live turns (agent chat + supervised-job conversations), streamed over SSE
+	agentTurns     *turns.Sessions       // live turns (supervised-job conversations), streamed over SSE
 	toolHealth     *toolhealth.Checker   // environment health (tool deep probes + catalogue presence)
 	s3cache        *s3Cache              // reuses minio clients + memoizes listings so browsing stays fast
 	sirilRunner    *siril.Runner         // one-off synchronous Siril work (star-annotation re-solve); nil-safe for tests
@@ -77,7 +75,7 @@ type Server struct {
 }
 
 // New builds the API server. hub is the shared turn transport (also handed to the job manager) so a
-// supervised finish and the AstroAgent chat stream over one SSE mechanism.
+// supervised finish streams over one SSE mechanism.
 func New(mgr *job.Manager, st *store.Store, cfg *config.Config, hub *turns.Sessions) *Server {
 	lp := lightpollution.New(cfg)
 	cp := canopy.New(cfg)
@@ -115,7 +113,6 @@ func New(mgr *job.Manager, st *store.Store, cfg *config.Config, hub *turns.Sessi
 	// The sequencer lives here rather than in the device server: a session is a statement about a
 	// target and a night, so its state belongs with the database.
 	s.capture = capture.NewRunner(capture.NewClient(cfg.DeviceAddr), captureRecorder{store: st})
-	s.buildAgent()
 	return s
 }
 
@@ -277,8 +274,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sky/weather/grid", s.skyWeatherGrid)
 	mux.HandleFunc("GET /api/sky/weather/grid/frames", s.skyWeatherGridFrames)
 	mux.HandleFunc("GET /api/sky/weather/tiles/{metric}/{time}/{z}/{x}/{y}", s.skyWeatherTile)
-	mux.HandleFunc("GET /api/agent/status", s.agentStatus)
-	mux.HandleFunc("POST /api/agent/chat", s.agentChat)
 	mux.HandleFunc("GET /api/agent/turns/{id}/events", s.agentTurnEvents)
 	mux.HandleFunc("POST /api/agent/turns/{id}/confirm", s.agentTurnConfirm)
 	mux.HandleFunc("POST /api/agent/turns/{id}/message", s.agentTurnMessage)
