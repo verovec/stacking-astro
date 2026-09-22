@@ -49,8 +49,6 @@ type Event struct {
 	PeakRSSBytes int64   `json:"peak_rss_bytes,omitempty"` // job-wide peak engine memory
 	CPUCores     int     `json:"cpu_cores,omitempty"`      // host core count (context for cpu_percent)
 
-	// Live byte progress for an S3 transfer job (streamed, never persisted — the Progress int is).
-
 	// Session attributes the event to one capture night ("YYYY-MM-DD") inside a cross-session
 	// channel step — the UI's per-night progress rows key on it. "" = run-level.
 	Session string `json:"session,omitempty"`
@@ -850,8 +848,8 @@ func (m *Manager) run(ctx context.Context, id int64) {
 	}
 
 	// Serialize against any other job whose input roots overlap — ALL of them, not only the primary
-	// (a transfer/free over a secondary multi-select folder must not race the stack), and
-	// prefix-aware (a parent-folder transfer conflicts with a child-folder run).
+	// (a job over a secondary multi-select folder must not race the stack), and prefix-aware
+	// (a parent-folder job conflicts with a child-folder run).
 	unlock := m.lockTarget(p.inputRoots()...)
 	defer unlock()
 
@@ -874,9 +872,8 @@ func (m *Manager) run(ctx context.Context, id int64) {
 
 	res, runErr := m.execute(runCtx, id, turnID, job.Kind, p, cp.pipelineResume(), gate)
 
-	// A cooperative mid-stack pause returns *PausedError; a manual pause during a standalone transfer
-	// returns transfer.ErrPaused. Either parks the job in the resumable paused state (Cause=manual, so the
-	// auto-resume sweep never touches it) rather than failing it.
+	// A cooperative mid-stack pause returns *PausedError: park the job in the resumable paused state
+	// rather than failing it.
 	if runErr != nil {
 		var pe *pipeline.PausedError
 		if errors.As(runErr, &pe) {
