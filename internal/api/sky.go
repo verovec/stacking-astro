@@ -28,7 +28,7 @@ type skySearchResult struct {
 }
 
 // skySearch does free-text lookup over the WHOLE merged deep-sky catalogue, so the mosaic planner can
-// target any object rather than only the ones tonight's altitude-filtered ranked list happens to carry.
+// target any object by name or alias.
 // GET /api/sky/search?q=&limit=
 func (s *Server) skySearch(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -47,7 +47,7 @@ func (s *Server) skySearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // skySearchResultFor projects a catalogue record onto the wire shape, reusing skyplan.DeriveType so the
-// type vocabulary matches the Tonight list exactly.
+// type vocabulary stays the skyplan-derived one.
 func skySearchResultFor(rec skycat.Record) skySearchResult {
 	res := skySearchResult{
 		Name:        rec.Name,
