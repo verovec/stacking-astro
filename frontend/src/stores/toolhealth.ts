@@ -3,11 +3,12 @@ import { ref, computed } from "vue";
 import { apiGet } from "@/services/api";
 import type { Environment } from "@/types";
 
-// Environment health (GET /api/environment): deep tool probes + plate-solve catalogue presence, with
+// Engine tool health (GET /api/environment): deep tool probes + plate-solve catalogue presence, with
 // human-readable run-impacting warnings — so the UI can warn BEFORE a run instead of the user
 // diagnosing a silently-degraded image afterwards. Cached here (the backend caches ~5 min itself);
-// refresh() re-asks and un-dismisses.
-export const useEnvironmentStore = defineStore("environment", () => {
+// refresh() re-asks and un-dismisses. (Named after the backend package internal/toolhealth — this is
+// NOT the removed observation-planning "environment"; the endpoint is alive and load-bearing.)
+export const useToolHealthStore = defineStore("toolhealth", () => {
   const report = ref<Environment | null>(null);
   const loading = ref(false);
   const error = ref("");

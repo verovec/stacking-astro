@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"encoding/json"
 	"net/http"
@@ -15,10 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/verove-jordan/astronomy/internal/config"
-	"github.com/verove-jordan/astronomy/internal/darksky"
 	"github.com/verove-jordan/astronomy/internal/fits/fitstest"
 	"github.com/verove-jordan/astronomy/internal/inspect"
-	"github.com/verove-jordan/astronomy/internal/lightpollution"
 )
 
 func TestWithin(t *testing.T) {
@@ -122,38 +119,6 @@ func TestPreview_FITSBufferAndConfinement(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(data, "clip.ser"), []byte("x"), 0o644))
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/preview?path="+filepath.Join(data, "clip.ser"), nil))
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-	})
-}
-
-type stubScanner struct{}
-
-func (stubScanner) ScanArea(_ context.Context, _ lightpollution.Bbox, _, _ int) []lightpollution.Cell {
-	return []lightpollution.Cell{{Lat: 44, Lon: 4, SQM: 21.7, Bortle: 2}}
-}
-
-func TestDarkSites_AreaAndValidation(t *testing.T) {
-	s := &Server{
-		cfg:     &config.Config{LatDeg: 48, LonDeg: 2},
-		darksky: darksky.New(stubScanner{}, nil, 4000, 10),
-	}
-	h := s.Handler()
-
-	t.Run("returns ranked candidates for a valid area", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-			"/api/sky/darksites?min_lat=43&min_lon=3&max_lat=45&max_lon=5&max_bortle=4", nil))
-		require.Equal(t, http.StatusOK, rec.Code)
-		var got darksky.Result
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
-		require.Equal(t, 1, got.Count)
-		assert.Equal(t, 21.7, got.Candidates[0].SQM)
-	})
-
-	t.Run("rejects an inverted/empty area", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-			"/api/sky/darksites?min_lat=45&min_lon=5&max_lat=43&max_lon=3", nil))
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 }

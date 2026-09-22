@@ -132,40 +132,6 @@ graxpert-service-status:
 inspect DIR:
     go run ./cmd/astrostack inspect "{{DIR}}"
 
-# Build the OFFLINE light-pollution atlas from the David Lorenz model (accurate, propagation-modeled sky
-# brightness — rural France reads Bortle 2-3, not 4-5) into the data dir. Downloaded once; every per-site /
-# finder / map query is then fully offline. REGION: france (default) | europe | world (or use the CLI's
-# --bbox for a custom area). Power-user alternative (pre-gridded URL / Falchi GeoTIFF via gdal): the script.
-update-light-pollution-data REGION="france":
-    go run ./cmd/astrostack lightpollution-atlas --region "{{REGION}}"
-
-# Legacy/power-user offline atlas via a pre-gridded URL or a Falchi/VIIRS GeoTIFF (needs gdal+jq); configure
-# ASTRO_LIGHTPOLLUTION_ATLAS_URL or ..._TIFF_URL in .env. See scripts/update-light-pollution.sh.
-update-light-pollution-data-custom:
-    @scripts/update-light-pollution.sh
-
-# Build the OFFLINE tree-canopy-height atlas for the dark-sky finder's tree-aware horizon (a spot hemmed in
-# by forest then scores its low southern horizon correctly). Point ASTRO_CANOPY_ATLAS_TIFF_URL at an ETH/Meta
-# canopy-height GeoTIFF (or /vsicurl/ URL) in .env; optional ASTRO_CANOPY_BBOX + ASTRO_CANOPY_RES_DEG (default
-# ~90 m). Needs gdal + jq. Optional + soft-fails; restart the engine to load it. See scripts/update-canopy.sh.
-update-canopy-data:
-    @scripts/update-canopy.sh
-
-# Rebuild the frontend sky-map dataset (frontend/src/assets/skymap.json): the star + constellation-line
-# figures the GoTo "Find it in the sky" map renders. Fetches the HYG catalogue + Stellarium constellations
-# (network at build time ONLY); the app then renders the sky fully offline. MAG = faintest star (default 6.0
-# = naked-eye limit). Re-run only to refresh the data or change density; commit the regenerated JSON.
-gen-skymap-data MAG="6.0":
-    go run ./cmd/astrostack skymap-data --mag "{{MAG}}"
-
-# One-time download of the planet/moon surface maps the 3-D solar-system page (/solarsystem) draws
-# with, into <ASTRO_WORK_DIR>/solarsystem (~20 MB at 2k, ~200 MB at 8k). Optional and idempotent:
-# every body whose map is absent is shaded procedurally, so the page works fully without this — the
-# maps only make it photographic. RES = 2k (default) or 8k. Source: Solar System Scope, CC BY 4.0;
-# the page credits it in its legend (see docs/third-party.md).
-download-planet-textures RES="2k":
-    @scripts/download-planet-textures.sh "{{RES}}"
-
 # Rebuild the embedded deep star catalogue (internal/deepstars/catalogue/hyg_mag9.csv.gz) the
 # star-annotation endpoint uses for name labels (proper/Bayer/Flamsteed/HD). Fetches the HYG database
 # (network at generation time ONLY; same source pin as gen-skymap-data). MAG = faintest star kept.

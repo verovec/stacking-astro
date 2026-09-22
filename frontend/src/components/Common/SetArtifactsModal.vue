@@ -111,7 +111,7 @@ function reasonText(r: SetQaReason): string {
   });
 }
 
-// Severity styling: HIGH score = bad (inverse of the shared quality scoreTier palette).
+// Severity styling: HIGH score = bad.
 function severityPill(s: SetQaSet): string {
   if (!s.measured)
     return "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400";

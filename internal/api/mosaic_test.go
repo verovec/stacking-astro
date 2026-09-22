@@ -14,7 +14,6 @@ import (
 
 	"github.com/verove-jordan/astronomy/internal/config"
 	"github.com/verove-jordan/astronomy/internal/mosaicplan"
-	"github.com/verove-jordan/astronomy/internal/skyplan"
 )
 
 // mosaicTestServer is skyTestServer with M31 in the catalogue — the planner golden target (the
@@ -35,7 +34,7 @@ func mosaicTestServer(t *testing.T) *Server {
 		SensorWpx:       4656,
 		SensorHpx:       3520,
 	}
-	return &Server{cfg: cfg, planner: skyplan.New(dir)}
+	return &Server{cfg: cfg}
 }
 
 type mosaicPreviewResp struct {

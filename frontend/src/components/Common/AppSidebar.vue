@@ -4,10 +4,7 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { setLocale } from "@/i18n";
 import AppLogo from "@/components/Common/AppLogo.vue";
-import IconMoon from "@/components/Icons/IconMoon.vue";
 import IconMosaic from "@/components/Icons/IconMosaic.vue";
-import IconCalendar from "@/components/Icons/IconCalendar.vue";
-import IconSolarSystem from "@/components/Icons/IconSolarSystem.vue";
 import IconCamera from "@/components/Icons/IconCamera.vue";
 import IconChevronRight from "@/components/Icons/IconChevronRight.vue";
 import IconX from "@/components/Icons/IconX.vue";
@@ -24,10 +21,7 @@ const route = useRoute();
 type NavLink = { to: string; key: string; prefix?: string; icon: Component };
 const links = computed<NavLink[]>(() => {
   const base: NavLink[] = [
-    { to: "/tonight", key: "nav.tonight", icon: IconMoon },
     { to: "/mosaic", key: "nav.mosaic", icon: IconMosaic },
-    { to: "/calendar", key: "nav.calendar", icon: IconCalendar },
-    { to: "/solarsystem", key: "nav.solarSystem", icon: IconSolarSystem },
     {
       to: "/processing",
       key: "nav.processing",

@@ -17,78 +17,42 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/verove-jordan/astronomy/internal/buildinfo"
-	"github.com/verove-jordan/astronomy/internal/canopy"
 	"github.com/verove-jordan/astronomy/internal/config"
-	"github.com/verove-jordan/astronomy/internal/darksky"
-	"github.com/verove-jordan/astronomy/internal/elevation"
 	"github.com/verove-jordan/astronomy/internal/inspect"
 	"github.com/verove-jordan/astronomy/internal/job"
-	"github.com/verove-jordan/astronomy/internal/lightpollution"
 	"github.com/verove-jordan/astronomy/internal/mode"
 	"github.com/verove-jordan/astronomy/internal/pipeline"
 	"github.com/verove-jordan/astronomy/internal/preview"
-	"github.com/verove-jordan/astronomy/internal/routing"
 	"github.com/verove-jordan/astronomy/internal/siril"
-	"github.com/verove-jordan/astronomy/internal/skyevents"
-	"github.com/verove-jordan/astronomy/internal/skyplan"
 	"github.com/verove-jordan/astronomy/internal/store"
 	"github.com/verove-jordan/astronomy/internal/thumb"
 	"github.com/verove-jordan/astronomy/internal/toolhealth"
 	"github.com/verove-jordan/astronomy/internal/turns"
-	"github.com/verove-jordan/astronomy/internal/weather"
 )
 
 // Server holds the API dependencies.
 type Server struct {
-	mgr            *job.Manager
-	store          *store.Store
-	cfg            *config.Config
-	scanCache      *inspect.ScanCache
-	planner        *skyplan.Planner
-	events         *skyevents.Engine
-	lightpollution *lightpollution.Provider
-	elevation      *elevation.Provider
-	canopy         *canopy.Provider
-	darksky        *darksky.Finder
-	weather        *weather.Provider
-	agentTurns     *turns.Sessions       // live turns (supervised-job conversations), streamed over SSE
-	toolHealth     *toolhealth.Checker   // environment health (tool deep probes + catalogue presence)
-	sirilRunner    *siril.Runner         // one-off synchronous Siril work (star-annotation re-solve); nil-safe for tests
-	starsFlight    singleflight.Group // dedupes concurrent star-annotation computes per run dir
+	mgr         *job.Manager
+	store       *store.Store
+	cfg         *config.Config
+	scanCache   *inspect.ScanCache
+	agentTurns  *turns.Sessions     // live turns (supervised-job conversations), streamed over SSE
+	toolHealth  *toolhealth.Checker // environment health (tool deep probes + catalogue presence)
+	sirilRunner *siril.Runner       // one-off synchronous Siril work (star-annotation re-solve); nil-safe for tests
+	starsFlight singleflight.Group  // dedupes concurrent star-annotation computes per run dir
 }
 
 // New builds the API server. hub is the shared turn transport (also handed to the job manager) so a
 // supervised finish streams over one SSE mechanism.
 func New(mgr *job.Manager, st *store.Store, cfg *config.Config, hub *turns.Sessions) *Server {
-	lp := lightpollution.New(cfg)
-	cp := canopy.New(cfg)
-	elev := elevation.New(cfg, cp)
-	rt := routing.New(cfg)
-	wx := weather.New(cfg)
-	dk := darksky.New(lp, elev, cfg.DarkSkyMaxCells, cfg.HorizonCandidates,
-		darksky.WithScore(darksky.ScoreConfig{
-			DarkWeight:       cfg.DarkSkyDarkWeight,
-			SouthWeight:      cfg.DarkSkySouthWeight,
-			MaxSouthBlockDeg: cfg.DarkSkyMaxSouthBlockDeg,
-			WeatherWeight:    cfg.DarkSkyWeatherWeight,
-		}),
-		darksky.WithRouter(rt),
-		darksky.WithWeather(wx, cfg.DarkSkyWeatherProbes))
 	s := &Server{
-		mgr:            mgr,
-		store:          st,
-		cfg:            cfg,
-		scanCache:      inspect.NewScanCache(),
-		planner:        skyplan.New(cfg.SirilCatalogDir),
-		events:         skyevents.New(cfg),
-		lightpollution: lp,
-		elevation:      elev,
-		canopy:         cp,
-		darksky:        dk,
-		weather:        wx,
-		agentTurns:     hub,
-		toolHealth:     toolhealth.New(cfg),
-		sirilRunner:    siril.New(cfg.SirilBin, siril.Limits{MaxCPUs: cfg.MaxCPUs, MemRatio: cfg.SirilMemRatio, Nice: cfg.SirilNice}),
+		mgr:         mgr,
+		store:       st,
+		cfg:         cfg,
+		scanCache:   inspect.NewScanCache(),
+		agentTurns:  hub,
+		toolHealth:  toolhealth.New(cfg),
+		sirilRunner: siril.New(cfg.SirilBin, siril.Limits{MaxCPUs: cfg.MaxCPUs, MemRatio: cfg.SirilMemRatio, Nice: cfg.SirilNice}),
 	}
 	return s
 }
@@ -130,9 +94,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/jobs/{id}/stars", s.getStars)
 	mux.HandleFunc("GET /api/jobs/{id}/scene3d", s.getScene3D)
 	mux.HandleFunc("GET /api/galaxy/points", s.getGalaxyPoints)
-	mux.HandleFunc("GET /api/solarsystem/bodies", s.solarSystemBodies)
-	mux.HandleFunc("GET /api/solarsystem/state", s.solarSystemState)
-	mux.HandleFunc("GET /api/solarsystem/texture", s.solarSystemTexture)
 	mux.HandleFunc("GET /api/jobs/{id}/iterations", s.jobIterations)
 	mux.HandleFunc("GET /api/jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /api/series", s.createSeries)
@@ -145,10 +106,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/file", s.serveFile)
 	mux.HandleFunc("GET /api/preview", s.previewFile)
 	mux.HandleFunc("GET /api/thumb", s.serveThumb)
-	mux.HandleFunc("GET /api/sky/targets", s.skyTargets)
-	mux.HandleFunc("GET /api/sky/events", s.skyEvents)
-	mux.HandleFunc("GET /api/sky/series", s.skyEventSeries)
-	mux.HandleFunc("GET /api/sky/geocode", s.geocode)
 	mux.HandleFunc("GET /api/equipment", s.listEquipment)
 	mux.HandleFunc("POST /api/equipment", s.saveEquipment)
 	mux.HandleFunc("PUT /api/equipment/{id}", s.updateEquipment)
@@ -166,19 +123,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/local/drives", s.localDrives)
 	mux.HandleFunc("GET /api/local/sources", s.localSources)
 	mux.HandleFunc("GET /api/local/browse", s.localBrowse)
-	mux.HandleFunc("GET /api/sky/point", s.skyPoint)
-	mux.HandleFunc("GET /api/sky/lightpollution", s.lightPollution)
-	mux.HandleFunc("GET /api/sky/lightpollution/atlas", s.atlasStatus)
-	mux.HandleFunc("POST /api/sky/lightpollution/atlas", s.buildAtlas)
-	mux.HandleFunc("GET /api/sky/lightpollution/tiles/{z}/{x}/{y}", s.lightPollutionTile)
-	mux.HandleFunc("GET /api/sky/darksites", s.darkSites)
-	mux.HandleFunc("GET /api/sky/nights", s.skyNights)
-	mux.HandleFunc("GET /api/sky/canopy/atlas", s.canopyAtlasStatus)
-	mux.HandleFunc("POST /api/sky/canopy/atlas", s.canopyBuildAtlas)
-	mux.HandleFunc("GET /api/sky/weather", s.skyWeather)
-	mux.HandleFunc("GET /api/sky/weather/grid", s.skyWeatherGrid)
-	mux.HandleFunc("GET /api/sky/weather/grid/frames", s.skyWeatherGridFrames)
-	mux.HandleFunc("GET /api/sky/weather/tiles/{metric}/{time}/{z}/{x}/{y}", s.skyWeatherTile)
 	mux.HandleFunc("GET /api/agent/turns/{id}/events", s.agentTurnEvents)
 	mux.HandleFunc("POST /api/agent/turns/{id}/confirm", s.agentTurnConfirm)
 	mux.HandleFunc("POST /api/agent/turns/{id}/message", s.agentTurnMessage)

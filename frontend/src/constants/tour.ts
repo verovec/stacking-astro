@@ -8,11 +8,6 @@
 // from the same pair, so there is exactly one place to add a step and nothing to keep in sync.
 
 export const TOURS: Record<string, readonly string[]> = {
-  // Planner
-  tonight: ["targets", "score", "skymap", "weather", "darksky", "optics"],
-  calendar: ["months", "kinds", "event"],
-  solarsystem: ["scene", "time", "scale", "bodies", "legend"],
-
   // Capture planning
   mosaic: ["plan", "panels", "progress"],
 

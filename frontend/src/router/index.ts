@@ -5,24 +5,9 @@ const router = createRouter({
   routes: [
     { path: "/", redirect: { name: "import" } },
     {
-      path: "/tonight",
-      name: "tonight",
-      component: () => import("@/views/TonightView.vue"),
-    },
-    {
       path: "/mosaic",
       name: "mosaic",
       component: () => import("@/views/MosaicView.vue"),
-    },
-    {
-      path: "/calendar",
-      name: "calendar",
-      component: () => import("@/views/CalendarView.vue"),
-    },
-    {
-      path: "/solarsystem",
-      name: "solarsystem",
-      component: () => import("@/views/SolarSystemView.vue"),
     },
     // The "Processing" hub: one page, six tabs as child routes. Names are preserved from the old flat
     // routes so existing `router.push({ name: "job" })` calls keep working.

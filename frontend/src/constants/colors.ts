@@ -98,18 +98,8 @@ export const NIGHT_SKY = {
   skyGlow: "rgba(38, 38, 44, 0.5)", // subtle grey lift from the top (depth), fades to transparent
 } as const;
 
-// Tonight altitude chart + polar sky map (ECharts canvases — never referenced in templates).
-export const CHART_GRID = "#1f2937";
-export const CHART_ALT_LINE = "#818cf8"; // brand-400
-export const CHART_ALT_FILL = "#6366f1"; // brand-500
-export const CHART_DARK_BAND = "rgba(99,102,241,0.12)";
-export const CHART_HORIZON = "#64748b";
-export const CHART_MINALT = "#f59e0b";
-export const CHART_TRANSIT = "#22c55e";
-export const CHART_NOW = "#e11d48";
-export const CHART_SUN = "#fbbf24"; // amber-400 (sun curve + sunset/sunrise)
-export const CHART_MOON = "#cbd5e1"; // slate-300 (moon curve + moonrise/moonset)
-export const MAP_SELECTED = "#f8fafc"; // near-white ring + label for the selected target on the sky map
+// Selected-overlay emphasis on the Aladin sky view (mosaic planner's selected tile outline).
+export const MAP_SELECTED = "#f8fafc"; // near-white ring
 
 // Interactive GoTo sky map (raw canvas — never referenced in templates). A deep night sky, faint
 // constellation "bars", the target star glowing amber, and Moon/planet landmark hues.
@@ -131,14 +121,6 @@ export const SKY_MAP = {
   planet: "#fbbf24", // amber planet dot + label
   milkyWay: "#b9c7e4", // faint galactic band fill (alpha scaled by strip depth × brightness at draw time)
 } as const;
-
-// Score-tier hexes for the polar sky-map markers (mirror scoreTierBar in constants/styles.ts).
-export const SCORE_TIER_HEX: Record<string, string> = {
-  excellent: "#22c55e",
-  good: "#6366f1",
-  fair: "#f59e0b",
-  poor: "#94a3b8",
-};
 
 // Distinct hues for "processed together" folder groups in the file browser (used as an inline dot
 // colour, not a Tailwind class). A folder processed on its own gets PROCESSED_SINGLE.

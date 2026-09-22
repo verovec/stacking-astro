@@ -86,8 +86,7 @@ function captureTile(row: TileRow, event?: Event) {
 
 const captureError = ref("");
 
-// Typed by the exposed surface, not InstanceType — GenericTable is generic (house pattern, see
-// DarkSkyFinder).
+// Typed by the exposed surface, not InstanceType — GenericTable is generic (house pattern).
 const tableRef = ref<{ scrollToKey: (k: string | number) => void } | null>(
   null,
 );
