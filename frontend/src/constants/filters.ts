@@ -50,3 +50,22 @@ export function nextUnusedFilter(used: Iterable<string>): string {
   const taken = new Set(used);
   return FILTERS.find((f) => !taken.has(f)) ?? "";
 }
+
+// FILTER_SETS mirrors Go's filters.FilterSet (internal/filters/filterset.go) — which clip filter a
+// ONE-SHOT-COLOR session was shot through. A colour camera has no wheel and writes no FILTER card,
+// so the two are told apart from the pixels; "unknown" means the signals did not agree and every
+// consumer must fall back to its pre-filter-set behaviour rather than assuming broadband.
+//
+// Mirrored, not re-derived: filters.spec.ts pins this against the Go list, under the same rule as
+// FILTERS itself.
+export const FILTER_SETS = ["unknown", "broadband", "dualband"] as const;
+export type FilterSet = (typeof FILTER_SETS)[number];
+
+// isKnownFilterSet reports whether a value carries actual information. Consumers branch on this
+// rather than comparing against "broadband", so an unmeasured set is never mistaken for a measured
+// one. Mirrors FilterSet.Known() (Go).
+export function isKnownFilterSet(
+  value: string | undefined,
+): value is FilterSet {
+  return value === "broadband" || value === "dualband";
+}

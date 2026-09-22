@@ -78,6 +78,10 @@ type ScanOptions struct {
 	// the user chose to drop — the Import stray-light check. Applied in finalize BEFORE
 	// FilterMapping so the tokens always match, and as a slice-filter only (ScanCache-safe).
 	ExcludeSets []string
+	// FilterSetOverrides asserts, per light set (SetKey.ID → "broadband"/"dualband"), which clip
+	// filter a one-shot-color night was shot through. The user's word is final: an override is
+	// applied even where detection measured nothing, and detection only fills the blanks.
+	FilterSetOverrides map[string]filters.FilterSet
 }
 
 // DefaultScanOptions enables signal-based detection with robust default thresholds.
@@ -237,6 +241,9 @@ func finalizeInventory(inv *Inventory, opts ScanOptions) {
 	}
 	// Summarize the capture nights (nil for an all-undated scan — payload unchanged), and warn when
 	// a multi-night split leaves undated frames in their own bucket.
+	// Measured LAST among the grouping steps: exclusions and the filter mapping both re-key the sets,
+	// and the verdict is stored against a set's final ID.
+	annotateFilterSets(inv, opts.FilterSetOverrides, fits.ReadImage)
 	inv.Sessions = sessionSummary(inv.Frames)
 	if multiNight(inv.Frames) {
 		warnUndatedSplit(inv)

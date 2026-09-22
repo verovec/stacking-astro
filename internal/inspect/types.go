@@ -3,6 +3,8 @@
 // calibration and stacking stages consume.
 package inspect
 
+import "github.com/verove-jordan/astronomy/internal/filters"
+
 // FrameType is the kind of an astrophotography capture frame.
 type FrameType string
 
@@ -158,6 +160,12 @@ type Set struct {
 	Frames             []*Frame `json:"-"`
 	Count              int      `json:"count"`
 	TotalIntegrationMs int64    `json:"total_integration_ms"`
+	// FilterSet is which clip filter a ONE-SHOT-COLOR light set was shot through, measured from the
+	// pixels (filterset.go) or asserted by the user. Empty/unknown on every mono set and wherever the
+	// signals disagreed. Deliberately NOT part of SetKey: the key's ID() is the token the UI sends
+	// back in exclude_sets, and adding a measured field to it would churn stored tokens the moment a
+	// threshold moved. The durable record is Inventory.FilterSets; this is its projection.
+	FilterSet filters.FilterSet `json:"filter_set,omitempty"`
 }
 
 // ColorModel is how a whole scan records colour, decided once in finalizeInventory and carried to
@@ -187,6 +195,11 @@ type Inventory struct {
 	// ColorModel is the scan's overall colour verdict (see ColorModel). Computed in finalize from the
 	// LIGHT frames only — calibration frames follow whatever rig shot them.
 	ColorModel ColorModel `json:"color_model,omitempty"`
+	// FilterSets maps a light set's SetKey.ID() to the clip filter it was shot through, for one-shot-
+	// color scans only. It is the DURABLE record — Sets are rebuilt from frames by several code paths
+	// and lose their projected field, this map does not. Absent for mono scans and for anything the
+	// pixels could not settle. See filterset.go.
+	FilterSets map[string]filters.FilterSet `json:"filter_sets,omitempty"`
 	// Sessions summarizes the capture nights found in the scan (per-night counts, time window and
 	// light configs), sorted by night. nil when no frame carries a DATE-OBS. See session.go.
 	Sessions []SessionInfo `json:"sessions,omitempty"`

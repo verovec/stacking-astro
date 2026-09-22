@@ -17,6 +17,7 @@ import (
 
 	"github.com/verove-jordan/astronomy/internal/buildinfo"
 	"github.com/verove-jordan/astronomy/internal/config"
+	"github.com/verove-jordan/astronomy/internal/filters"
 	"github.com/verove-jordan/astronomy/internal/inspect"
 	"github.com/verove-jordan/astronomy/internal/job"
 	"github.com/verove-jordan/astronomy/internal/mode"
@@ -154,6 +155,9 @@ func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Path  string   `json:"path"`
 		Paths []string `json:"paths"`
+		// FilterSetOverrides asserts, per light set (SetKey.ID → "broadband"/"dualband"), which clip
+		// filter a one-shot-color night was shot through — for the sets the pixels could not settle.
+		FilterSetOverrides map[string]string `json:"filter_set_overrides,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		badRequest(w, "invalid body")
@@ -164,7 +168,21 @@ func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "path must be inside the data directory")
 		return
 	}
-	inv, err := s.scanCache.ScanMany(r.Context(), roots, inspect.DefaultScanOptions())
+	opts := inspect.DefaultScanOptions()
+	// A typo must fail the request rather than silently leaving the set unclassified — the user would
+	// see their override "not take" with no explanation.
+	for setID, raw := range body.FilterSetOverrides {
+		fs, err := filters.ParseFilterSet(raw)
+		if err != nil {
+			badRequest(w, err.Error())
+			return
+		}
+		if opts.FilterSetOverrides == nil {
+			opts.FilterSetOverrides = map[string]filters.FilterSet{}
+		}
+		opts.FilterSetOverrides[setID] = fs
+	}
+	inv, err := s.scanCache.ScanMany(r.Context(), roots, opts)
 	if err != nil {
 		serverError(w, err)
 		return

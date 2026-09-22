@@ -122,6 +122,39 @@ Camera raws (NEF/CR2/CR3/ARW/RAF/DNG) are decoded by Siril's own libraw during `
 fails (Apple ProRAW is the known case) they are developed by LibRaw's `dcraw_emu` instead, in linear
 light — see `internal/rawconv`.
 
+## Filter sets on a one-shot-colour rig
+
+A colour camera has no filter wheel, so it writes no `FILTER` card: the same body shooting broadband
+one night and through a dual-band Ha/OIII clip the next produces two sets of frames that are
+indistinguishable by metadata. They are **not** interchangeable — a dual-band frame carries two
+emission lines on a near-black sky, a broadband frame a full continuum — so stacking them together,
+or dividing one by the other's flat, is wrong.
+
+Inspect therefore measures it from the pixels, per light set
+(`internal/inspect/filterset.go`), and records `filter_set` = `broadband | dualband | unknown`:
+
+| signal | dual-band | broadband |
+|---|---|---|
+| sky above the bias pedestal, per 120 s | 2–6 ADU | 30–45 ADU |
+| background colour | red-dominant (R > G > B) | green/blue-dominant |
+
+**Both signals must agree, or the answer is `unknown`.** Amplitude alone is fooled by a bright sky or
+a faster lens; colour alone by a red light-pollution gradient. An honest `unknown` costs nothing
+because every consumer falls back to its pre-filter-set behaviour, whereas a wrong verdict silently
+mis-stacks a whole night.
+
+The **bias pedestal is required**, not optional. An uncalibrated frame sits at several hundred ADU of
+pure electronic offset — twenty times the broadband sky — so with no bias or dark in the scan there
+is nothing to subtract and every set stays `unknown`. A CFA mosaic is sampled at its Bayer positions
+(the colour is carried by position, not by a plane), and Siril's normalized `[0,1]` float output is
+rescaled to 16-bit ADU so a frame measures the same before and after a Siril pass.
+
+You can overrule it per set from the Import light-set table, or on the wire via
+`POST /api/inspect {"filter_set_overrides": {"<set id>": "dualband"}}`. An override wins outright and
+applies even where nothing could be measured; detection only fills the blanks — the same precedence
+the `info.txt` manifest keeps over the FITS header. Overridden rows are marked in the UI, because a
+measured verdict and an asserted one mean very different things when a run comes out wrong.
+
 ## Phone (iPhone DNG) calibration masters
 
 Milky-way captures calibrate through a **separate** library (`phone_calib_masters` table,

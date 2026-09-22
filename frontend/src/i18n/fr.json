@@ -607,7 +607,15 @@
       "unfavorite": "Retirer des favoris",
       "nameTaken": "Une sélection enregistrée porte déjà ce nom",
       "saved": "Sélection enregistrée"
-    }
+    },
+    "filterSets": {
+      "unknown": "inconnu",
+      "broadband": "Large bande",
+      "dualband": "Dual-band"
+    },
+    "filterSetAuto": "Auto",
+    "filterSetOverridden": "Vous l'avez défini — cela remplace la mesure faite sur les pixels.",
+    "filterSetOverrideHint": "Le filtre clip utilisé cette nuit-là. Laissez sur Auto sauf si la mesure est fausse."
   },
   "capture": {
     "summary": "Capture sélectionnée",
@@ -665,7 +673,9 @@
     "residual": "Résidu",
     "rotation": "Rotation",
     "coverage": "Couverture",
-    "applied": "Appliqué"
+    "applied": "Appliqué",
+    "filterSet": "Jeu de filtres",
+    "night": "Nuit"
   },
   "job": {
     "title": "Tâche",

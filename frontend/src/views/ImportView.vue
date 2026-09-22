@@ -19,6 +19,7 @@ import Spinner from "@/components/Common/Spinner.vue";
 import CaptureSummary from "@/components/Common/CaptureSummary.vue";
 import RigPanel from "@/components/Common/RigPanel.vue";
 import ObjectTypeChips from "@/components/Common/ObjectTypeChips.vue";
+import FilterSetCell from "@/components/Common/FilterSetCell.vue";
 import FilterMappingEditor from "@/components/Common/FilterMappingEditor.vue";
 import ReusePanel from "@/components/Common/ReusePanel.vue";
 import CalibrationPanel from "@/components/Common/CalibrationPanel.vue";
@@ -394,10 +395,25 @@ const reuseSelectionForRun = computed(() =>
     : reuseSelected.value,
 );
 
+// filterSetOverrides holds the user's per-light-set assertion of which clip filter a one-shot-colour
+// night was shot through, keyed by the canonical set token. Detection fills the blanks; an override
+// wins outright — the user looked at the stack, the classifier looked at three frames.
+const filterSetOverrides = ref<Record<string, string>>({});
+
+// Changing an override re-inspects: the verdict is computed engine-side, so the UI never second-
+// guesses it locally. An empty choice clears the assertion and lets detection speak again.
+async function setFilterSetOverride(setId: string, value: string) {
+  const next = { ...filterSetOverrides.value };
+  if (value) next[setId] = value;
+  else delete next[setId];
+  filterSetOverrides.value = next;
+  if (selectedPaths.value.length) await doInspect(selectedPaths.value);
+}
+
 // doInspect inspects a set of LOCAL capture folder paths (unions frames + reuse/calibration previews).
 async function doInspect(paths: string[]) {
   selectedPaths.value = paths;
-  await browseStore.inspect(paths);
+  await browseStore.inspect(paths, filterSetOverrides.value);
   // Reuse + calibration previews are independent — fetch them together. The calibration preview honors
   // the (sticky) force toggle so a pre-checked "force" already shows the mismatched masters it will apply.
   const [reuse, calib, plan] = await Promise.all([
@@ -818,7 +834,30 @@ function rowsFor(types: string[]): Row[] {
       offset: s.key.offset,
       iso: s.key.iso || 0,
       temp: s.key.temp_bucket_c,
+      // The capture night. Set only on multi-night scans (a single-night scan leaves it empty), which
+      // is exactly when two otherwise-identical rows are indistinguishable without it.
+      session: s.key.session || "",
+      // One-shot-colour only: which clip filter the night was shot through, measured from the pixels.
+      filter_set: s.filter_set || "",
+      // The canonical set token — what a filter-set override is keyed by on the wire.
+      set_id: setIdOf(s.key),
     }));
+}
+
+// setIdOf rebuilds inspect.SetKey.ID() — the canonical token the engine keys exclusions and
+// filter-set overrides by. Mirrors internal/inspect SetKey.ID(); the format is pinned Go-side by
+// TestSetKeyID_Stable, and any change there breaks stored tokens, so this must not drift.
+function setIdOf(k: FrameSet["key"]): string {
+  return [
+    k.type,
+    k.object || "",
+    k.filter || "",
+    `e${k.exposure_ms}`,
+    `g${k.gain}o${k.offset}b${k.bin}`,
+    `i${k.iso || 0}`,
+    `t${k.temp_bucket_c}`,
+    `s:${k.session || ""}`,
+  ].join("|");
 }
 const lightRows = computed(() => rowsFor(["LIGHT"]));
 const calibRows = computed(() => rowsFor(["DARK", "FLAT", "DARKFLAT", "BIAS"]));
@@ -870,6 +909,19 @@ const lightColumns: Column<Row>[] = [
     sortable: true,
     format: degC,
     align: "right",
+  },
+  // Multi-night scans only: without it two nights of the same target at the same settings render as
+  // two identical rows. Blank on a single-night scan, where the column carries no information.
+  {
+    key: "session",
+    label: t("fields.night"),
+    sortable: true,
+    searchable: true,
+  },
+  {
+    key: "filter_set",
+    label: t("fields.filterSet"),
+    sortable: true,
   },
 ];
 const calibColumns: Column<Row>[] = [
@@ -2081,6 +2133,16 @@ function histChip(exists: boolean): string {
           <template #cell-filter="{ value }">
             <FilterChip v-if="value" :filter="String(value)" />
             <span v-else class="text-slate-400">—</span>
+          </template>
+          <template #cell-filter_set="{ row }">
+            <FilterSetCell
+              :detected="String(row.filter_set || '')"
+              :override="filterSetOverrides[String(row.set_id)]"
+              :osc="inv?.color_model === 'osc'"
+              @update:override="
+                setFilterSetOverride(String(row.set_id), $event)
+              "
+            />
           </template>
         </GenericTable>
       </section>

@@ -276,12 +276,21 @@ export const useBrowseStore = defineStore("browse", () => {
 
   // inspect scans one or more capture folders and merges them into a single inventory (the backend
   // unions frames/sets across all paths, so calibration in one folder satisfies lights in another).
-  async function inspect(paths: string[]) {
+  // filterSetOverrides asserts, per light set (SetKey.ID → "broadband"/"dualband"), which clip filter
+  // a one-shot-colour night was shot through — for the nights the pixels could not settle. Omitted
+  // when empty so an ordinary inspect is byte-identical to one made before the override existed.
+  async function inspect(
+    paths: string[],
+    filterSetOverrides?: Record<string, string>,
+  ) {
     loading.value = true;
     error.value = "";
     inventory.value = null;
     try {
-      inventory.value = await apiPost<Inventory>("/api/inspect", { paths });
+      const body: Record<string, unknown> = { paths };
+      if (filterSetOverrides && Object.keys(filterSetOverrides).length)
+        body.filter_set_overrides = filterSetOverrides;
+      inventory.value = await apiPost<Inventory>("/api/inspect", body);
     } catch (e) {
       error.value = (e as Error).message;
     } finally {

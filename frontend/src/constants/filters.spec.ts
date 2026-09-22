@@ -8,6 +8,8 @@ import {
   filterRank,
   compareFilters,
   nextUnusedFilter,
+  FILTER_SETS,
+  isKnownFilterSet,
 } from "./filters";
 import { FILTER_HEX } from "./colors";
 import { filterChip } from "./styles";
@@ -97,5 +99,23 @@ describe("nextUnusedFilter", () => {
 
   it("returns empty when every filter is taken", () => {
     expect(nextUnusedFilter(FILTERS)).toBe("");
+  });
+});
+
+describe("FILTER_SETS", () => {
+  // Pinned against internal/filters/filterset.go. The whole reason this file exists is that a
+  // vocabulary with two copies drifts; a filter set added in Go and forgotten here would render as
+  // a blank badge rather than as an error.
+  it("mirrors the Go filter-set enum exactly, in order", () => {
+    expect([...FILTER_SETS]).toEqual(["unknown", "broadband", "dualband"]);
+  });
+
+  it("treats only a measured set as known", () => {
+    expect(isKnownFilterSet("broadband")).toBe(true);
+    expect(isKnownFilterSet("dualband")).toBe(true);
+    // "unknown" is the honest default, not a verdict — it must never gate behaviour on.
+    expect(isKnownFilterSet("unknown")).toBe(false);
+    expect(isKnownFilterSet("")).toBe(false);
+    expect(isKnownFilterSet(undefined)).toBe(false);
   });
 });
