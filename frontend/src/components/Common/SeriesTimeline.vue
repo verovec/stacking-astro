@@ -44,8 +44,8 @@ function bestScore(job: Job): number | null {
   return Math.max(...iters.map((it) => it.combined_score));
 }
 
-// previewFor resolves the attempt's final PNG as a small S3-fallback-tagged thumb ("" when the
-// result has no image output yet).
+// previewFor resolves the attempt's final PNG as a small thumb ("" when the result has no image
+// output yet).
 function previewFor(job: Job): string {
   const outs = job.result?.final?.outputs ?? job.result?.outputs ?? [];
   const png = outs.find((o) => o.endsWith(".png"));

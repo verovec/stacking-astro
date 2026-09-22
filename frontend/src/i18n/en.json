@@ -533,126 +533,7 @@
       "import": "Import",
       "tasks": "Tasks",
       "runs": "Runs",
-      "library": "Library",
-      "storage": "Storage",
-      "drives": "Drives"
-    }
-  },
-  "drives": {
-    "title": "External Drives",
-    "subtitle": "Browse a connected drive and copy a folder straight to S3 — a smart copy that scans first and uploads only the files that are missing or corrupted.",
-    "target": "S3 destination",
-    "noS3": "No S3 connection yet.",
-    "openStorage": "Connect one in Storage →",
-    "connectHere": "Add and default one in the Connections section above.",
-    "bucket": "Bucket",
-    "pickBucket": "Choose a bucket…",
-    "prefix": "Prefix",
-    "smartHint": "Copied under your prefix, in a folder named after the source. Re-running uploads only what changed.",
-    "noBuckets": "This connection isn't reachable or has no buckets — check it in Storage.",
-    "drivesHeading": "Mounted drives",
-    "sourcesHeading": "App folders",
-    "sources": {
-      "input": "Input (data)",
-      "output": "Output",
-      "work": "Work"
-    },
-    "up": "Up",
-    "refresh": "Refresh",
-    "copyThisFolder": "Copy this folder to S3",
-    "copySelected": "Copy {n} folder(s) to S3",
-    "copyFolderHint": "Smart copy to S3 — only missing or corrupted files are uploaded",
-    "pickBucketFirst": "Choose an S3 bucket first",
-    "copy": "Copy to S3",
-    "copying": "Queuing…",
-    "capacity": "{free} free of {total}",
-    "noDrives": "No external drives found. Plug one in, then Refresh.",
-    "emptyFolder": "This folder is empty."
-  },
-  "storage": {
-    "title": "Storage",
-    "subtitle": "Manage S3 connections, browse objects, copy local drives to S3, and back up your data. The default connection also powers import, processing and results.",
-    "connections": "Connections",
-    "browseObjects": "Browse objects",
-    "drivesSection": "Local drives → S3",
-    "browseHint": "Pick a connection above and click Browse to view its buckets and objects.",
-    "backupNeedsS3": "Choose a default connection and a bucket (in the sections above) to enable backups.",
-    "addConnection": "Add connection",
-    "newConnection": "New connection",
-    "editConnection": "Edit connection",
-    "noConnections": "No connections yet. Add one to connect to an S3 store.",
-    "default": "Default",
-    "browse": "Browse",
-    "setDefault": "Set default",
-    "edit": "Edit",
-    "delete": "Delete",
-    "name": "Name",
-    "endpoint": "Endpoint",
-    "region": "Region",
-    "accessKey": "Access key ID",
-    "secretKey": "Secret access key",
-    "secretKeep": "•••••• (unchanged)",
-    "useSSL": "Use SSL",
-    "makeDefault": "Make default",
-    "test": "Test connection",
-    "testing": "Testing…",
-    "testOk": "Connected — {n} bucket(s) visible.",
-    "testFail": "Failed: {error}",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirmDeleteConn": "Delete the connection \"{name}\"?",
-    "browsing": "Browsing: {name}",
-    "buckets": "Buckets",
-    "newBucket": "New bucket",
-    "refresh": "Refresh",
-    "noBuckets": "No buckets.",
-    "allBuckets": "Buckets",
-    "up": "Up",
-    "newFolder": "New folder",
-    "upload": "Upload",
-    "download": "Download",
-    "emptyFolder": "This folder is empty.",
-    "newBucketPrompt": "New bucket name:",
-    "confirmDeleteBucket": "Delete bucket \"{name}\"?",
-    "forceDeleteBucket": "Delete ALL objects in it first? (OK = force-empty then delete, Cancel = only if already empty)",
-    "newFolderPrompt": "New folder name:",
-    "move": {
-      "moveSelected": "Move selected…",
-      "hint": "Drag a row onto a folder to move it, or check rows and use “Move selected…”.",
-      "title": "Move {n} into…",
-      "moveHere": "Move here",
-      "noSubfolders": "No sub-folders",
-      "moving": "Moving {n} item(s)…",
-      "started": "Started",
-      "elapsed": "Elapsed",
-      "remaining": "Remaining",
-      "throughput": "Throughput",
-      "transferred": "Transferred",
-      "done": "Move complete",
-      "failed": "Move failed: {error}"
-    },
-    "confirmDeleteObject": "Delete \"{name}\"?",
-    "confirmDeleteFolder": "Delete the folder \"{name}\" and everything in it?",
-    "defaultClass": "Default storage class",
-    "defaultClassNone": "Provider default (Standard)",
-    "defaultClassHint": "New uploads on this connection use this class. It must stay instantly readable — archive later with “Change storage class”.",
-    "tier": {
-      "changeSelected": "Change storage class…",
-      "title": "Change storage class of {n} item(s)",
-      "subtitle": "Archive to a cheaper cold tier, or restore cold data back to instant access.",
-      "targetLabel": "Target class",
-      "restoreOnly": "Restore only (thaw temporarily, keep the archived class)",
-      "restoreOnlyNote": "The selected objects will be thawed to a temporary readable copy without changing their storage class.",
-      "retrieval": "Retrieval speed",
-      "thawNote": "Archived data must be thawed first — this can take from minutes to ~48h. The job stays visitable in Tasks and finishes automatically once ready.",
-      "apply": "Apply",
-      "archivedBadge": "Archived in Glacier ({class}) — restore before download",
-      "restoreTitle": "Restore from Glacier",
-      "progress": {
-        "archive": "Archiving {n} item(s)…",
-        "restore": "Restoring {n} item(s) from Glacier…",
-        "retier": "Changing storage class of {n} item(s)…"
-      }
+      "library": "Library"
     }
   },
   "preset": {
@@ -805,8 +686,6 @@
     "forceCalibration": "Force calibration frames",
     "forceCalibrationHint": "Apply your darks, flats and bias/offsets even when their gain, exposure or temperature don't match the lights. Use only when you know the frames are compatible — a mismatched dark can over- or under-subtract.",
     "chips": {
-      "s3": "Full S3",
-      "s3LowDisk": "Low disk",
       "palette": "Palette · {name}",
       "spcc": "SPCC",
       "denoise": "Denoise",
@@ -827,8 +706,6 @@
       "milkyway": "Milky Way",
       "planetary": "Planetary",
       "comet": "Comet",
-      "transfer": "Transfer",
-      "backup": "Backup",
       "mosaic": "Mosaic (tiled panels)",
       "nightpano": "Sky panorama (many pointings)",
       "sun": "Sun (Hα / white light)",
@@ -973,59 +850,6 @@
     "missingChannels": "No {filters} this night — those channels come from the other night(s).",
     "calibTitle": "Calibration for this night",
     "noCalib": "No matched calibration for this night."
-  },
-  "s3": {
-    "title": "S3 storage",
-    "bucket": "Bucket",
-    "prefix": "Prefix (optional)",
-    "pickBucket": "Choose a bucket…",
-    "test": "Refresh",
-    "connected": "Connected",
-    "notConfigured": "S3 is not configured — set ASTRO_S3_* in the environment to enable cloud storage.",
-    "queued": "Queued {n} transfer(s).",
-    "storage": "Storage",
-    "storageHint": "Full S3: pull inputs from S3, process locally, push inputs + results back, then free local disk (only after every file is verified on S3).",
-    "storageLocal": "Full local",
-    "storageS3": "Full S3 (free local after)",
-    "lowDisk": "Low local disk",
-    "lowDiskHint": "Stage captures from S3 one channel at a time and free each after stacking — keeps peak local disk to about one channel's frames instead of the whole dataset (deep-sky/nebula).",
-    "badge": {
-      "synced": "On S3 (synced with local)",
-      "cloudOnly": "Only on S3 — download to use it locally"
-    },
-    "action": {
-      "sync": "Sync",
-      "syncHint": "Upload files missing on S3 (keeps local copies)",
-      "download": "Download",
-      "downloadHint": "Download the selected folders from S3 to local",
-      "removeLocal": "Free local",
-      "removeLocalHint": "Delete local copies — only after verifying every file is on S3",
-      "upload": "Upload"
-    }
-  },
-  "backup": {
-    "title": "Backup & restore",
-    "subtitle": "Snapshot your database, calibration library, light-pollution atlas and app settings to S3.",
-    "component": {
-      "db": "Database",
-      "library": "Calibration library",
-      "atlas": "Light-pollution atlas",
-      "appstate": "App settings & AI chats"
-    },
-    "secretsNote": "Captures & results are backed up via Sync. Secrets in .env (DB password, API keys) are never included.",
-    "backupNow": "Back up now",
-    "working": "Working…",
-    "refresh": "Refresh",
-    "queued": "Backup queued.",
-    "past": "Past backups",
-    "empty": "No backups yet.",
-    "restore": "Restore",
-    "confirmRestore": "Restore this backup? The database / library / atlas will be overwritten with the snapshot.",
-    "restoreQueued": "Restore started.",
-    "reload": "Reload now",
-    "reloadHint": "App settings & chats were restored —",
-    "storageClass": "Archive backup to",
-    "storageClassStandard": "Standard (hot, instant restore)"
   },
   "common": {
     "inspect": "Inspect",
@@ -1338,27 +1162,6 @@
           "body": "Copy the library to S3 and matched masters are pulled back automatically when they are missing locally — so freeing disk space does not cost you your calibration."
         }
       }
-    },
-    "storage": {
-      "title": "Storage",
-      "steps": {
-        "connections": {
-          "title": "Connecting S3",
-          "body": "Endpoint, access key and secret. The secret is encrypted before it is stored and is never shown again or sent back to the browser."
-        },
-        "browse": {
-          "title": "Local and remote side by side",
-          "body": "Each folder shows whether it exists locally, on S3, or both — so you always know what freeing something would actually cost you."
-        },
-        "free": {
-          "title": "Freeing local disk",
-          "body": "Freeing verifies every file is present on S3 BEFORE deleting the local copy, and aborts the whole folder if any check fails. Freed previews and results still open — they fall back to S3 transparently."
-        },
-        "backup": {
-          "title": "Backup and restore",
-          "body": "Backs up the database and browser-side state (favourites, setups, agent chats). Secrets in your .env are deliberately excluded. Restoring the database is destructive — it replaces what is there."
-        }
-      }
     }
   },
   "import": {
@@ -1374,17 +1177,7 @@
     "selectCapture": "Select a capture folder above, then run.",
     "useFolder": "Inspect this folder",
     "inspectN": "Inspect {n} folders",
-    "downloadInspect": "Download & inspect {n}",
-    "downloadingBtn": "Downloading…",
     "inspectingBtn": "Inspecting…",
-    "downloadingS3": "Downloading {n} folder(s) from S3…",
-    "downloadingS3Progress": "Downloading {done}/{n} folder(s) from S3…",
-    "inspectingS3": "Inspecting frames…",
-    "tabs": {
-      "local": "Local Files",
-      "s3": "S3 Storage"
-    },
-    "s3NotConfigured": "Configure S3 on the Storage page to browse it here.",
     "selectedCount": "{n} selected",
     "nFolders": "{n} folders",
     "selectFolder": "Add to selection",
@@ -1403,8 +1196,6 @@
       "useAgain": "Use again",
       "runs": "{n}× run",
       "deleted": "Folder no longer exists",
-      "onS3": "On S3 — downloaded automatically when re-run",
-      "needS3": "These files were freed to S3. Select their S3 bucket first, then try again.",
       "untitled": "Untitled",
       "name": "Name this selection",
       "namePlaceholder": "Selection name",
@@ -2051,10 +1842,6 @@
     "memoryHint": "Live resident memory of the engine and every processing tool",
     "peak": "Peak",
     "peakHint": "Highest engine-wide memory seen during this job",
-    "transferred": "Transferred",
-    "throughput": "Throughput",
-    "remaining": "Remaining",
-    "destination": "Destination",
     "followTail": "Follow",
     "showLogs": "Show log",
     "hideLogs": "Hide log",
@@ -2070,9 +1857,6 @@
     "pausedError": "Paused after a transfer error — retrying automatically (attempt {n}/{max}).",
     "restart": "Restart",
     "restarting": "Restarting…",
-    "freeLocal": "Remove local files",
-    "freeLocalHint": "Delete the local copies of this run's files — safe, since each is verified on S3 first.",
-    "freeLocalConfirm": "Remove the local copies of this run's files? They stay on S3 (each is verified before deletion) and can be pulled back when you re-run.",
     "remove": "Remove",
     "queueBadge": "{n} queued",
     "prevTask": "Previous task (#{id}) — left arrow",
@@ -2653,11 +2437,7 @@
     "title": "Calibration library",
     "deepskyTitle": "Camera masters (cooled)",
     "phoneTitle": "Phone / DSLR masters (ISO)",
-    "empty": "The library is empty. Run a pipeline with calibration frames to populate it.",
-    "copyToS3": "Copy to S3",
-    "copyToS3Hint": "Mirror every calibration master to S3 (kept local too). Later runs pull back any master that's missing locally, and discard it after — so machines with little disk still stack.",
-    "copying": "Copying…",
-    "copyQueued": "Library copy to S3 queued."
+    "empty": "The library is empty. Run a pipeline with calibration frames to populate it."
   },
   "status": {
     "queued": "Queued",
@@ -3265,37 +3045,6 @@
       "penumbral_begin": "Penumbral begins",
       "penumbral_end": "Penumbral ends",
       "maximum": "Maximum"
-    }
-  },
-  "storageClass": {
-    "needsThaw": "needs restore",
-    "minDuration": "Min. storage {days} days (early-delete fee applies)",
-    "family": {
-      "instant": "Instant",
-      "archived": "Archived"
-    },
-    "tiers": {
-      "Standard": "Standard (~3–5h Flexible / ~12h Deep Archive)",
-      "Bulk": "Bulk (cheapest, up to 48h)",
-      "Expedited": "Expedited (1–5 min, Flexible only)"
-    },
-    "classes": {
-      "STANDARD": {
-        "label": "Standard",
-        "blurb": "The classic hot tier — instant access, no retrieval fee. The destination when restoring cold data."
-      },
-      "GLACIER_IR": {
-        "label": "Glacier Instant Retrieval",
-        "blurb": "Cheap archival storage but still instant reads (no thaw). Good for masters/results you re-read occasionally."
-      },
-      "GLACIER": {
-        "label": "Glacier Flexible Retrieval",
-        "blurb": "Low-cost archive; objects must be restored (minutes–hours) before download. The main “archive it” target."
-      },
-      "DEEP_ARCHIVE": {
-        "label": "Deep Archive",
-        "blurb": "Cheapest, coldest tier; restore can take up to ~48h. For long-term backups you rarely touch."
-      }
     }
   },
   "mosaic": {

@@ -533,126 +533,7 @@
       "import": "Importer",
       "tasks": "Tâches",
       "runs": "Traitements",
-      "library": "Bibliothèque",
-      "storage": "Stockage",
-      "drives": "Disques"
-    }
-  },
-  "drives": {
-    "title": "Disques externes",
-    "subtitle": "Parcourez un disque connecté et copiez un dossier directement vers S3 — une copie intelligente qui analyse d'abord et n'envoie que les fichiers manquants ou corrompus.",
-    "target": "Destination S3",
-    "noS3": "Aucune connexion S3 pour l'instant.",
-    "openStorage": "Configurez-en une dans Stockage →",
-    "connectHere": "Ajoutez-en une (et définissez-la par défaut) dans la section Connexions ci-dessus.",
-    "bucket": "Bucket",
-    "pickBucket": "Choisir un bucket…",
-    "prefix": "Préfixe",
-    "smartHint": "Copié sous votre préfixe, dans un dossier au nom de la source. Relancer n'envoie que ce qui a changé.",
-    "noBuckets": "Cette connexion est injoignable ou n'a aucun bucket — vérifiez-la dans Stockage.",
-    "drivesHeading": "Disques montés",
-    "sourcesHeading": "Dossiers de l'application",
-    "sources": {
-      "input": "Entrée (data)",
-      "output": "Sortie",
-      "work": "Travail"
-    },
-    "up": "Remonter",
-    "refresh": "Actualiser",
-    "copyThisFolder": "Copier ce dossier vers S3",
-    "copySelected": "Copier {n} dossier(s) vers S3",
-    "copyFolderHint": "Copie intelligente vers S3 — seuls les fichiers manquants ou corrompus sont envoyés",
-    "pickBucketFirst": "Choisissez d'abord un bucket S3",
-    "copy": "Copier vers S3",
-    "copying": "Mise en file…",
-    "capacity": "{free} libres sur {total}",
-    "noDrives": "Aucun disque externe trouvé. Branchez-en un, puis Actualisez.",
-    "emptyFolder": "Ce dossier est vide."
-  },
-  "storage": {
-    "title": "Stockage",
-    "subtitle": "Gérez les connexions S3, parcourez les objets, copiez des disques locaux vers S3 et sauvegardez vos données. La connexion par défaut alimente aussi l'import, le traitement et les résultats.",
-    "connections": "Connexions",
-    "browseObjects": "Parcourir les objets",
-    "drivesSection": "Disques locaux → S3",
-    "browseHint": "Choisissez une connexion ci-dessus puis cliquez sur Parcourir pour voir ses buckets et objets.",
-    "backupNeedsS3": "Choisissez une connexion par défaut et un bucket (dans les sections ci-dessus) pour activer les sauvegardes.",
-    "addConnection": "Ajouter une connexion",
-    "newConnection": "Nouvelle connexion",
-    "editConnection": "Modifier la connexion",
-    "noConnections": "Aucune connexion. Ajoutez-en une pour vous connecter à un stockage S3.",
-    "default": "Défaut",
-    "browse": "Parcourir",
-    "setDefault": "Définir par défaut",
-    "edit": "Modifier",
-    "delete": "Supprimer",
-    "name": "Nom",
-    "endpoint": "Endpoint",
-    "region": "Région",
-    "accessKey": "Access key ID",
-    "secretKey": "Secret access key",
-    "secretKeep": "•••••• (inchangé)",
-    "useSSL": "Utiliser SSL",
-    "makeDefault": "Définir par défaut",
-    "test": "Tester la connexion",
-    "testing": "Test…",
-    "testOk": "Connecté — {n} bucket(s) visible(s).",
-    "testFail": "Échec : {error}",
-    "save": "Enregistrer",
-    "cancel": "Annuler",
-    "confirmDeleteConn": "Supprimer la connexion « {name} » ?",
-    "browsing": "Parcours : {name}",
-    "buckets": "Buckets",
-    "newBucket": "Nouveau bucket",
-    "refresh": "Actualiser",
-    "noBuckets": "Aucun bucket.",
-    "allBuckets": "Buckets",
-    "up": "Remonter",
-    "newFolder": "Nouveau dossier",
-    "upload": "Envoyer",
-    "download": "Télécharger",
-    "emptyFolder": "Ce dossier est vide.",
-    "newBucketPrompt": "Nom du nouveau bucket :",
-    "confirmDeleteBucket": "Supprimer le bucket « {name} » ?",
-    "forceDeleteBucket": "Supprimer d'abord TOUS ses objets ? (OK = vider puis supprimer, Annuler = seulement s'il est déjà vide)",
-    "newFolderPrompt": "Nom du nouveau dossier :",
-    "move": {
-      "moveSelected": "Déplacer la sélection…",
-      "hint": "Glissez une ligne sur un dossier pour la déplacer, ou cochez des lignes puis « Déplacer la sélection… ».",
-      "title": "Déplacer {n} vers…",
-      "moveHere": "Déplacer ici",
-      "noSubfolders": "Aucun sous-dossier",
-      "moving": "Déplacement de {n} élément(s)…",
-      "started": "Démarré",
-      "elapsed": "Écoulé",
-      "remaining": "Restant",
-      "throughput": "Débit",
-      "transferred": "Transféré",
-      "done": "Déplacement terminé",
-      "failed": "Échec du déplacement : {error}"
-    },
-    "confirmDeleteObject": "Supprimer « {name} » ?",
-    "confirmDeleteFolder": "Supprimer le dossier « {name} » et tout son contenu ?",
-    "defaultClass": "Classe de stockage par défaut",
-    "defaultClassNone": "Par défaut du fournisseur (Standard)",
-    "defaultClassHint": "Les nouveaux envois sur cette connexion utilisent cette classe. Elle doit rester lisible instantanément — archivez plus tard via « Changer la classe de stockage ».",
-    "tier": {
-      "changeSelected": "Changer la classe de stockage…",
-      "title": "Changer la classe de stockage de {n} élément(s)",
-      "subtitle": "Archivez vers un palier froid moins cher, ou restaurez des données froides vers un accès instantané.",
-      "targetLabel": "Classe cible",
-      "restoreOnly": "Restaurer seulement (dégeler temporairement, garder la classe archivée)",
-      "restoreOnlyNote": "Les objets sélectionnés seront dégelés en une copie lisible temporaire, sans changer leur classe de stockage.",
-      "retrieval": "Vitesse de récupération",
-      "thawNote": "Les données archivées doivent d'abord être dégelées — cela peut prendre de quelques minutes à ~48 h. La tâche reste consultable dans Tâches et se termine automatiquement une fois prête.",
-      "apply": "Appliquer",
-      "archivedBadge": "Archivé dans Glacier ({class}) — restaurez avant de télécharger",
-      "restoreTitle": "Restaurer depuis Glacier",
-      "progress": {
-        "archive": "Archivage de {n} élément(s)…",
-        "restore": "Restauration de {n} élément(s) depuis Glacier…",
-        "retier": "Changement de classe de {n} élément(s)…"
-      }
+      "library": "Bibliothèque"
     }
   },
   "preset": {
@@ -805,8 +686,6 @@
     "forceCalibration": "Forcer les images de calibration",
     "forceCalibrationHint": "Appliquer vos darks, flats et bias/offsets même si leur gain, exposition ou température ne correspondent pas aux poses. À n'utiliser que si vous savez les images compatibles — un dark non concordant peut sur- ou sous-soustraire.",
     "chips": {
-      "s3": "S3 complet",
-      "s3LowDisk": "Disque réduit",
       "palette": "Palette · {name}",
       "spcc": "SPCC",
       "denoise": "Débruitage",
@@ -827,8 +706,6 @@
       "milkyway": "Voie lactée",
       "planetary": "Planétaire",
       "comet": "Comète",
-      "transfer": "Transfert",
-      "backup": "Sauvegarde",
       "mosaic": "Mosaïque (panneaux)",
       "nightpano": "Panorama du ciel (plusieurs visées)",
       "sun": "Soleil (Hα / lumière blanche)",
@@ -973,59 +850,6 @@
     "missingChannels": "Pas de {filters} cette nuit — ces canaux proviennent de l'autre ou des autres nuits.",
     "calibTitle": "Calibration de cette nuit",
     "noCalib": "Aucune calibration correspondante pour cette nuit."
-  },
-  "s3": {
-    "title": "Stockage S3",
-    "bucket": "Bucket",
-    "prefix": "Préfixe (optionnel)",
-    "pickBucket": "Choisir un bucket…",
-    "test": "Actualiser",
-    "connected": "Connecté",
-    "notConfigured": "S3 n'est pas configuré — définissez ASTRO_S3_* dans l'environnement pour activer le stockage cloud.",
-    "queued": "{n} transfert(s) mis en file.",
-    "storage": "Stockage",
-    "storageHint": "Full S3 : récupère les entrées depuis S3, traite en local, renvoie les entrées + résultats, puis libère le disque local (seulement une fois chaque fichier vérifié sur S3).",
-    "storageLocal": "Full local",
-    "storageS3": "Full S3 (libère le local ensuite)",
-    "lowDisk": "Disque local réduit",
-    "lowDiskHint": "Récupère les captures depuis S3 un canal à la fois et libère chacun après empilement — limite le pic de disque local à environ les images d'un seul canal au lieu de tout le jeu de données (ciel profond/nébuleuse).",
-    "badge": {
-      "synced": "Sur S3 (synchronisé avec le local)",
-      "cloudOnly": "Uniquement sur S3 — téléchargez-le pour l'utiliser en local"
-    },
-    "action": {
-      "sync": "Synchroniser",
-      "syncHint": "Envoyer les fichiers absents de S3 (garde les copies locales)",
-      "download": "Télécharger",
-      "downloadHint": "Télécharger les dossiers sélectionnés depuis S3 vers le local",
-      "removeLocal": "Libérer le local",
-      "removeLocalHint": "Supprimer les copies locales — seulement après vérification sur S3",
-      "upload": "Envoyer"
-    }
-  },
-  "backup": {
-    "title": "Sauvegarde & restauration",
-    "subtitle": "Sauvegardez sur S3 votre base de données, bibliothèque de calibration, atlas de pollution lumineuse et réglages de l'app.",
-    "component": {
-      "db": "Base de données",
-      "library": "Bibliothèque de calibration",
-      "atlas": "Atlas de pollution lumineuse",
-      "appstate": "Réglages & discussions IA"
-    },
-    "secretsNote": "Les captures et résultats se sauvegardent via Synchroniser. Les secrets du .env (mot de passe DB, clés API) ne sont jamais inclus.",
-    "backupNow": "Sauvegarder",
-    "working": "En cours…",
-    "refresh": "Actualiser",
-    "queued": "Sauvegarde lancée.",
-    "past": "Sauvegardes précédentes",
-    "empty": "Aucune sauvegarde.",
-    "restore": "Restaurer",
-    "confirmRestore": "Restaurer cette sauvegarde ? La base / bibliothèque / atlas seront écrasés par l'instantané.",
-    "restoreQueued": "Restauration lancée.",
-    "reload": "Recharger",
-    "reloadHint": "Réglages & discussions restaurés —",
-    "storageClass": "Archiver la sauvegarde vers",
-    "storageClassStandard": "Standard (chaud, restauration instantanée)"
   },
   "common": {
     "inspect": "Inspecter",
@@ -1338,27 +1162,6 @@
           "body": "Copiez la bibliothèque sur S3 et les maîtres correspondants seront rapatriés automatiquement s’ils manquent en local — libérer de la place ne vous coûte donc pas votre calibration."
         }
       }
-    },
-    "storage": {
-      "title": "Stockage",
-      "steps": {
-        "connections": {
-          "title": "Connecter un S3",
-          "body": "Point d’accès, clé et secret. Le secret est chiffré avant d’être enregistré, et n’est jamais réaffiché ni renvoyé au navigateur."
-        },
-        "browse": {
-          "title": "Local et distant côte à côte",
-          "body": "Chaque dossier indique s’il existe en local, sur S3, ou les deux — vous savez donc toujours ce que libérer coûterait réellement."
-        },
-        "free": {
-          "title": "Libérer de l’espace",
-          "body": "La libération vérifie que chaque fichier est bien présent sur S3 AVANT de supprimer la copie locale, et abandonne tout le dossier si une vérification échoue. Les aperçus et résultats libérés s’ouvrent quand même : ils basculent sur S3 de façon transparente."
-        },
-        "backup": {
-          "title": "Sauvegarde et restauration",
-          "body": "Sauvegarde la base et l’état côté navigateur (favoris, configurations, conversations). Les secrets de votre .env sont volontairement exclus. Restaurer la base est destructif : cela remplace ce qui s’y trouve."
-        }
-      }
     }
   },
   "import": {
@@ -1373,17 +1176,7 @@
     "openFolder": "Ouvrir le dossier",
     "selectCapture": "Sélectionnez un dossier de captures ci-dessus, puis lancez.",
     "useFolder": "Inspecter ce dossier",
-    "downloadInspect": "Télécharger et inspecter {n}",
-    "downloadingBtn": "Téléchargement…",
     "inspectingBtn": "Inspection…",
-    "downloadingS3": "Téléchargement de {n} dossier(s) depuis S3…",
-    "downloadingS3Progress": "Téléchargement de {done}/{n} dossier(s) depuis S3…",
-    "inspectingS3": "Inspection des images…",
-    "tabs": {
-      "local": "Fichiers locaux",
-      "s3": "Stockage S3"
-    },
-    "s3NotConfigured": "Configurez S3 sur la page Stockage pour le parcourir ici.",
     "inspectN": "Inspecter {n} dossiers",
     "selectedCount": "{n} sélectionné·s",
     "nFolders": "{n} dossiers",
@@ -1403,8 +1196,6 @@
       "useAgain": "Réutiliser",
       "runs": "{n} fois",
       "deleted": "Dossier introuvable",
-      "onS3": "Sur S3 — téléchargé automatiquement lors de la réutilisation",
-      "needS3": "Ces fichiers ont été libérés vers S3. Sélectionnez d'abord leur bucket S3, puis réessayez.",
       "untitled": "Sans titre",
       "name": "Nommer cette sélection",
       "namePlaceholder": "Nom de la sélection",
@@ -2051,10 +1842,6 @@
     "memoryHint": "Mémoire résidente en direct du moteur et de chaque outil de traitement",
     "peak": "Pic",
     "peakHint": "Mémoire moteur maximale observée pendant cette tâche",
-    "transferred": "Transféré",
-    "throughput": "Débit",
-    "remaining": "Temps restant",
-    "destination": "Destination",
     "followTail": "Suivre",
     "showLogs": "Afficher le journal",
     "hideLogs": "Masquer le journal",
@@ -2070,9 +1857,6 @@
     "pausedError": "Mis en pause après une erreur de transfert — reprise automatique (tentative {n}/{max}).",
     "restart": "Relancer",
     "restarting": "Relancement…",
-    "freeLocal": "Supprimer les fichiers locaux",
-    "freeLocalHint": "Supprime les copies locales des fichiers de ce traitement — sans risque, chaque fichier est d'abord vérifié sur S3.",
-    "freeLocalConfirm": "Supprimer les copies locales des fichiers de ce traitement ? Ils restent sur S3 (chacun est vérifié avant suppression) et pourront être récupérés lors d'une relance.",
     "remove": "Retirer",
     "queueBadge": "{n} en attente",
     "prevTask": "Tâche précédente (#{id}) — flèche gauche",
@@ -2653,11 +2437,7 @@
     "title": "Bibliothèque de calibration",
     "deepskyTitle": "Masters caméra (refroidie)",
     "phoneTitle": "Masters téléphone / reflex (ISO)",
-    "empty": "La bibliothèque est vide. Lancez un traitement avec des images de calibration pour la remplir.",
-    "copyToS3": "Copier vers S3",
-    "copyToS3Hint": "Réplique chaque master de calibration vers S3 (conservé aussi en local). Les traitements suivants retéléchargent tout master absent en local, puis le suppriment après — pour stacker même avec peu d'espace disque.",
-    "copying": "Copie en cours…",
-    "copyQueued": "Copie de la bibliothèque vers S3 mise en file."
+    "empty": "La bibliothèque est vide. Lancez un traitement avec des images de calibration pour la remplir."
   },
   "status": {
     "queued": "En attente",
@@ -3265,37 +3045,6 @@
       "penumbral_begin": "Début pénombre",
       "penumbral_end": "Fin pénombre",
       "maximum": "Maximum"
-    }
-  },
-  "storageClass": {
-    "needsThaw": "restauration requise",
-    "minDuration": "Durée min. {days} jours (frais de suppression anticipée)",
-    "family": {
-      "instant": "Instantané",
-      "archived": "Archivé"
-    },
-    "tiers": {
-      "Standard": "Standard (~3–5 h Flexible / ~12 h Deep Archive)",
-      "Bulk": "Bulk (le moins cher, jusqu'à 48 h)",
-      "Expedited": "Expedited (1–5 min, Flexible uniquement)"
-    },
-    "classes": {
-      "STANDARD": {
-        "label": "Standard",
-        "blurb": "Le palier chaud classique — accès instantané, sans frais de récupération. La destination lors d'une restauration."
-      },
-      "GLACIER_IR": {
-        "label": "Glacier Instant Retrieval",
-        "blurb": "Stockage d'archive économique mais lectures instantanées (sans dégel). Idéal pour des maîtres/résultats relus de temps en temps."
-      },
-      "GLACIER": {
-        "label": "Glacier Flexible Retrieval",
-        "blurb": "Archive à bas coût ; les objets doivent être restaurés (minutes–heures) avant téléchargement. La cible « archiver » principale."
-      },
-      "DEEP_ARCHIVE": {
-        "label": "Deep Archive",
-        "blurb": "Le palier le plus froid et le moins cher ; la restauration peut prendre jusqu'à ~48 h. Pour des sauvegardes long terme rarement consultées."
-      }
     }
   },
   "mosaic": {

@@ -78,13 +78,7 @@ const router = createRouter({
           name: "library",
           component: () => import("@/views/LibraryView.vue"),
         },
-        {
-          path: "storage",
-          name: "storage",
-          component: () => import("@/views/StorageView.vue"),
-        },
         // Drives merged into Storage — keep the old path working (bookmarks / in-app links).
-        { path: "drives", redirect: { name: "storage" } },
       ],
     },
 

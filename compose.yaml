@@ -125,14 +125,14 @@ services:
       # Mirror each data dir at its SAME host path (${PWD} = repo root) so the absolute paths the host
       # engine stored in Postgres + run.json resolve unchanged inside the container. input is
       # read-WRITE: the pipeline never modifies raw captures (it writes only to work/ and output/),
-      # but the S3 "download & inspect" import writes downloaded capture folders INTO input, so a
+      # and downloaded/imported capture folders land INTO input, so a
       # read-only mount broke it ("mkdir …/input/…: read-only file system"). Matches the host engine,
       # where input is a normal writable folder.
       - ${PWD}/input:${PWD}/input          # capture data (import writes here; pipeline only reads)
       - ${PWD}/library:${PWD}/library      # calibration masters (shared, read-write)
       - ${PWD}/output:${PWD}/output        # final stacks + reports
       - ${PWD}/work:${PWD}/work            # scratch
-      # External drives for the "Drives → Copy to S3" page. On a macOS host they live under /Volumes and
+      # External drives for the import-from-drive browser. On a macOS host they live under /Volumes and
       # Docker Desktop shares them (verified: nested drive mounts show through the parent bind). On a Linux
       # server set ASTRO_DRIVES_DIR to your mount root (e.g. /media or /mnt). READ-ONLY — the copy only ever
       # reads from the drive — and mounted at the SAME path so it matches ASTRO_BROWSE_ROOTS and the paths

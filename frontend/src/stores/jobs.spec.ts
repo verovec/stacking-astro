@@ -7,7 +7,6 @@ vi.mock("@/services/api", () => ({
   apiGet: vi.fn(async () => ({})),
   apiPost: (...args: unknown[]) => apiPost(...args),
   health: vi.fn(async () => true),
-  withS3: (u: string) => u,
 }));
 
 import { useJobsStore } from "./jobs";

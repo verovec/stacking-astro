@@ -21,9 +21,6 @@ interface JobEvent {
   cpu_percent?: number; // live CPU usage (100 == one core)
   peak_rss_bytes?: number; // job-wide peak engine memory
   cpu_cores?: number; // host core count (context for cpu_percent)
-  bytes_done?: number; // S3 transfer: bytes copied so far
-  bytes_total?: number; // S3 transfer: total bytes to copy
-  bytes_per_sec?: number; // S3 transfer: smoothed throughput (débit)
   iteration?: IterationRecord; // one supervised-finish pass, streamed as it completes
   stage_preview?: StagePreview; // one saved processing-milestone preview, streamed as it is produced
   stage_previews?: StagePreview[]; // the accumulated milestones, sent once by the reconnect snapshot
@@ -65,10 +62,6 @@ export function useJobStream(
   const cpuPercent = ref(0);
   const peakRssBytes = ref(0);
   const cpuCores = ref(0);
-  // S3 transfer byte progress + throughput (0 for non-transfer jobs, which never send these fields).
-  const bytesDone = ref(0);
-  const bytesTotal = ref(0);
-  const bytesPerSec = ref(0);
   // Supervised-finish iterations accumulated live (upsert by index, so the winner's re-emit with
   // chosen=true updates its card in place). Empty for non-supervised runs.
   const iterations = ref<IterationRecord[]>([]);
@@ -152,13 +145,6 @@ export function useJobStream(
       rssBytes.value = 0;
       cpuPercent.value = 0;
     }
-    // Transfer byte progress. bytes_total marks a transfer event; bytes_done/bytes_per_sec are omitted
-    // when zero (omitempty), so default them rather than leave a stale value from an earlier tick.
-    if (e.bytes_total !== undefined) {
-      bytesTotal.value = e.bytes_total;
-      bytesDone.value = e.bytes_done ?? 0;
-      bytesPerSec.value = e.bytes_per_sec ?? 0;
-    }
     if (e.iteration) {
       const at = iterations.value.findIndex(
         (it) => it.index === e.iteration!.index,
@@ -192,9 +178,6 @@ export function useJobStream(
     cpuPercent,
     peakRssBytes,
     cpuCores,
-    bytesDone,
-    bytesTotal,
-    bytesPerSec,
     iterations,
     stagePreviews,
     photomRecords,

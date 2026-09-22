@@ -26,12 +26,9 @@ import (
 	"github.com/verove-jordan/astronomy/internal/photom"
 	"github.com/verove-jordan/astronomy/internal/pipeline"
 	"github.com/verove-jordan/astronomy/internal/postprocess"
-	"github.com/verove-jordan/astronomy/internal/s3conn"
-	"github.com/verove-jordan/astronomy/internal/secret"
 	"github.com/verove-jordan/astronomy/internal/siril"
 	"github.com/verove-jordan/astronomy/internal/starnet"
 	"github.com/verove-jordan/astronomy/internal/store"
-	"github.com/verove-jordan/astronomy/internal/transfer"
 	"github.com/verove-jordan/astronomy/internal/turns"
 	"github.com/verove-jordan/astronomy/internal/videoout"
 )
@@ -51,11 +48,6 @@ type Event struct {
 	CPUPercent   float64 `json:"cpu_percent,omitempty"`    // live CPU usage (100 == one core)
 	PeakRSSBytes int64   `json:"peak_rss_bytes,omitempty"` // job-wide peak engine memory
 	CPUCores     int     `json:"cpu_cores,omitempty"`      // host core count (context for cpu_percent)
-
-	// Live byte progress for an S3 transfer job (streamed, never persisted — the Progress int is).
-	BytesDone   int64 `json:"bytes_done,omitempty"`
-	BytesTotal  int64 `json:"bytes_total,omitempty"`
-	BytesPerSec int64 `json:"bytes_per_sec,omitempty"` // smoothed transfer throughput (débit)
 
 	// Session attributes the event to one capture night ("YYYY-MM-DD") inside a cross-session
 	// channel step — the UI's per-night progress rows key on it. "" = run-level.
@@ -150,13 +142,10 @@ type Manager struct {
 	store  *store.Store
 	runner *siril.Runner
 	cfg    *config.Config
-	s3conn *s3conn.Service // resolves the default S3 connection (UI-managed) for pipeline transfers/backups
 	turns  TurnHub         // shared turn transport for supervised-job conversations; nil → conversations off
 
 	queue     chan int64
 	seqQueue  chan int64   // sequential lane: stacked "Add to queue" jobs run one-at-a-time, auto-advancing
-	xferQueue chan int64   // S3 transfer lane: uploads/downloads run in their own pool, never starving runs
-	thawQueue chan int64   // Glacier tier/thaw lane: only Restore/Stat + cheap server-side copies, never local I/O
 	inFlight  atomic.Int64 // jobs currently executing across all lanes — the work sweep only runs at zero
 	mu        sync.Mutex
 	subs      map[int64][]chan Event
@@ -320,125 +309,7 @@ type RunRequest struct {
 	// "masters"), reusing the whole job progress/SSE stack. See runBuildMasters.
 	BuildMasters bool `json:"build_masters,omitempty"`
 
-	// Transfer, when set, makes this an S3 transfer job (upload/sync/download/remove-local) instead of a
-	// pipeline run — it is intercepted before mode parsing and reuses the whole job progress/SSE stack.
-	Transfer *TransferRequest `json:"transfer,omitempty"`
-
-	// Move, when set, makes this an S3→S3 object/folder move (server-side copy → ledger rekey → delete
-	// source, per object) instead of a pipeline run — intercepted before mode parsing like Transfer, reusing
-	// the whole progress/SSE stack so the explorer move shows a live bar + speed + ETA. It runs on the
-	// explorer's chosen connection (Conn), NOT the pipeline default.
-	Move *MoveRequest `json:"move,omitempty"`
-
-	// TierChange, when set, makes this an S3 storage-class change (archive classic→Glacier, restore/thaw
-	// Glacier→classic, or restore-only) instead of a pipeline run — intercepted like Move. Archived sources
-	// are thawed first: the job PARKS (causeThaw) and the auto-resume sweep re-checks on a thaw cadence until
-	// the restore completes, then transitions. Runs on the explorer connection (Conn), on the low-cost lane.
-	// (Named TierChange, not Tier — Tier above is the unrelated supervised re-entry ceiling.)
-	TierChange *TierRequest `json:"tier_change,omitempty"`
-
-	// StorageMode selects where a pipeline run's files live: "local" (default, keep) or "s3" (pull inputs,
-	// process, push inputs+outputs, then remove local copies). S3 targets the run's S3Target.
-	StorageMode string    `json:"storage_mode,omitempty"`
-	S3          *S3Target `json:"s3,omitempty"`
-	// LowDisk overrides the server ASTRO_S3_LOW_DISK default for this full-S3 deep-sky/nebula run: when on,
-	// inputs are staged from S3 one frame-type/channel wave at a time and freed after, so peak local disk
-	// stays ≈ one channel's frames. nil → the server default. See internal/job/stager.go.
-	LowDisk *bool `json:"low_disk,omitempty"`
-
-	// Backup / Restore, when set, make this a backup-everything (or restore) job instead of a pipeline run
-	// — intercepted before mode parsing like Transfer, reusing the whole job progress/SSE stack.
-	Backup  *BackupRequest  `json:"backup,omitempty"`
-	Restore *RestoreRequest `json:"restore,omitempty"`
 }
-
-// BackupRequest snapshots precious local state (Postgres db, calibration library, LP atlas, browser app
-// state) to <Prefix>/backup/<stamp>/ in Bucket. Credentials are env-only (never carried here). AppState is
-// the UI-exported browser JSON (favorites/setups/prefs + AI chats) — only the frontend can produce it.
-// StampMs is set server-side.
-type BackupRequest struct {
-	Bucket     string   `json:"bucket"`
-	Prefix     string   `json:"prefix"`
-	Components []string `json:"components"` // db | library | atlas | appstate
-	AppState   string   `json:"appstate,omitempty"`
-	StampMs    int64    `json:"stamp_ms"`
-	// StorageClass, when a non-STANDARD class, archives the heavy backup components (db.dump, library.tar,
-	// atlas) to that class after upload — backups are the natural archival target. The manifest and appstate
-	// are always kept instant so the backup picker + browser-side appstate restore work without a thaw. An
-	// archived (GLACIER/DEEP_ARCHIVE) backup is thawed before restore; GLACIER_IR restores instantly.
-	StorageClass string `json:"storage_class,omitempty"`
-}
-
-// RestoreRequest restores the chosen components from <Prefix>/backup/<Stamp>/ in Bucket. The appstate
-// component is applied browser-side (fetched via GET /api/backup/appstate), not by this job.
-type RestoreRequest struct {
-	Bucket     string   `json:"bucket"`
-	Prefix     string   `json:"prefix"`
-	Stamp      string   `json:"stamp"`
-	Components []string `json:"components"`
-}
-
-// TransferRequest describes an S3 folder transfer. Credentials are NOT carried here (env only); Bucket +
-// Prefix + Namespace ("data" for captures / "output" for results) + RelPath locate the folder and its
-// mirror key (`<Prefix>/<Namespace>/<RelPath>`).
-type TransferRequest struct {
-	Op        string `json:"op"` // upload | sync | download | removeLocal
-	Bucket    string `json:"bucket"`
-	Prefix    string `json:"prefix"`
-	Namespace string `json:"namespace"` // "data" | "output"
-	RelPath   string `json:"rel_path"`
-	// LocalRoot, when set, is an ABSOLUTE local root OUTSIDE DataDir/OutputDir (an external drive) that the
-	// transfer walks instead of the namespace root. The API validates it against the browse allowlist before
-	// enqueuing (localfs.Allowed) — it is never derived from an untrusted body alone. With it, keys are
-	// `<Prefix>/<RelPath>/…` (Namespace stays empty) and the classified data-plan is skipped: these are
-	// arbitrary files, not AstroStack captures.
-	LocalRoot string `json:"local_root,omitempty"`
-	// Verify upgrades a sync to content-verified — upload only files MISSING or CORRUPTED, not just
-	// size-changed (see transfer.Request.Verify). Used by the external-drive copy so a half-written mirror
-	// object is re-uploaded rather than trusted.
-	Verify bool `json:"verify,omitempty"`
-	// ExcludeDirs names subdirectories the transfer walk skips entirely (see transfer.Request.ExcludeDirs).
-	// The calibration-library mirror sets it to ["catalogues"] so the multi-GB Gaia catalogues tree under
-	// LibraryDir is never uploaded.
-	ExcludeDirs []string `json:"exclude_dirs,omitempty"`
-	// SkipSymlinks drops symlinked entries from the upload walk (see transfer.Request.SkipSymlinks). The
-	// local-folder copy sets it so copying WorkDir does not follow Siril's `link` symlinks and re-upload
-	// every input frame with a wrong (tiny) size.
-	SkipSymlinks bool `json:"skip_symlinks,omitempty"`
-}
-
-// MoveRequest describes an S3→S3 move of one or more objects/folders into a destination folder, all within
-// one Bucket on the UI-selected connection Conn. Srcs are object keys (a folder key ends "/"); Dst is the
-// destination folder key ("" = bucket root). Credentials are resolved from Conn (never carried here).
-type MoveRequest struct {
-	Conn   int64    `json:"conn"`
-	Bucket string   `json:"bucket"`
-	Srcs   []string `json:"srcs"`
-	Dst    string   `json:"dst"`
-}
-
-// TierRequest describes a storage-class change of one or more objects/folders on the UI-selected connection
-// Conn. Srcs are object keys (a folder key ends "/") that get expanded to their contained objects.
-// TargetClass is the class to transition to (STANDARD|GLACIER|DEEP_ARCHIVE|GLACIER_IR|…). RestoreOnly thaws
-// an archived object to a temporarily-readable copy WITHOUT a permanent transition (for a download/inspect
-// without paying to re-hydrate to STANDARD). Days is the restore lifetime (0 → engine default); Tier is the
-// retrieval speed (Standard|Bulk|Expedited; "" → Standard). Credentials come from Conn (never carried here).
-type TierRequest struct {
-	Conn        int64    `json:"conn"`
-	Bucket      string   `json:"bucket"`
-	Srcs        []string `json:"srcs"`
-	TargetClass string   `json:"target_class"`
-	RestoreOnly bool     `json:"restore_only,omitempty"`
-	Days        int      `json:"days,omitempty"`
-	Tier        string   `json:"tier,omitempty"`
-}
-
-// S3Target is the bucket + prefix a full-S3 run reads inputs from and pushes results to.
-type S3Target struct {
-	Bucket string `json:"bucket"`
-	Prefix string `json:"prefix"`
-}
-
 // RefineRequest re-finishes an existing completed run under the AI supervisor. RunDir is the run's
 // output folder (output/<object>/<runID>); the finish is re-run from its on-disk masters (Tier A/B) or,
 // when AllowRestack is set and the raw frames are still present, re-stacked from scratch (Tier C).
@@ -504,11 +375,8 @@ func NewManager(st *store.Store, runner *siril.Runner, cfg *config.Config, hub T
 		runner:        runner,
 		cfg:           cfg,
 		turns:         hub,
-		s3conn:        newS3ConnService(st, cfg),
 		queue:         make(chan int64, 256),
 		seqQueue:      make(chan int64, 256),
-		xferQueue:     make(chan int64, 256),
-		thawQueue:     make(chan int64, 256),
 		subs:          map[int64][]chan Event{},
 		cancels:       map[int64]context.CancelFunc{},
 		pauses:        map[int64]*pauseGate{},
@@ -530,21 +398,6 @@ func (m *Manager) initEngineMon() *engineMonitor {
 	return m.engineMon
 }
 
-// newS3ConnService builds the encrypted-connection service for the worker (nil when the master key can't be
-// resolved — pipeline S3 then falls back to the env credentials).
-func newS3ConnService(st *store.Store, cfg *config.Config) *s3conn.Service {
-	box, err := secret.NewBox(cfg.EncryptionKey, cfg.SecretKeyFile)
-	if err != nil {
-		return nil
-	}
-	return s3conn.New(st, box)
-}
-
-// lockTarget serializes jobs that share an input directory so a new run cannot race a still-running one
-// on the shared calibration library and output directory. Jobs over different inputs run concurrently.
-// It blocks until the lock is free and returns the unlock function.
-// lockTarget serializes this run against any other job whose input roots overlap (equal or nested
-// paths). Kept as a named seam; the real logic lives in pathLocker.
 func (m *Manager) lockTarget(paths ...string) func() {
 	return m.locker.Acquire(paths)
 }
@@ -577,20 +430,10 @@ func (m *Manager) Start(ctx context.Context, n int) {
 		go m.worker(ctx, m.queue)
 	}
 	go m.worker(ctx, m.seqQueue)
-	// Two transfer workers so a couple of uploads/downloads can overlap without touching the run pool.
-	go m.worker(ctx, m.xferQueue)
-	go m.worker(ctx, m.xferQueue)
-	// Two thaw workers for the storage-class/restore lane. Their active work is cheap (Restore/Stat +
-	// server-side copies) and the long WAIT happens via a paused checkpoint, so they occupy no worker while
-	// a restore is in flight — they never starve the transfer or run pools.
-	go m.worker(ctx, m.thawQueue)
-	go m.worker(ctx, m.thawQueue)
 	// Re-dispatch jobs a previous instance left 'queued'. Enqueue schedules a job by pushing its id onto
 	// an in-process lane channel, which is lost on restart — so, like the orphaned-running reconcile above,
 	// a job queued when the previous instance stopped has no live worker and would sit queued forever.
 	m.redispatchQueued(ctx)
-	// Auto-resume error-paused jobs (transient S3 failures) with backoff — manual pauses are left alone.
-	go m.autoResumePaused(ctx)
 }
 
 // redispatchQueued re-schedules every job the DB still has as 'queued' by pushing its id back onto the
@@ -626,7 +469,7 @@ func (m *Manager) redispatchQueued(ctx context.Context) {
 func (m *Manager) Enqueue(ctx context.Context, req RunRequest) (int64, error) {
 	// Validate fine-knob overrides up front on a scratch preset — a malformed params body must fail
 	// the REQUEST, not the worker mid-run. execute() re-applies onto the real preset and logs it.
-	if len(req.Params) > 0 && req.Transfer == nil && req.Backup == nil && req.Restore == nil {
+	if len(req.Params) > 0 {
 		if mo, merr := mode.ParseMode(req.Mode); merr == nil {
 			scratch := mode.For(mo)
 			if _, perr := pipeline.ApplyParamPatch(&scratch, req.Params); perr != nil {
@@ -794,7 +637,7 @@ func (m *Manager) Rerun(ctx context.Context, sourceJobID int64, stage string, pa
 	// ORIGINAL baseline preset (the fallback when a run predates the stage checkpoint); the NEW override
 	// rides in Rerun.Params, which RerunFromStage applies onto the checkpoint to pick the re-entry tier.
 	req := src
-	req.Refine, req.Transfer, req.Backup, req.Restore = nil, nil, nil, nil
+	req.Refine = nil
 	req.Sequential = false
 	req.Supervise = false
 	req.Rerun = &RerunRequest{RunDir: runDir, Stage: stage, Params: params}
@@ -822,64 +665,11 @@ func (m *Manager) DenoiseFinal(ctx context.Context, sourceJobID int64) (int64, e
 		return 0, fmt.Errorf("job %d has invalid params: %w", sourceJobID, err)
 	}
 	req := src
-	req.Refine, req.Transfer, req.Backup, req.Restore, req.Rerun = nil, nil, nil, nil, nil
+	req.Refine, req.Rerun = nil, nil
 	req.Sequential, req.Supervise = false, false
 	req.DenoiseFinal = &DenoiseFinalRequest{RunDir: runDir}
 	return m.Enqueue(ctx, req)
 }
-
-// FreeLocal frees the local input + output files of a finished full-S3 run by enqueuing verified removeLocal
-// transfers (each aborts unless every file is already on S3, so data is never lost). Returns the enqueued
-// transfer job ids. Errors when the job is not a succeeded full-S3 run or has nothing local to free. This is
-// the explicit counterpart to the auto-free that used to run after every full-S3 run.
-func (m *Manager) FreeLocal(ctx context.Context, sourceJobID int64) ([]int64, error) {
-	j, err := m.store.GetJob(ctx, sourceJobID)
-	if err != nil {
-		return nil, err
-	}
-	if j.Status != store.JobSucceeded {
-		return nil, fmt.Errorf("job %d is not a completed run", sourceJobID)
-	}
-	var p RunRequest
-	if err := json.Unmarshal(j.Params, &p); err != nil {
-		return nil, fmt.Errorf("job %d has invalid params: %w", sourceJobID, err)
-	}
-	if !p.wantsS3Storage() {
-		return nil, fmt.Errorf("job %d is not a full-S3 run", sourceJobID)
-	}
-	inputs, outRel := m.s3RunTargets(p, json.RawMessage(j.Result))
-
-	var ids []int64
-	enqueue := func(namespace, rel string) error {
-		newID, err := m.Enqueue(ctx, RunRequest{Mode: "transfer", Transfer: &TransferRequest{
-			Op: "removeLocal", Bucket: p.S3.Bucket, Prefix: p.S3.Prefix, Namespace: namespace, RelPath: rel,
-		}})
-		if err != nil {
-			return err
-		}
-		ids = append(ids, newID)
-		return nil
-	}
-	for _, rel := range inputs {
-		if err := enqueue("data", rel); err != nil {
-			return ids, err
-		}
-	}
-	if outRel != "" {
-		if err := enqueue("output", outRel); err != nil {
-			return ids, err
-		}
-	}
-	if len(ids) == 0 {
-		return nil, fmt.Errorf("job %d has no local files to free", sourceJobID)
-	}
-	return ids, nil
-}
-
-// runDirFromResult resolves a finished job's on-disk run directory from its stored result JSON. Deep-sky,
-// comet and milkyway persist a pipeline.Result with output_dir; planetary persists a flat planetary.Result
-// with out_base (<runDir>/<object>_stack) and no output_dir, so fall back to the directory of out_base.
-// Empty when neither is present (nothing on disk to refine).
 func runDirFromResult(raw []byte) string {
 	if len(raw) == 0 {
 		return ""
@@ -1058,8 +848,8 @@ func (m *Manager) run(ctx context.Context, id int64) {
 	}
 
 	// Serialize against any other job whose input roots overlap — ALL of them, not only the primary
-	// (a transfer/free over a secondary multi-select folder must not race the stack), and
-	// prefix-aware (a parent-folder transfer conflicts with a child-folder run).
+	// (a job over a secondary multi-select folder must not race the stack), and prefix-aware
+	// (a parent-folder job conflicts with a child-folder run).
 	unlock := m.lockTarget(p.inputRoots()...)
 	defer unlock()
 
@@ -1080,126 +870,16 @@ func (m *Manager) run(ctx context.Context, id int64) {
 	_ = m.store.SetJobRunning(ctx, id)
 	m.publish(Event{JobID: id, Status: store.JobRunning, Progress: 0, Step: "starting"})
 
-	// A thaw wait that has blown past its 48 h retrieval window fails clearly rather than polling forever
-	// (a restore should have completed long ago; something is wrong on the provider side).
-	if thawExpired(cp, time.Now().UnixMilli()) {
-		m.finishTerminal(id, store.JobFailed, fmt.Errorf("Glacier restore did not complete within the retrieval window (%dh)", thawDeadlineMs/3600/1000))
-		return
-	}
-
-	// Resume fast path: a job paused after a SUCCESSFUL compute (only the S3 push failed) just re-pushes
-	// the kept result — no recompute.
-	if cp.Phase == phasePush {
-		res := json.RawMessage(job.Result)
-		if err := m.pushS3Run(runCtx, id, p, res); err != nil {
-			m.settleS3Error(id, runCtx, phasePush, res, err, cp.Attempts)
-			return
-		}
-		m.finishSucceeded(id, p, job.Result)
-		return
-	}
-
-	// Full-S3 storage: pull the capture folders from S3 before processing so a run can work from files that
-	// live only on S3 (idempotent — same-size local files are skipped, so a resumed pull is cheap). A
-	// transient network failure PAUSES the job (resumable) rather than failing it. The low-disk staged mode
-	// skips this whole-folder pull: the pipeline's InputStager downloads one wave at a time instead. A
-	// denoise re-finish also skips it — it needs only the output tree (final.tif), hydrated in
-	// executeDenoiseFinal via ensureRunDirLocal, never the raw captures.
-	if p.wantsS3Storage() && !m.lowDiskActive(p) && p.DenoiseFinal == nil {
-		if err := m.pullS3Inputs(runCtx, id, p); err != nil {
-			// Archived (Glacier) inputs → initiate a thaw and PARK on a thaw cadence; resume re-pulls once
-			// they are readable. This is the "download and process from Glacier data" path.
-			var ae *transfer.ArchivedError
-			if errors.As(err, &ae) {
-				if terr := m.beginThaw(runCtx, id, p.S3.Bucket, ae.Keys); terr != nil {
-					m.finishTerminal(id, store.JobFailed, terr)
-					return
-				}
-				m.pauseJob(id, thawCheckpoint(phasePull, cp.Attempts, thawDeadlineOr(cp)), nil)
-				return
-			}
-			m.settleS3Error(id, runCtx, phasePull, nil, err, cp.Attempts)
-			return
-		}
-	}
-
 	res, runErr := m.execute(runCtx, id, turnID, job.Kind, p, cp.pipelineResume(), gate)
 
-	// A cooperative mid-stack pause returns *PausedError; a manual pause during a standalone transfer
-	// returns transfer.ErrPaused. Either parks the job in the resumable paused state (Cause=manual, so the
-	// auto-resume sweep never touches it) rather than failing it.
+	// A cooperative mid-stack pause returns *PausedError: park the job in the resumable paused state
+	// rather than failing it.
 	if runErr != nil {
-		// Low-disk staged input pull failed mid-compute: pause the compute phase (carrying the run's
-		// id/outDir so resume reuses the output dir + skips finished channels). A transient S3 error
-		// auto-resumes with backoff; a manual pause during staging (ErrPaused inside) stays paused. Checked
-		// before PausedError/ErrPaused because a StagePullError unwraps to ErrPaused for a manual pause.
-		var spe *pipeline.StagePullError
-		if errors.As(runErr, &spe) {
-			// Cold (archived) inputs surfaced by a low-disk wave pull → thaw + park the compute phase
-			// (carrying run id/outDir so resume reuses the output dir + skips finished channels).
-			var ae *transfer.ArchivedError
-			if errors.As(spe.Err, &ae) {
-				if terr := m.beginThaw(runCtx, id, p.S3.Bucket, ae.Keys); terr != nil {
-					m.finishTerminal(id, store.JobFailed, terr)
-					return
-				}
-				tcp := thawCheckpoint(phaseCompute, cp.Attempts, thawDeadlineOr(cp))
-				tcp.RunID, tcp.OutDir = spe.RunID, spe.OutDir
-				m.pauseJob(id, tcp, nil)
-				return
-			}
-			switch classifyS3Error(runCtx.Err(), spe.Err) {
-			case outcomeCancel:
-				m.finishTerminal(id, store.JobCancelled, spe.Err)
-			case outcomePause:
-				pcp := s3PauseCheckpoint(phaseCompute, spe.Err, cp.Attempts)
-				pcp.RunID, pcp.OutDir = spe.RunID, spe.OutDir
-				m.pauseJob(id, pcp, nil)
-			default:
-				m.finishTerminal(id, store.JobFailed, spe.Err)
-			}
-			return
-		}
 		var pe *pipeline.PausedError
 		if errors.As(runErr, &pe) {
 			m.pauseJob(id, resumeCheckpoint{Phase: phaseCompute, RunID: pe.RunID, OutDir: pe.OutDir,
 				Cause: causeManual, Reason: "paused by you — will continue the remaining channels"}, nil)
 			return
-		}
-		if errors.Is(runErr, transfer.ErrPaused) {
-			m.pauseJob(id, resumeCheckpoint{Phase: phaseTransfer, Cause: causeManual,
-				Reason: "paused by you — will resume the transfer"}, nil)
-			return
-		}
-		// A tier/thaw job with objects still restoring parks as a causeThaw pause; the auto-resume sweep
-		// re-checks on a thaw cadence and re-runs the transition once they are readable. Bounded by the 48 h
-		// deadline threaded through the checkpoint.
-		var tw *thawWaiting
-		if errors.As(runErr, &tw) {
-			m.pauseJob(id, thawCheckpoint(phaseTransfer, cp.Attempts, thawDeadlineOr(cp)), nil)
-			return
-		}
-		// Cold (archived) objects surfaced through execute(): a full-S3 run's low-disk scan full-pull
-		// fallback (park at pull), or a standalone S3→local download such as the Import-from-S3 tab (park at
-		// transfer). Either way: thaw the cold keys and park on a thaw cadence; resume re-enters and proceeds
-		// once they are readable — the "download from Glacier" path.
-		var ae *transfer.ArchivedError
-		if errors.As(runErr, &ae) {
-			bucket, phase := "", phaseTransfer
-			switch {
-			case p.S3 != nil:
-				bucket, phase = p.S3.Bucket, phasePull
-			case p.Transfer != nil:
-				bucket, phase = p.Transfer.Bucket, phaseTransfer
-			}
-			if bucket != "" {
-				if terr := m.beginThaw(runCtx, id, bucket, ae.Keys); terr != nil {
-					m.finishTerminal(id, store.JobFailed, terr)
-					return
-				}
-				m.pauseJob(id, thawCheckpoint(phase, cp.Attempts, thawDeadlineOr(cp)), nil)
-				return
-			}
 		}
 		// Terminal writes use a fresh context so they persist even if the run was cancelled.
 		status := store.JobFailed
@@ -1221,38 +901,11 @@ func (m *Manager) run(ctx context.Context, id int64) {
 		return
 	}
 
-	// Full-S3 storage: after a successful run, push inputs+outputs to S3 (local copies are kept so a retry
-	// can reuse them — freeing is the explicit "Remove local files" action). A transient push failure
-	// PAUSES (results stay safe locally) so Continue re-uploads.
-	if p.wantsS3Storage() {
-		if err := m.pushS3Run(runCtx, id, p, res); err != nil {
-			m.settleS3Error(id, runCtx, phasePush, res, err, cp.Attempts)
-			return
-		}
-	}
-
 	m.finishSucceeded(id, p, resultBlob(res))
 }
 
 func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p RunRequest,
 	resume *pipeline.ResumeState, gate *pauseGate) (any, error) {
-	// S3 transfer / backup / restore jobs are intercepted before pipeline-mode parsing — they reuse the
-	// whole progress/SSE stack but do not run Siril.
-	if p.Transfer != nil {
-		return m.runTransfer(ctx, id, p.Transfer)
-	}
-	if p.Move != nil {
-		return m.runS3Move(ctx, id, p.Move)
-	}
-	if p.TierChange != nil {
-		return m.runTier(ctx, id, p.TierChange)
-	}
-	if p.Backup != nil {
-		return m.runBackup(ctx, id, p.Backup)
-	}
-	if p.Restore != nil {
-		return m.runRestore(ctx, id, p.Restore)
-	}
 	if p.Path == "" {
 		return nil, fmt.Errorf("job has no path")
 	}
@@ -1550,7 +1203,7 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: graxRunner, Starnet: starRunner, DenoiseScale: m.cfg.DenoiseScale, ChannelParallel: m.cfg.ChannelParallel,
 			Supervisor: superRunner, JobID: id, FinishIterStore: m.store, FinishPriors: m.priors(), Goal: p.Goal, // opt-in local-AI-agent finish
 			Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, DarkDir: p.DarkDir, FlatDir: p.FlatDir, BiasDir: p.BiasDir,
-			PhoneCalib: m.store, LibraryDir: m.cfg.LibraryDir, LibraryMirror: m.libPuller(ctx),
+			PhoneCalib: m.store, LibraryDir: m.cfg.LibraryDir,
 			CatalogDir: m.cfg.SirilCatalogDir, OnProgress: pipeProg, Steer: steer, Confirm: confirm,
 		})
 		if err != nil {
@@ -1569,7 +1222,7 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			InputDir: p.Path, InputDirs: p.inputRoots(), OutputDir: m.cfg.OutputDir, WorkDir: m.cfg.WorkDir, Runner: m.runner,
 			Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: graxRunner, Starnet: starRunner,
 			Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, DarkDir: p.DarkDir, FlatDir: p.FlatDir, BiasDir: p.BiasDir,
-			PhoneCalib: m.store, LibraryDir: m.cfg.LibraryDir, LibraryMirror: m.libPuller(ctx),
+			PhoneCalib: m.store, LibraryDir: m.cfg.LibraryDir,
 			CatalogDir: m.cfg.SirilCatalogDir, DeepStarCat: m.cfg.DeepStarCat,
 			JobID: id, OnProgress: pipeProg, Steer: steer, Confirm: confirm,
 		})
@@ -1628,7 +1281,7 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			InputDir: p.Path, InputDirs: p.inputRoots(), OutputDir: m.cfg.OutputDir, WorkDir: m.cfg.WorkDir, Runner: m.runner,
 			Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: graxRunner, Starnet: starRunner, DenoiseScale: m.cfg.DenoiseScale, ChannelParallel: m.cfg.ChannelParallel,
 			Supervisor: superRunner, JobID: id, FinishIterStore: m.store, FinishPriors: m.priors(), Goal: p.Goal,
-			Library: m.store, LibraryDir: m.cfg.LibraryDir, LibraryMirror: m.libPuller(ctx),
+			Library: m.store, LibraryDir: m.cfg.LibraryDir,
 			FilterMapping: p.FilterMap, Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
 			Catalog: m.store, CalibExclude: p.CalibExclude, ExcludeSets: p.ExcludeSets, ForceCalibration: p.ForceCalibration,
 			OnProgress: pipeProg, Steer: steer, Confirm: confirm,
@@ -1655,7 +1308,7 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			Grade: &grd, Preset: &preset, Gimp: gclient, Graxpert: graxRunner, Starnet: starRunner, DenoiseScale: m.cfg.DenoiseScale, ChannelParallel: m.cfg.ChannelParallel,
 			Supervisor: superRunner,                                                          // opt-in local-AI-agent finish (nil → standard finish)
 			JobID:      id, FinishIterStore: m.store, FinishPriors: m.priors(), Goal: p.Goal, // persist supervised iterations against this job
-			Library: m.store, LibraryDir: m.cfg.LibraryDir, LibraryMirror: m.libPuller(ctx), OnProgress: pipeProg, Steer: steer, Confirm: confirm,
+			Library: m.store, LibraryDir: m.cfg.LibraryDir, OnProgress: pipeProg, Steer: steer, Confirm: confirm,
 			FilterMapping: p.FilterMap, Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
 			Catalog:          m.store, // always record the run so its frames become reusable
 			CalibExclude:     p.CalibExclude,
@@ -1672,15 +1325,6 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			opts.Reuse = pipeline.ReuseConfig{
 				Provider: m.store, ConeDeg: m.cfg.ReuseConeDeg, Sessions: p.reuseSessions(),
 			}
-		}
-		// Low-disk staged S3 mode: supply inputs on demand (scan remotely, download/free one wave at a time)
-		// instead of the whole-folder pull run() skipped for this run.
-		if m.lowDiskActive(p) {
-			st, serr := m.newS3Stager(id, p)
-			if serr != nil {
-				return nil, fmt.Errorf("low-disk stager: %w", serr)
-			}
-			opts.Stager = st
 		}
 		r, err := pipeline.Process(ctx, opts)
 		if err != nil {
@@ -1701,10 +1345,6 @@ func (m *Manager) executeRefine(ctx context.Context, id int64, p RunRequest, pre
 	gclient *gimp.Client, grax *graxpert.Runner, star *starnet.Runner, super *llm.Runner,
 	solve siril.SolveOptions, spcc siril.SpccOptions, pipeProg func(pipeline.Progress),
 	steer func() (string, bool), confirm func(context.Context, string, []string) (string, bool)) (any, error) {
-	// A refine reads the run's on-disk masters/run.json; re-hydrate them from S3 when they were freed.
-	if err := m.ensureRunDirLocal(ctx, id, p, p.Refine.RunDir); err != nil {
-		return nil, err
-	}
 	preset.Supervise = true
 	preset.SuperviseTier = p.Refine.Tier
 	if p.Refine.MaxIters > 0 {
@@ -1761,11 +1401,6 @@ func (m *Manager) executeRefine(ctx context.Context, id int64, p RunRequest, pre
 func (m *Manager) executeRerun(ctx context.Context, id int64, p RunRequest, preset mode.Preset,
 	gclient *gimp.Client, grax *graxpert.Runner, star *starnet.Runner,
 	solve siril.SolveOptions, spcc siril.SpccOptions, pipeProg func(pipeline.Progress)) (any, error) {
-	// A Tier-A/B rerun reuses the run's on-disk masters; re-hydrate the output tree from S3 when it was freed
-	// (a Tier-C re-stack additionally gets its raw inputs from the whole-folder pull in run()).
-	if err := m.ensureRunDirLocal(ctx, id, p, p.Rerun.RunDir); err != nil {
-		return nil, err
-	}
 	preset.Supervise = false // a manual rerun never invokes the agent
 	grd := preset.Grade
 	opts := pipeline.Options{
@@ -1797,11 +1432,6 @@ func (m *Manager) executeRerun(ctx context.Context, id int64, p RunRequest, pres
 // CoreML-incompatible, so this is CPU-bound — "faster + on demand", not instant.
 func (m *Manager) executeDenoiseFinal(ctx context.Context, id int64, p RunRequest, grax *graxpert.Runner, pipeProg func(pipeline.Progress)) (any, error) {
 	runDir := p.DenoiseFinal.RunDir
-	// Re-hydrate the run's output tree from S3 when its results were freed (final.tif lives under output/,
-	// which the input pull never fetches); no-op when already local. Idempotent, so a retry reuses on-disk files.
-	if err := m.ensureRunDirLocal(ctx, id, p, runDir); err != nil {
-		return nil, err
-	}
 	if err := grax.Available(ctx); err != nil {
 		return nil, fmt.Errorf("GraXpert unavailable (set GRAXPERT_BIN, or run `just run-graxpert-service` + ASTRO_GRAXPERT_URL): %w", err)
 	}

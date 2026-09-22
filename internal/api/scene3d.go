@@ -69,7 +69,7 @@ func (s *Server) getScene3D(w http.ResponseWriter, r *http.Request) {
 		return scene3d.Build(res, scene3d.Options{
 			RunDir: runDir,
 			Locate: func(rel string) (string, bool) {
-				return s.ensureServable(ctx, r, filepath.Join(runDir, rel), s.cfg.OutputDir, "output")
+				return servableLocal(filepath.Join(runDir, rel))
 			},
 		})
 	})

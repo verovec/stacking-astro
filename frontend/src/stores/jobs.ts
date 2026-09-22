@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { ApiError, apiGet, apiPost, health, withS3 } from "@/services/api";
+import { ApiError, apiGet, apiPost, health } from "@/services/api";
 import type {
   AlignPointsEstimate,
   Inventory,
@@ -54,11 +54,6 @@ export interface CreateOpts {
   // Frozen snapshot of the matched calibration masters (the Calibration preview), persisted with the job
   // so its page can show which darks/flats/bias are included and with what params. Informational only.
   calibPlan?: CalibPreview | null;
-  // Storage mode: "local" (default — keep files) or "s3" (pull inputs from S3, process locally, push
-  // inputs+results back to S3, then free the local copies — verified). s3 carries the target bucket/prefix.
-  storageMode?: "local" | "s3";
-  s3?: { bucket: string; prefix: string };
-  lowDisk?: boolean; // staged low-disk S3 processing (download/free one channel at a time)
   // Imaging target for plate-solve/SPCC seeding — a catalogue name ("M66") or "RA,Dec" — for
   // captures whose headers/folders can't identify the field. Never renames the run.
   target?: string;
@@ -278,11 +273,6 @@ export const useJobsStore = defineStore("jobs", () => {
     if (opts.forceCalibration) body.force_calibration_frames = true;
     if (opts.buildMasters) body.build_masters = true;
     if (opts.calibPlan) body.calib_plan = opts.calibPlan;
-    if (opts.storageMode === "s3" && opts.s3?.bucket) {
-      body.storage_mode = "s3";
-      body.s3 = { bucket: opts.s3.bucket, prefix: opts.s3.prefix };
-      if (typeof opts.lowDisk === "boolean") body.low_disk = opts.lowDisk;
-    }
     if (opts.target) body.target = opts.target;
     if (opts.goal) body.goal = opts.goal;
     if (opts.params && Object.keys(opts.params).length)
@@ -452,15 +442,12 @@ export const useJobsStore = defineStore("jobs", () => {
   }
 
   // fetchStars loads the cached annotation (GET). 404 = never computed → null, silently; other
-  // failures also yield null so the count button simply remains available. Both stars calls carry
-  // the S3 tags (withS3) so the backend can pull freed-to-S3 masters back on demand.
+  // failures also yield null so the count button simply remains available.
   async function fetchStars(id: number): Promise<StarAnnotations | null> {
     const cached = starsByJob.value[id];
     if (cached) return cached;
     try {
-      const data = await apiGet<StarAnnotations>(
-        withS3(`/api/jobs/${id}/stars`),
-      );
+      const data = await apiGet<StarAnnotations>(`/api/jobs/${id}/stars`);
       starsByJob.value[id] = normalizeStars(data);
       return starsByJob.value[id];
     } catch {
@@ -478,9 +465,7 @@ export const useJobsStore = defineStore("jobs", () => {
     }
     starsBusy.value[id] = true;
     try {
-      const data = await apiPost<StarAnnotations>(
-        withS3(`/api/jobs/${id}/stars`),
-      );
+      const data = await apiPost<StarAnnotations>(`/api/jobs/${id}/stars`);
       starsByJob.value[id] = normalizeStars(data);
       // The same pass rebuilds the 3D scene, so the cached manifest is now stale by construction —
       // dropping it is what makes "recompute" visibly fix a run whose scene could not be built.
@@ -498,26 +483,17 @@ export const useJobsStore = defineStore("jobs", () => {
 
   // fetchScene3D loads the cached 3D manifest (GET). 404 = the stars were never computed, which is
   // the normal state before the user asks for them; both that and any other failure yield null so
-  // the 3D chip simply stays hidden. Carries the S3 tags like the stars calls do.
+  // the 3D chip simply stays hidden.
   async function fetchScene3D(id: number): Promise<Scene3DManifest | null> {
     const cached = sceneByJob.value[id];
     if (cached) return cached;
     try {
-      const data = await apiGet<Scene3DManifest>(
-        withS3(`/api/jobs/${id}/scene3d`),
-      );
+      const data = await apiGet<Scene3DManifest>(`/api/jobs/${id}/scene3d`);
       sceneByJob.value[id] = data;
       return data;
     } catch {
       return null;
     }
-  }
-
-  // freeLocal frees a finished full-S3 run's local input+output files (each verified present on S3 first)
-  // by enqueuing removeLocal transfers; returns their ids so the caller can follow the frees in Tasks.
-  async function freeLocal(id: number): Promise<number[]> {
-    const data = await apiPost<{ ids: number[] }>(`/api/jobs/${id}/free-local`);
-    return data.ids ?? [];
   }
 
   // refine re-finishes a completed run under the AI supervisor (no re-stack unless allowRestack) as a
@@ -593,7 +569,7 @@ export const useJobsStore = defineStore("jobs", () => {
     error.value = "";
     try {
       const data = await apiGet<{ runs: RunSummary[]; total: number }>(
-        withS3(`/api/runs?offset=${runs.value.length}&limit=${RUNS_PAGE}`),
+        `/api/runs?offset=${runs.value.length}&limit=${RUNS_PAGE}`,
       );
       runs.value = [...runs.value, ...(data.runs || [])];
       runsTotal.value = data.total ?? runs.value.length;
@@ -641,7 +617,6 @@ export const useJobsStore = defineStore("jobs", () => {
     countStars,
     sceneFor,
     fetchScene3D,
-    freeLocal,
     refine,
     rerun,
     listRuns,

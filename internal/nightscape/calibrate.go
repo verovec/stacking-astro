@@ -57,7 +57,6 @@ func calibrateLights(ctx context.Context, o Options, plan calPlan, seqDir string
 	key.Width, key.Height = ref.W, ref.H
 	sel := calib.MatchPhoneCalibration(key, plan.masters)
 	// Pull the matched phone masters back from the S3 library mirror if their files are absent locally.
-	o.ensureMasters(ctx, []string{phoneMasterPath(sel.Dark), phoneMasterPath(sel.Bias), phoneMasterPath(sel.Flat)})
 
 	dark, dn := buildOrReusePhoneMaster(ctx, o, "dark", key, sel.Dark)
 	bias, bn := buildOrReusePhoneMaster(ctx, o, "bias", key, sel.Bias)

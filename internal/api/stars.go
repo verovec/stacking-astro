@@ -97,7 +97,7 @@ func (s *Server) computeStars(w http.ResponseWriter, r *http.Request) {
 		RunDir: runDir,
 		Mode:   mode,
 		Locate: func(rel string) (string, bool) {
-			return s.ensureServable(ctx, r, filepath.Join(runDir, rel), s.cfg.OutputDir, "output")
+			return servableLocal(filepath.Join(runDir, rel))
 		},
 		Runner:      s.sirilRunner,
 		Solve:       solve,

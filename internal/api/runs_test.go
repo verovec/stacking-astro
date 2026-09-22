@@ -50,29 +50,3 @@ func TestSummarizeRunBytes_EmptyFallsBackToPath(t *testing.T) {
 
 // cleanRel must confine every transfer rel_path to within its namespace — a leading ".." is absorbed by the
 // anchoring "/", so it can never escape; only empty/root-resolving inputs are rejected.
-func TestCleanRel(t *testing.T) {
-	cases := []struct {
-		in   string
-		want string
-		ok   bool
-	}{
-		{"M101", "M101", true},
-		{"M101/L", "M101/L", true},
-		{"a/b/../c", "a/c", true},
-		{"./M101", "M101", true},
-		{`M101\L`, "M101/L", true}, // backslashes normalized to forward slashes
-		{"../etc", "etc", true},    // leading ".." absorbed → confined, never escapes
-		{"../../secret", "secret", true},
-		{"", "", false},
-		{".", "", false},
-		{"..", "", false},      // resolves to root → rejected
-		{"M101/..", "", false}, // cancels out to root → rejected
-	}
-	for _, tc := range cases {
-		got, ok := cleanRel(tc.in)
-		assert.Equal(t, tc.ok, ok, tc.in)
-		if tc.ok {
-			assert.Equal(t, tc.want, got, tc.in)
-		}
-	}
-}

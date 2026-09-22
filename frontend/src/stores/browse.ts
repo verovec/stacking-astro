@@ -1,16 +1,8 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import {
-  apiDelete,
-  apiGet,
-  apiPost,
-  apiPut,
-  previewUrl,
-  withS3,
-} from "@/services/api";
+import { apiDelete, apiGet, apiPost, apiPut, previewUrl } from "@/services/api";
 import { PROCESSED_GROUP_COLORS } from "@/constants/colors";
 import { baseName } from "@/utils/format";
-import { useS3Store } from "@/stores/s3";
 import { fetchPreviewBuffer } from "@/utils/previewbuf";
 import type {
   BrowseEntry,
@@ -58,7 +50,7 @@ export const useBrowseStore = defineStore("browse", () => {
       const data = await apiGet<{
         groups: ProcessedGroup[];
         selections?: SavedSelectionInfo[];
-      }>(withS3("/api/processed"));
+      }>("/api/processed");
       processedGroups.value = data.groups ?? [];
       savedSelections.value = data.selections ?? [];
     } catch {
@@ -100,22 +92,6 @@ export const useBrowseStore = defineStore("browse", () => {
   async function deleteSelection(id: number): Promise<void> {
     await apiDelete(`/api/selections/${id}`);
     await loadProcessed();
-  }
-
-  // loadProcessedFor fetches just ONE job's processed group (GET /api/processed?job_id=…) and merges it into
-  // processedGroups (replace-or-append by job_id). The task-detail page needs only its own group (to gate the
-  // "Remove local files" action), so it must not pull the whole recent window like loadProcessed does.
-  async function loadProcessedFor(jobId: number) {
-    try {
-      const data = await apiGet<{ groups: ProcessedGroup[] }>(
-        withS3(`/api/processed?job_id=${jobId}`),
-      );
-      const g = (data.groups ?? []).find((x) => x.job_id === jobId);
-      const rest = processedGroups.value.filter((x) => x.job_id !== jobId);
-      processedGroups.value = g ? [...rest, g] : rest;
-    } catch {
-      // leave any previously-loaded groups intact; the action just won't light up
-    }
   }
 
   // path → processing info. Folders from one multi-folder job share a colour (keyed by job id); the
@@ -229,25 +205,19 @@ export const useBrowseStore = defineStore("browse", () => {
     }));
   }
 
-  // browseQuery builds the /api/browse query string, folding in the chosen S3 bucket/prefix when S3 is
-  // active so the backend returns local/cloud/both presence for each folder. `fresh` appends the
-  // cache-bypass flag the backend honours on an explicit refresh (never part of the cache key).
+  // browseQuery builds the /api/browse query string. `fresh` appends the cache-bypass flag the
+  // backend honours on an explicit refresh (never part of the cache key).
   function browseQuery(p?: string, fresh = false): string {
     const params = new URLSearchParams();
     if (p) params.set("path", p);
-    const s3 = useS3Store();
-    if (s3.active) {
-      params.set("bucket", s3.bucket);
-      params.set("prefix", s3.prefix);
-    }
     if (fresh) params.set("fresh", "1");
     const qs = params.toString();
     return qs ? `?${qs}` : "";
   }
 
-  // Directory-listing cache + in-flight de-duplication (keyed by the bucket/prefix-aware query, minus
-  // the fresh flag). Serving the Miller-column ancestor fan-out and back-and-forth navigation from here
-  // avoids re-hitting the backend; `force` bypasses the cache and re-lists live (Refresh / bucket change).
+  // Directory-listing cache + in-flight de-duplication (keyed by the query, minus the fresh flag).
+  // Serving the Miller-column ancestor fan-out and back-and-forth navigation from here avoids
+  // re-hitting the backend; `force` bypasses the cache and re-lists live (Refresh).
   const respCache = new Map<string, { path: string; entries: BrowseEntry[] }>();
   const inFlight = new Map<
     string,
@@ -349,7 +319,6 @@ export const useBrowseStore = defineStore("browse", () => {
     setSelectionFavorite,
     deleteSelection,
     loadProcessed,
-    loadProcessedFor,
     selectPaths,
   };
 });

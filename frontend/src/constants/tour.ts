@@ -43,7 +43,6 @@ export const TOURS: Record<string, readonly string[]> = {
   job: ["progress", "controls", "previews", "results", "stages"],
   runs: ["gallery", "open"],
   library: ["masters", "keys", "mirror"],
-  storage: ["connections", "browse", "free", "backup"],
 
   // Agent
 };

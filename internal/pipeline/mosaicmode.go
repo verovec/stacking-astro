@@ -38,7 +38,6 @@ func ProcessMosaic(ctx context.Context, opts Options) (*Result, error) {
 	} else {
 		opts.OnProgress = func(p Progress) { timer.observe(p.Step) }
 	}
-	defer opts.freePulledMasters(ctx)
 
 	scanOpts := inspect.DefaultScanOptions()
 	scanOpts.FilterMapping = opts.FilterMapping

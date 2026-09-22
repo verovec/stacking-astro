@@ -4,7 +4,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useJobsStore } from "@/stores/jobs";
-import { useBrowseStore } from "@/stores/browse";
 import { useAgentStore } from "@/stores/agent";
 import { usePresetsStore, payloadFromRunParams } from "@/stores/presets";
 import { useMosaicStore } from "@/stores/mosaic";
@@ -49,7 +48,6 @@ const { t } = useI18n();
 const router = useRouter();
 const jobsStore = useJobsStore();
 const mosaicStore = useMosaicStore();
-const browseStore = useBrowseStore();
 const agent = useAgentStore();
 // Set (this session) for a supervised/refine run: the id of its live steerable conversation turn.
 const turnId = computed(() => jobsStore.turnFor(jobId));
@@ -120,9 +118,6 @@ const {
   cpuPercent,
   peakRssBytes,
   cpuCores,
-  bytesDone,
-  bytesTotal,
-  bytesPerSec,
   iterations,
   stagePreviews,
   photomRecords,
@@ -194,24 +189,9 @@ function excludedSetChip(id: string): string {
 const reInv = ref<Inventory | null>(null);
 const cancelling = ref(false);
 
-// An S3 transfer job reports byte progress + throughput instead of a subprocess's CPU/RAM.
-const isTransfer = computed(() => bytesTotal.value > 0);
-
-// Live readouts for the running job, packed into a compact StatGrid: transferred/throughput for an S3
-// copy, else the whole engine tree's CPU/RAM (engine + Siril/GraXpert/StarNet/GIMP/ffmpeg).
+// Live readouts for the running job, packed into a compact StatGrid: the whole engine tree's
+// CPU/RAM (engine + Siril/GraXpert/StarNet/GIMP/ffmpeg).
 const progressStats = computed(() => {
-  if (isTransfer.value) {
-    return [
-      {
-        label: t("job.transferred"),
-        value: `${formatBytes(bytesDone.value)} / ${formatBytes(bytesTotal.value)}`,
-      },
-      {
-        label: t("job.throughput"),
-        value: `${formatBytes(bytesPerSec.value)}/s`,
-      },
-    ];
-  }
   // "10.8 / 12 cores" reads the true load at a glance; % of one core is the fallback when the
   // stream predates cpu_cores.
   const cpu = cpuCores.value
@@ -248,12 +228,6 @@ onMounted(async () => {
   }
   await jobsStore.get(jobId);
   const jb = jobsStore.current;
-  // Per-folder local/S3 truth for the "Remove local files" action — but that button only ever appears on a
-  // succeeded full-S3 run, so fetch it single-job-scoped (not the whole /api/processed window) and only when
-  // it can matter. Every other job skips the call entirely.
-  if (jb?.status === "succeeded" && jb.params?.storage_mode === "s3") {
-    void browseStore.loadProcessedFor(jobId);
-  }
   if (jb?.log_tail) seed(jb.log_tail.split("\n"));
   // Open the SSE stream only for a job that can still emit events. A finished job's state is fully
   // in the fetched row — opening a stream for it just spends a connection (and, on a loaded engine,
@@ -295,22 +269,13 @@ const canRestart = computed(() => {
   return s === "failed" || s === "cancelled";
 });
 const restarting = ref(false);
-// A paused job (manual pause, or auto-paused on a transient S3 error) can be continued from where it
+// A paused job (manual pause, or auto-paused on a transient error) can be continued from where it
 // left off. Not terminal — it shows Continue + Cancel.
 const isPaused = computed(() => liveStatus.value === "paused");
-// Manual mid-run pause is honored by the multi-channel deep-sky path (deepsky/nebula) AND by any S3
-// copy — a full-S3 run or a standalone transfer/backup pauses between files. Other local modes have no
-// safe mid-run boundary, so we don't offer a Pause that would look like a no-op.
-const isS3Copy = computed(
-  () =>
-    job.value?.params?.storage_mode === "s3" ||
-    job.value?.kind === "transfer" ||
-    job.value?.kind === "backup",
-);
+// Manual mid-run pause is honored by the multi-channel deep-sky path (deepsky/nebula). Other modes
+// have no safe mid-run boundary, so we don't offer a Pause that would look like a no-op.
 const canPause = computed(
-  () =>
-    running.value &&
-    (PAUSABLE_MODES.includes(job.value?.params?.mode ?? "") || isS3Copy.value),
+  () => running.value && PAUSABLE_MODES.includes(job.value?.params?.mode ?? ""),
 );
 const pausing = ref(false);
 const continuing = ref(false);
@@ -341,29 +306,6 @@ const canRefine = computed(
 const canDenoiseFinal = computed(
   () => job.value?.status === "succeeded" && !!result.value?.final,
 );
-// "Remove local files": offered on a succeeded full-S3 run whose capture folders are still on local disk
-// (from /api/processed). Freeing is safe — each file is verified on S3 server-side before deletion.
-const jobFilesLocal = computed(() => {
-  const g = browseStore.processedGroups.find((x) => x.job_id === jobId);
-  return !!g && g.paths.some((p) => p.local);
-});
-const freedLocal = ref(false);
-const canFreeLocal = computed(
-  () =>
-    job.value?.status === "succeeded" &&
-    job.value?.params?.storage_mode === "s3" &&
-    !freedLocal.value &&
-    jobFilesLocal.value,
-);
-async function freeLocalAction() {
-  if (!window.confirm(t("job.freeLocalConfirm"))) return;
-  try {
-    await jobsStore.freeLocal(jobId);
-    freedLocal.value = true; // optimistic hide; the removeLocal transfers run in Tasks
-  } catch {
-    // a failed transfer surfaces in the Tasks list
-  }
-}
 const denoising = ref(false);
 const denoiseError = ref("");
 async function denoiseFinalJob() {
@@ -490,28 +432,6 @@ function fmtElapsed(ms: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
 }
 
-// Estimated time remaining for an S3 transfer, from the already-smoothed throughput and bytes left.
-// 0 (hidden) for non-transfer jobs, a stalled rate, or once the copy is done.
-const etaMs = computed(() => {
-  if (!isTransfer.value || bytesPerSec.value <= 0) return 0;
-  const remain = bytesTotal.value - bytesDone.value;
-  if (remain <= 0) return 0;
-  return (remain / bytesPerSec.value) * 1000;
-});
-
-// The S3 mirror destination for a transfer job (`s3://<bucket>/<prefix>/<namespace>/<rel_path>`), rebuilt
-// from job params like the backend's baseKey(). Empty for non-transfer jobs. JS has no path.Join, so trim
-// slashes and drop empty segments (external-drive copies leave namespace empty).
-const destPath = computed(() => {
-  const tr = job.value?.params?.transfer;
-  if (!tr?.bucket) return "";
-  const key = [tr.prefix, tr.namespace, tr.rel_path]
-    .map((s) => (s ?? "").replace(/^\/+|\/+$/g, ""))
-    .filter(Boolean)
-    .join("/");
-  return `s3://${tr.bucket}${key ? "/" + key : ""}`;
-});
-
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
@@ -581,20 +501,12 @@ async function continueJobAction() {
 
 // ── Save this run as a preset (optionally starred) ────────────────────────────────────────────────
 // A succeeded pipeline run's persisted params ARE the recipe (payloadFromRunParams picks the preset
-// subset), so a good result can be kept as a named preset right here. Intercept jobs (transfer/backup/
-// restore/move/masters) carry no recipe and never offer it.
+// subset), so a good result can be kept as a named preset right here. Intercept jobs (masters) carry
+// no recipe and never offer it.
 const presetsStore = usePresetsStore();
 const canSavePreset = computed(() => {
   const p = job.value?.params;
-  return (
-    job.value?.status === "succeeded" &&
-    !!p?.mode &&
-    !p?.transfer &&
-    !p?.backup &&
-    !p?.restore &&
-    !p?.move &&
-    !p?.build_masters
-  );
+  return job.value?.status === "succeeded" && !!p?.mode && !p?.build_masters;
 });
 const presetSaveOpen = ref(false);
 const presetName = ref("");
@@ -808,14 +720,6 @@ async function savePresetFromRun() {
       >
         {{ restarting ? t("job.restarting") : t("job.restart") }}
       </button>
-      <button
-        v-if="canFreeLocal"
-        :class="[btnGhost, 'ml-auto text-danger']"
-        :title="t('job.freeLocalHint')"
-        @click="freeLocalAction"
-      >
-        {{ t("job.freeLocal") }}
-      </button>
     </div>
 
     <!-- Environment warnings (missing/broken tools, catalogues): collapsed count chip, expandable. -->
@@ -863,12 +767,6 @@ async function savePresetFromRun() {
                   class="flex shrink-0 items-center gap-3 text-slate-500 dark:text-slate-400"
                 >
                   <span class="tabular-nums">{{ fmtElapsed(elapsedMs) }}</span>
-                  <span
-                    v-if="etaMs"
-                    class="tabular-nums"
-                    :title="t('job.remaining')"
-                    >~{{ fmtElapsed(etaMs) }}</span
-                  >
                   <span class="font-medium text-slate-700 dark:text-slate-200"
                     >{{ progress }}%</span
                   >
@@ -876,18 +774,11 @@ async function savePresetFromRun() {
               </div>
               <ProgressBar :percent="progress" :active="running" />
               <StatGrid
-                v-if="rssBytes || cpuPercent || isTransfer"
+                v-if="rssBytes || cpuPercent"
                 class="mt-3"
                 :cols="3"
                 :items="progressStats"
               />
-              <p
-                v-if="destPath"
-                class="mt-3 truncate font-mono text-xs text-slate-500 dark:text-slate-400"
-                :title="destPath"
-              >
-                {{ t("job.destination") }}: {{ destPath }}
-              </p>
             </div>
             <CaptureSummary v-if="summary" :summary="summary" />
             <CalibrationPanel

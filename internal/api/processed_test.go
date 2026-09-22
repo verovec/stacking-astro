@@ -41,7 +41,7 @@ func TestBuildProcessedGroup(t *testing.T) {
 	// exists: only /data/M92/darks is still on local disk; /data/M92/flats was freed after an S3 push.
 	exists := func(p string) bool { return p == "/data/M92/darks" }
 
-	t.Run("multi-folder, one freed, bucket set", func(t *testing.T) {
+	t.Run("multi-folder, one missing on disk", func(t *testing.T) {
 		j := store.Job{
 			ID:     42,
 			Kind:   "deepsky",
@@ -49,7 +49,7 @@ func TestBuildProcessedGroup(t *testing.T) {
 			Params: json.RawMessage(`{"paths":["/data/M92/darks","/data/M92/flats","s3://live/x"],"mode":"deepsky","format":"fits"}`),
 			Result: json.RawMessage(`{"object":"M92"}`),
 		}
-		g, absent, ok := buildProcessedGroup(j, exists, dataAbs, "my-bucket")
+		g, ok := buildProcessedGroup(j, exists, dataAbs)
 		if !ok {
 			t.Fatal("expected ok=true")
 		}
@@ -65,9 +65,6 @@ func TestBuildProcessedGroup(t *testing.T) {
 		if g.Paths[1].Local || g.Paths[1].Rel != "M92/flats" {
 			t.Fatalf("flats should be non-local at rel M92/flats: %+v", g.Paths[1])
 		}
-		if len(absent) != 1 || absent[0] != "M92/flats" {
-			t.Fatalf("want absent=[M92/flats], got %v", absent)
-		}
 		// The signature covers the REAL folders only (s3:// skipped) and is the backend-computed
 		// join key the frontend matches saved selections against.
 		if want := store.SelectionSignature([]string{"/data/M92/darks", "/data/M92/flats"}); g.Signature != want {
@@ -75,20 +72,9 @@ func TestBuildProcessedGroup(t *testing.T) {
 		}
 	})
 
-	t.Run("no bucket → no absent rels collected", func(t *testing.T) {
-		j := store.Job{ID: 7, Params: json.RawMessage(`{"path":"/data/M92/flats"}`)}
-		_, absent, ok := buildProcessedGroup(j, exists, dataAbs, "")
-		if !ok {
-			t.Fatal("expected ok=true")
-		}
-		if len(absent) != 0 {
-			t.Fatalf("no bucket → no absent rels, got %v", absent)
-		}
-	})
-
 	t.Run("only synthetic paths → ok=false", func(t *testing.T) {
 		j := store.Job{ID: 9, Params: json.RawMessage(`{"paths":["s3://live/x"]}`)}
-		if _, _, ok := buildProcessedGroup(j, exists, dataAbs, "my-bucket"); ok {
+		if _, ok := buildProcessedGroup(j, exists, dataAbs); ok {
 			t.Fatal("a job with only a synthetic s3:// path must not produce a group")
 		}
 	})

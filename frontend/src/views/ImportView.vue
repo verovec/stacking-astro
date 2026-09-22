@@ -4,7 +4,6 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useBrowseStore } from "@/stores/browse";
 import { useJobsStore } from "@/stores/jobs";
-import { useS3Store, type TransferOp } from "@/stores/s3";
 import { usePresetsStore } from "@/stores/presets";
 import { useMosaicStore } from "@/stores/mosaic";
 import { MODES } from "@/constants/modes";
@@ -31,7 +30,6 @@ import StatusPill from "@/components/Common/StatusPill.vue";
 import EnvWarnings from "@/components/Common/EnvWarnings.vue";
 import HelpButton from "@/components/Common/HelpButton.vue";
 import IconFolder from "@/components/Icons/IconFolder.vue";
-import IconCloud from "@/components/Icons/IconCloud.vue";
 import type { CreateOpts, KnobRange, StackMenu } from "@/stores/jobs";
 import type {
   AlignPointsEstimate,
@@ -60,30 +58,11 @@ const router = useRouter();
 const { t } = useI18n();
 const browseStore = useBrowseStore();
 const jobsStore = useJobsStore();
-const s3 = useS3Store();
-// Storage mode for a run (only offered when S3 is active): "local" keeps files on disk; "s3" pulls inputs
-// from S3, processes locally, pushes inputs+results back to S3, then frees the local copies (verified).
-const processMode = ref<"local" | "s3">("local");
-const lowDisk = ref(true); // staged low-disk S3 processing (default on; deep-sky/nebula only)
 
-// Import file-source tab: browse local disk vs the S3 mirror. Both drive the same FileBrowser over the
-// DataDir tree, filtered by source; the selection is shared across tabs. S3-only folders download to local
-// before inspect (downloadingS3 = count in flight; inspectError surfaces a failure).
-const sourceTab = ref<"local" | "s3">("local");
-const tabClass = (kind: "local" | "s3") =>
-  kind === sourceTab.value
-    ? "rounded-md px-3 py-2 text-sm font-medium bg-brand-600 text-white"
-    : "rounded-md px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700";
-// S3 → local progress feedback: downloadingS3 = folders being pulled, downloadedS3 = how many finished,
-// inspecting = the post-download frame scan. s3Busy drives the browser's disabled/busy button + banner.
-const downloadingS3 = ref(0);
-const downloadedS3 = ref(0);
+// Inspect feedback: inspecting = the frame scan over the selected folders (drives the browser's
+// disabled/busy button + banner); inspectError surfaces a failure.
 const inspecting = ref(false);
 const inspectError = ref("");
-const s3Busy = computed(() => downloadingS3.value > 0 || inspecting.value);
-const s3BusyLabel = computed(() =>
-  inspecting.value ? t("import.inspectingBtn") : t("import.downloadingBtn"),
-);
 
 const selectedPaths = ref<string[]>([]);
 const rootPath = ref("");
@@ -352,7 +331,6 @@ function nudgeParam(key: string, dir: 1 | -1) {
 }
 
 onMounted(async () => {
-  s3.fetchStatus(); // learn whether S3 is configured (drives presence badges + transfer actions)
   await browseStore.browse();
   rootPath.value = browseStore.path;
   browseStore.loadProcessed(); // mark folders already used in a past processing
@@ -362,75 +340,6 @@ async function openDir(path: string) {
   await browseStore.browse(path);
 }
 
-// --- S3 storage --------------------------------------------------------------------------------------
-// openS3Tab switches to the S3 tab and lists the real bucket at its root (only when configured).
-function openS3Tab() {
-  if (!s3.configured) return;
-  sourceTab.value = "s3";
-  if (s3.bucket) void s3.s3Browse("");
-}
-// Changing the bucket/prefix re-lists the S3 tab from the root (and refreshes the local presence badges);
-// the previous S3 selection is cleared since it referred to the old bucket/prefix.
-async function onBucket(e: Event) {
-  s3.setBucket((e.target as HTMLSelectElement).value);
-  s3.clearS3();
-  // The new bucket invalidates both cached listings (presence badges + object tree).
-  browseStore.clearCache();
-  s3.clearS3Cache();
-  await Promise.all([
-    browseStore.browse(browseStore.path, true),
-    s3.s3Browse("", true),
-  ]);
-}
-
-// refreshS3 re-checks the connection and re-lists both trees live (bypassing every cache).
-async function refreshS3() {
-  browseStore.clearCache();
-  s3.clearS3Cache();
-  await s3.fetchStatus();
-  await Promise.all([
-    browseStore.browse(browseStore.path, true),
-    s3.bucket ? s3.s3Browse(s3.s3Rel, true) : Promise.resolve(),
-  ]);
-}
-async function onPrefix(e: Event) {
-  s3.setPrefix((e.target as HTMLInputElement).value);
-  s3.clearS3();
-  browseStore.clearCache();
-  s3.clearS3Cache();
-  await Promise.all([
-    browseStore.browse(browseStore.path, true),
-    s3.s3Browse("", true),
-  ]);
-}
-
-// relToRoot maps a selected folder's absolute path to its path relative to the capture root (DataDir),
-// which is the transfer key. rootPath is the initial browse root (= DataDir).
-function relToRoot(p: string): string {
-  const root = rootPath.value;
-  if (root && p.startsWith(root))
-    return p.slice(root.length).replace(/^\/+/, "");
-  return baseName(p);
-}
-
-// onTransfer enqueues one S3 transfer job per selected folder; each shows a progress bar in Tasks.
-const transferToast = ref<{ n: number; op: TransferOp } | null>(null);
-async function onTransfer(op: TransferOp) {
-  const folders = browseStore.selected;
-  if (!folders.length) return;
-  let n = 0;
-  for (const f of folders) {
-    const rel = relToRoot(f.path);
-    if (!rel) continue;
-    try {
-      await s3.transfer(op, rel);
-      n++;
-    } catch {
-      // surfaced via the Tasks list if the job fails
-    }
-  }
-  transferToast.value = { n, op };
-}
 // Cross-session reuse: discovered prior data + the user's selection.
 const reusePreview = ref<ReusePreview | null>(null);
 const reuseEnabled = ref(true);
@@ -509,32 +418,12 @@ watch(forceCalibration, async (on) => {
   calibExcluded.value = [];
 });
 
-// onInspect is the primary action for both tabs: download any S3-picked folders to local (kept local),
-// then inspect the combined set (local selection + the downloaded S3 folders). Falls back to the emitted
-// active local folder only when nothing is checked in either tab.
+// onInspect is the primary action: inspect the checked selection, falling back to the emitted active
+// folder when nothing is checked.
 async function onInspect(emitted: string[]) {
   inspectError.value = "";
   const localSel = browseStore.selected.map((e) => e.path);
-  const s3Rels = s3.s3Selected.map((e) => e.path);
-  const localPaths =
-    localSel.length || s3Rels.length
-      ? localSel
-      : emitted.filter((p) => p.startsWith(rootPath.value)); // ignore an S3-tab active rel
-  if (s3Rels.length) {
-    downloadingS3.value = s3Rels.length;
-    downloadedS3.value = 0;
-    try {
-      await s3.importFolders(s3Rels, () => downloadedS3.value++);
-      await browseStore.browse(browseStore.path); // downloaded folders now show in Local Files
-    } catch (e) {
-      inspectError.value = (e as Error).message;
-      downloadingS3.value = 0;
-      return;
-    }
-    downloadingS3.value = 0;
-  }
-  const landing = s3Rels.map((rel) => `${rootPath.value}/${rel}`);
-  const paths = [...localPaths, ...landing];
+  const paths = localSel.length ? localSel : emitted;
   if (paths.length) {
     inspecting.value = true;
     try {
@@ -1097,16 +986,6 @@ function runOpts(): CreateOpts {
     // Tiled-mosaic run: reference the saved plan (panel labels, expected centers, solve hints).
     mosaicPlanId:
       isMosaicMode.value && mosaicPlanId.value ? mosaicPlanId.value : undefined,
-    // Full-S3 run: pull inputs from S3, process, push inputs+results, then free local (only when active).
-    storageMode: s3.active && processMode.value === "s3" ? "s3" : undefined,
-    s3:
-      s3.active && processMode.value === "s3"
-        ? { bucket: s3.bucket, prefix: s3.prefix }
-        : undefined,
-    lowDisk:
-      s3.active && processMode.value === "s3" && isDeepskyFamily.value
-        ? lowDisk.value
-        : undefined,
   };
 }
 
@@ -1147,46 +1026,14 @@ async function queuePipeline() {
 // Re-run a past folder-set: re-select the folders that still exist, restore mode/format, inspect, and
 // scroll to the run controls. Deleted folders are dropped (the chips show them crossed-out).
 const runControls = ref<HTMLElement | null>(null);
-// useHistory re-runs a past folder-set whether its files are still local or were freed to S3 after a
-// full-S3 run. Folders present on the S3 mirror but not on disk (exists && !local) are pulled back from
-// <prefix>/data/<rel> into <DataDir>/<rel> first, so the inspection below always sees real local files.
+// useHistory re-runs a past folder-set from the folders still present on disk; folders that no
+// longer exist are dropped (the chips show them crossed-out).
 async function useHistory(entry: ProcessingHistoryEntry) {
   inspectError.value = "";
-  // Partition the folder-set. `local === false` (strict) is the only signal to pull from S3, so an older
-  // backend that omits `local` safely degrades to the local-only path instead of pulling every folder.
-  const localPaths = entry.paths
+  const paths = entry.paths
     .filter((p) => p.exists && p.local !== false)
     .map((p) => p.path);
-  const s3Only = entry.paths.filter((p) => p.exists && p.local === false);
-  if (!localPaths.length && !s3Only.length) return; // every folder truly gone
-
-  const landing: string[] = [];
-  if (s3Only.length) {
-    if (!s3.active) {
-      inspectError.value = t("import.history.needS3");
-      return;
-    }
-    // Pull with the backend-authoritative DataDir-rel (the ledger key the offer was based on) — a
-    // client-side rel guess diverges for nested folders and misses the ledger. A data-namespace download
-    // of `rel` lands at <DataDir>/<rel>, which is exactly `p.path`, so inspect the original paths below.
-    const pulls = s3Only.filter((p) => p.rel);
-    const rels = pulls.map((p) => p.rel);
-    downloadingS3.value = rels.length;
-    downloadedS3.value = 0;
-    try {
-      await s3.downloadFolders(rels, () => downloadedS3.value++);
-    } catch (e) {
-      inspectError.value = (e as Error).message;
-      downloadingS3.value = 0;
-      return;
-    }
-    downloadingS3.value = 0;
-    await browseStore.browse(browseStore.path); // pulled folders now show in Local Files
-    landing.push(...pulls.map((p) => p.path));
-  }
-
-  const paths = [...localPaths, ...landing];
-  if (!paths.length) return;
+  if (!paths.length) return; // every folder truly gone
   browseStore.selectPaths(paths);
   if (entry.mode && modes.includes(entry.mode)) selectedMode.value = entry.mode;
   if (entry.format && formats.includes(entry.format))
@@ -1284,76 +1131,8 @@ function histChip(exists: boolean): string {
     </div>
 
     <div :class="card">
-      <!-- Source tabs: browse local disk vs the S3 mirror; the selection is shared across both. -->
-      <div class="mb-4 flex gap-2">
-        <button :class="tabClass('local')" @click="sourceTab = 'local'">
-          {{ t("import.tabs.local") }}
-        </button>
-        <button
-          :class="tabClass('s3')"
-          :disabled="!s3.configured"
-          :title="!s3.configured ? t('import.s3NotConfigured') : ''"
-          @click="openS3Tab"
-        >
-          {{ t("import.tabs.s3") }}
-        </button>
-      </div>
-
-      <!-- S3 storage config (S3 tab only): pick a bucket/prefix to see the mirror + enable transfers. -->
-      <div
-        v-if="sourceTab === 's3' && s3.configured"
-        class="mb-3 flex flex-wrap items-center gap-2 text-xs"
-      >
-        <span class="font-medium text-slate-500 dark:text-slate-400">{{
-          t("s3.title")
-        }}</span>
-        <select
-          v-if="s3.buckets.length"
-          :value="s3.bucket"
-          :class="input"
-          class="!w-auto !py-1"
-          @change="onBucket"
-        >
-          <option value="">{{ t("s3.pickBucket") }}</option>
-          <option v-for="b in s3.buckets" :key="b" :value="b">{{ b }}</option>
-        </select>
-        <input
-          v-else
-          :value="s3.bucket"
-          :class="input"
-          class="!w-40 !py-1"
-          :placeholder="t('s3.bucket')"
-          @change="onBucket"
-        />
-        <input
-          :value="s3.prefix"
-          :class="input"
-          class="!w-40 !py-1"
-          :placeholder="t('s3.prefix')"
-          @change="onPrefix"
-        />
-        <button :class="btnGhost" class="!px-2 !py-1" @click="refreshS3">
-          {{ t("s3.test") }}
-        </button>
-        <span
-          v-if="s3.reachable"
-          class="inline-flex items-center gap-1 text-success-600 dark:text-success-300"
-          >● {{ t("s3.connected") }}</span
-        >
-        <span v-else-if="s3.status?.error" class="text-danger">{{
-          s3.status.error
-        }}</span>
-      </div>
-      <p
-        v-else-if="sourceTab === 's3'"
-        class="mb-3 text-xs text-slate-400 dark:text-slate-500"
-      >
-        {{ t("import.s3NotConfigured") }}
-      </p>
-
-      <!-- Local tab: the local filesystem (with S3-mirror presence badges for the sync/backup workflow). -->
+      <!-- Local capture-folder browser; the selection persists across navigation. -->
       <FileBrowser
-        v-if="sourceTab === 'local'"
         :path="browseStore.path"
         :root="rootPath"
         :entries="browseStore.entries"
@@ -1362,68 +1141,20 @@ function histChip(exists: boolean): string {
         :error="browseStore.error"
         :fetch-children="browseStore.listDir"
         :processed="browseStore.processedByPath"
-        :s3-enabled="s3.active"
-        source-filter="local"
-        :downloading="s3Busy"
-        :busy-label="s3BusyLabel"
+        :busy="inspecting"
         @navigate="openDir"
         @inspect="onInspect"
         @toggle="browseStore.toggleSelected"
         @clear-selection="browseStore.clearSelected"
-        @transfer="onTransfer"
-      />
-      <!-- S3 tab: the real bucket at <prefix>/<rel> (default connection). Picked folders download to
-           <DataDir>/<rel> on inspect and become normal local captures. -->
-      <FileBrowser
-        v-else
-        :path="s3.s3Rel"
-        root=""
-        :entries="s3.s3Entries"
-        :loading="s3.loading"
-        :selected="s3.s3Selected"
-        :error="s3.error"
-        :fetch-children="s3.s3ListDir"
-        :downloading="s3Busy"
-        :busy-label="s3BusyLabel"
-        @navigate="s3.s3Browse"
-        @inspect="onInspect"
-        @toggle="s3.toggleS3"
-        @clear-selection="s3.clearS3"
       />
       <div
-        v-if="s3Busy"
+        v-if="inspecting"
         class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400"
       >
-        <Spinner>
-          <span v-if="downloadingS3 > 0">{{
-            t("import.downloadingS3Progress", {
-              done: downloadedS3,
-              n: downloadingS3,
-            })
-          }}</span>
-          <span v-else>{{ t("import.inspectingS3") }}</span>
-        </Spinner>
-        <router-link
-          v-if="downloadingS3 > 0"
-          :to="{ name: 'jobs' }"
-          class="font-medium underline hover:text-slate-700 dark:hover:text-slate-200"
-          >{{ t("import.viewQueue") }}</router-link
-        >
+        <Spinner>{{ t("import.inspectingBtn") }}</Spinner>
       </div>
       <p v-if="inspectError" class="mt-2 text-xs text-danger">
         {{ inspectError }}
-      </p>
-      <p
-        v-if="transferToast"
-        class="mt-2 text-xs text-success-600 dark:text-success-300"
-      >
-        {{ t("s3.queued", { n: transferToast.n }) }}
-        <router-link
-          :to="{ name: 'jobs' }"
-          class="font-medium underline hover:text-success-700 dark:hover:text-success-200"
-        >
-          {{ t("import.viewQueue") }}
-        </router-link>
       </p>
     </div>
 
@@ -1538,7 +1269,7 @@ function histChip(exists: boolean): string {
             <button
               :class="btnGhost"
               class="ml-auto !px-2 !py-1 !text-xs"
-              :disabled="s3Busy || !entry.paths.some((p) => p.exists)"
+              :disabled="inspecting || !entry.paths.some((p) => p.exists)"
               @click="useHistory(entry)"
             >
               {{ t("import.history.useAgain") }}
@@ -1550,44 +1281,22 @@ function histChip(exists: boolean): string {
               :key="p.path"
               :class="histChip(p.exists)"
               :title="
-                !p.exists
-                  ? t('import.history.deleted') + ': ' + p.path
-                  : p.local
-                    ? p.path
-                    : t('import.history.onS3') + ': ' + p.path
+                !p.exists ? t('import.history.deleted') + ': ' + p.path : p.path
               "
             >
-              <IconCloud
-                v-if="p.exists && !p.local"
-                class="h-3 w-3 shrink-0 text-brand-500 dark:text-brand-300"
-              />
-              <IconFolder v-else class="h-3 w-3 shrink-0" />
+              <IconFolder class="h-3 w-3 shrink-0" />
               {{ baseName(p.path) }}
             </span>
           </div>
         </li>
       </ul>
       <p v-if="histError" class="mt-2 text-xs text-danger">{{ histError }}</p>
-      <!-- Feedback while a history re-run pulls its freed folders back from the S3 mirror. -->
+      <!-- Feedback while a history re-run inspects its folders. -->
       <div
-        v-if="s3Busy"
+        v-if="inspecting"
         class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400"
       >
-        <Spinner>
-          <span v-if="downloadingS3 > 0">{{
-            t("import.downloadingS3Progress", {
-              done: downloadedS3,
-              n: downloadingS3,
-            })
-          }}</span>
-          <span v-else>{{ t("import.inspectingS3") }}</span>
-        </Spinner>
-        <router-link
-          v-if="downloadingS3 > 0"
-          :to="{ name: 'jobs' }"
-          class="font-medium underline hover:text-slate-700 dark:hover:text-slate-200"
-          >{{ t("import.viewQueue") }}</router-link
-        >
+        <Spinner>{{ t("import.inspectingBtn") }}</Spinner>
       </div>
       <p v-if="inspectError" class="mt-3 text-xs text-danger">
         {{ inspectError }}
@@ -1790,23 +1499,6 @@ function histChip(exists: boolean): string {
         >
           {{ t("run.sunHint") }}
         </p>
-        <label v-if="s3.active" class="text-sm" :title="t('s3.storageHint')">
-          <span class="mb-1 block text-xs font-medium text-slate-500">{{
-            t("s3.storage")
-          }}</span>
-          <select v-model="processMode" :class="input">
-            <option value="local">{{ t("s3.storageLocal") }}</option>
-            <option value="s3">{{ t("s3.storageS3") }}</option>
-          </select>
-        </label>
-        <label
-          v-if="s3.active && processMode === 's3' && isDeepskyFamily"
-          class="flex items-center gap-2 self-end pb-2 text-sm"
-          :title="t('s3.lowDiskHint')"
-        >
-          <input v-model="lowDisk" type="checkbox" :class="checkbox" />
-          {{ t("s3.lowDisk") }}
-        </label>
         <label v-if="isMilkyway" class="text-sm">
           <span class="mb-1 block text-xs font-medium text-slate-500">{{
             t("run.look")

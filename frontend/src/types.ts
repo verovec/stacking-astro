@@ -747,26 +747,7 @@ export interface JobParams {
   // supervisor/refine) tunes rides in `params` below, like the other fine knobs.
   auto_fix_stars?: boolean;
   sequential?: boolean;
-  live?: boolean;
-  // Storage: "local" | "s3" (full-S3 free-local-after), plus the target bucket/prefix.
-  storage_mode?: string;
-  s3?: { bucket?: string; prefix?: string };
-  low_disk?: boolean; // staged low-disk S3 processing (download/free one channel at a time)
-  // Standalone S3 transfer/backup job (upload|sync|download|removeLocal). Mirrors the Go TransferRequest
-  // JSON; the mirror destination base is `s3://<bucket>/<prefix>/<namespace>/<rel_path>`.
-  transfer?: {
-    op?: string;
-    bucket?: string;
-    prefix?: string;
-    namespace?: string; // "data" | "output" (empty for external-drive copies)
-    rel_path?: string;
-    local_root?: string;
-  };
-  // Other intercept jobs (no pipeline recipe): backup/restore/move sub-requests, and the masters-only
-  // calibration build flag (kind "masters").
-  backup?: Record<string, unknown>;
-  restore?: Record<string, unknown>;
-  move?: Record<string, unknown>;
+  // Masters-only calibration build flag (kind "masters" — no pipeline recipe).
   build_masters?: boolean;
   // Milkyway (nightscape) run options.
   look?: string;
@@ -803,7 +784,7 @@ export interface JobParams {
 
 // PresetPayload is the situation recipe a processing preset carries: the subset of the /api/jobs body a
 // preset re-applies to the launch form (mirrors internal/preset.Payload). Input-specific fields (paths,
-// calibration, reuse, S3, orientation) are deliberately absent — a preset is a recipe, not a run.
+// calibration, reuse, orientation) are deliberately absent — a preset is a recipe, not a run.
 export interface PresetPayload {
   mode?: string;
   format?: string;
@@ -888,28 +869,11 @@ export interface BrowseEntry {
   name: string;
   path: string;
   is_dir: boolean;
-  local?: boolean; // present on local disk (only set when browsing with an S3 bucket)
-  remote?: boolean; // present on the S3 mirror
-  storage_class?: string; // S3 explorer: "" == STANDARD; e.g. GLACIER / DEEP_ARCHIVE / GLACIER_IR
-  archived?: boolean; // S3 explorer: needs a Glacier restore before it can be downloaded
+  local?: boolean; // present on local disk (always true from the current backend)
 }
 
-// S3 connection status (GET /api/s3/status). configured = credentials present in the env; reachable +
-// buckets are filled when a connection test succeeds. conn_id names the default UI-managed connection
-// (absent when the backend runs on env credentials) so the store can persist it beside bucket/prefix.
-export interface S3Status {
-  configured: boolean;
-  endpoint?: string;
-  reachable?: boolean;
-  buckets?: string[];
-  error?: string;
-  conn_id?: number;
-}
-
-// One capture folder of a past processing (GET /api/processed). `exists` = usable (on local disk OR the
-// S3 mirror); `local` = present on local disk. `exists && !local` means it was freed after an S3 push and
-// must be pulled back from the mirror before it can be inspected/re-run. `rel` is the DataDir-relative slash
-// path — the authoritative ledger key the mirror pull uses (a client-side rel guess misses nested folders).
+// One capture folder of a past processing (GET /api/processed). `exists` = still on local disk (usable);
+// `local` mirrors it. `rel` is the DataDir-relative slash path.
 export interface ProcessedPath {
   path: string;
   exists: boolean;
@@ -2499,11 +2463,7 @@ export interface CaptureSessionRow {
 // calculation for a polar scope; these are the measured ones, from frames the telescope actually took.
 
 export type PolarCamPhase =
-  | "idle"
-  | "measuring"
-  | "solved"
-  | "adjusting"
-  | "failed";
+  "idle" | "measuring" | "solved" | "adjusting" | "failed";
 
 export interface PolarCamSample {
   index: number;
