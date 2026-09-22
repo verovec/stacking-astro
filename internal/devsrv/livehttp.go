@@ -92,10 +92,10 @@ func (s *Server) liveFrame(w http.ResponseWriter, r *http.Request) {
 
 // liveSave writes the newest live frame to disk as a FITS the engine can plate-solve.
 //
-// Polar alignment needs frames that are both SOLVABLE and VISIBLE: the engine has to measure where the
-// telescope is really pointing, and the user has to watch the same image while turning a bolt. Driving
-// separate exposures for the engine would take the camera away from the live loop and blank the screen
-// at exactly the wrong moment, so the two share one stream of frames instead — the engine solves the
+// Solve-driven features (GoTo centering, track measurement) need frames that are both SOLVABLE and
+// VISIBLE: the engine has to measure where the telescope is really pointing while the user watches the
+// same image. Driving separate exposures for the engine would take the camera away from the live loop
+// and blank the screen at exactly the wrong moment, so the two share one stream — the engine solves the
 // picture the user is looking at.
 //
 // The response carries the frame's sequence number so a caller can insist on a frame taken AFTER it
@@ -233,9 +233,6 @@ func (s *Server) liveSimulate(w http.ResponseWriter, r *http.Request) {
 		FaintStarsPerDeg2 *float64 `json:"faint_stars_per_deg2"`
 		// FlatPanelADUPerSec puts a flat panel over the aperture; 0 takes it away.
 		FlatPanelADUPerSec *float64 `json:"flat_panel_adu_per_sec"`
-		// PolarErrorAltArcmin/AzArcmin knock the simulated mount's polar axis off the pole, so the
-		// camera-based alignment can be exercised without a sky. Both must be sent together: leaving
-		// one out would silently keep whatever the other run left behind.
 			}
 	if !decodeBody(w, r, &body) {
 		return
