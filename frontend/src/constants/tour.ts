@@ -10,14 +10,10 @@
 export const TOURS: Record<string, readonly string[]> = {
   // Planner
   tonight: ["targets", "score", "skymap", "weather", "darksky", "optics"],
-  goto: ["why", "catalogue", "sequence", "chart"],
   calendar: ["months", "kinds", "event"],
   solarsystem: ["scene", "time", "scale", "bodies", "legend"],
 
-  // Capture
-  capture: ["devices", "liveview", "camera", "filters", "sequencer", "focus"],
-  logbook: ["list", "score", "filters"],
-  logbookSession: ["shot", "order", "conditions"],
+  // Capture planning
   mosaic: ["plan", "panels", "progress"],
 
   // Processing hub

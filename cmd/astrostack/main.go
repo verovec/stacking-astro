@@ -7,8 +7,6 @@
 //	astrostack process <dir> [flags]  run the full auto pipeline
 //	astrostack video   <file> [flags] process a lunar/planetary video
 //	astrostack serve                  run the HTTP API server
-//	astrostack device                 run the device server (camera / filter wheel / mount)
-//	astrostack mount <sub>            diagnose, probe, soak-test or audit the hand-controller link
 //	astrostack migrate                apply database migrations
 //	astrostack doctor                 report which external tools are present and what is degraded
 package main
@@ -40,10 +38,6 @@ func main() {
 		err = runVideo(os.Args[2:])
 	case "serve":
 		err = runServe(os.Args[2:])
-	case "device":
-		err = runDevice(os.Args[2:])
-	case "mount":
-		err = runMount(os.Args[2:])
 	case "migrate":
 		err = runMigrate(os.Args[2:])
 	case "doctor":
@@ -81,8 +75,6 @@ Usage:
   astrostack refine  <run-dir>       re-run the finish (local AI agent) on an existing run — no re-stack
   astrostack video   <file> [flags]  process a lunar/planetary video
   astrostack serve                   run the HTTP API server
-  astrostack device                  run the device server (camera / filter wheel / mount)
-  astrostack mount <sub>             hand-controller link: doctor | probe | soak | audit | reset
   astrostack migrate                 apply database migrations
   astrostack doctor                  report which external tools are present, and what degrades without them
   astrostack lightpollution-atlas    build the offline light-pollution atlas (djlorenz model)

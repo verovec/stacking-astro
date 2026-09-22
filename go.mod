@@ -5,21 +5,18 @@ go 1.23.0
 toolchain go1.23.3
 
 require (
-	github.com/ebitengine/purego v0.10.2
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joshuaferrara/go-satellite v0.0.0-20220611180459-512638c64e5b
 	github.com/klauspost/compress v1.17.9
 	github.com/soniakeys/meeus/v3 v3.0.1
 	github.com/soniakeys/unit v1.0.0
 	github.com/stretchr/testify v1.11.1
-	go.bug.st/serial v1.6.2
 	golang.org/x/image v0.18.0
 	golang.org/x/sync v0.13.0
 	golang.org/x/sys v0.32.0
 )
 
 require (
-	github.com/creack/goselect v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

@@ -158,15 +158,15 @@ async function copy(text: string, tag: string) {
           />
           <span class="font-medium">{{
             t("mosaic.tile.look", {
-              dir: t(`goto.compass.${compass16(live.azDeg)}`),
+              dir: t(`mosaic.compass.${compass16(live.azDeg)}`),
               alt: Math.round(live.altDeg),
             })
           }}</span>
           <span class="text-xs text-slate-400"
             >·
             {{
-              t("goto.card.meridian", {
-                side: t(`goto.card.${tile.meridian_side}`),
+              t("mosaic.tile.meridian", {
+                side: t(`mosaic.tile.${tile.meridian_side}`),
               })
             }}</span
           >

@@ -7,10 +7,7 @@ package toolhealth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,7 +53,6 @@ type Report struct {
 	// invite fixing one and leaving the other.
 	FFmpeg     Tool       `json:"ffmpeg"`
 	RawDev     Tool       `json:"raw_developer"`
-	Devices    Tool       `json:"devices"` // the camera/mount device server (a separate process)
 	LLM        Tool       `json:"llm"`
 	PlateSolve PlateSolve `json:"plate_solve"`
 	CheckedMs  int64      `json:"checked_ms"`
@@ -156,7 +152,6 @@ func (c *Checker) collect(ctx context.Context) *Report {
 		r.Starnet = Tool{OK: true}
 	}
 
-	r.Devices = c.deviceHealth(ctx)
 
 	if kind, err := rawconv.Developer(); err != nil {
 		r.RawDev = Tool{Err: err.Error()}
@@ -275,41 +270,4 @@ func effectiveCatalog(cfg *config.Config) string {
 		return "localgaia"
 	}
 	return ""
-}
-
-// deviceHealth probes the device server — a SEPARATE process (`just device`) that owns the camera,
-// filter wheel and mount. It is normal for it not to be running (nothing is plugged in, or the user
-// is only processing), so a refused connection is reported as a plain "not running", never as a
-// warning that would clutter a processing-only session.
-func (c *Checker) deviceHealth(ctx context.Context) Tool {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+c.cfg.DeviceAddr+"/health", nil)
-	if err != nil {
-		return Tool{Err: err.Error()}
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return Tool{Err: "not running (start it with `just device`)"}
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return Tool{Err: "device server returned " + resp.Status}
-	}
-	var body struct {
-		Drivers []struct {
-			Name      string `json:"name"`
-			Available bool   `json:"available"`
-		} `json:"drivers"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&body); err != nil {
-		return Tool{OK: true, Detail: "running"}
-	}
-	names := make([]string, 0, len(body.Drivers))
-	for _, d := range body.Drivers {
-		if d.Available {
-			names = append(names, d.Name)
-		}
-	}
-	return Tool{OK: true, Detail: "drivers: " + strings.Join(names, ", ")}
 }

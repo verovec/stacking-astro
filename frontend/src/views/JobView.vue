@@ -16,9 +16,9 @@ import {
 import StatusPill from "@/components/Common/StatusPill.vue";
 import ProgressBar from "@/components/Common/ProgressBar.vue";
 import LogConsole from "@/components/Common/LogConsole.vue";
-import CaptureSummary from "@/components/Capture/CaptureSummary.vue";
-import CalibrationPanel from "@/components/Capture/CalibrationPanel.vue";
-import ChannelMappingList from "@/components/Capture/ChannelMappingList.vue";
+import CaptureSummary from "@/components/Common/CaptureSummary.vue";
+import CalibrationPanel from "@/components/Common/CalibrationPanel.vue";
+import ChannelMappingList from "@/components/Common/ChannelMappingList.vue";
 import RunResultPanels from "@/components/Common/RunResultPanels.vue";
 import SupervisorPanel from "@/components/Common/SupervisorPanel.vue";
 import SupervisorChat from "@/components/Common/SupervisorChat.vue";

@@ -57,13 +57,10 @@ The camera/mount/filter-wheel server is a separate process (`just device`), reac
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASTRO_DEVICE_ADDR` | `127.0.0.1:8084` | Where the engine expects the device server |
 | `ASI_SDK_LIB` | auto | Path to the ZWO camera library. Auto-detected from an ASIStudio install; ZWO ship no arm64 macOS build, hence `just device-x86` |
 | `EFW_SDK_LIB` | auto | Path to the ZWO filter-wheel library, same story |
-| `ASTRO_SIM_SOLVER` | `false` | Accept simulated frames as plate-solvable (simulated star fields cannot be solved for real) |
 | `ASTRO_WORM_PERIOD_SEC` | `478` | Mount worm period, for the periodic-error analysis |
 | `ASTRO_TRACKING_SOLVE_EVERY` | `1` | Plate-solve every Nth sub when measuring tracking |
-| `ASTRO_CAPTURE_CONDITIONS_INTERVAL_MIN` | `60` | How often a running capture samples the sky for the logbook. The weather has no archive, so a session not sampled live can never be backfilled |
 
 ## Performance opt-ins
 

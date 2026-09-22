@@ -12,14 +12,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/klauspost/compress/gzhttp"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/verove-jordan/astronomy/internal/buildinfo"
 	"github.com/verove-jordan/astronomy/internal/canopy"
-	"github.com/verove-jordan/astronomy/internal/capture"
 	"github.com/verove-jordan/astronomy/internal/config"
 	"github.com/verove-jordan/astronomy/internal/darksky"
 	"github.com/verove-jordan/astronomy/internal/elevation"
@@ -32,7 +30,6 @@ import (
 	"github.com/verove-jordan/astronomy/internal/routing"
 	"github.com/verove-jordan/astronomy/internal/siril"
 	"github.com/verove-jordan/astronomy/internal/skyevents"
-	"github.com/verove-jordan/astronomy/internal/skylog"
 	"github.com/verove-jordan/astronomy/internal/skyplan"
 	"github.com/verove-jordan/astronomy/internal/store"
 	"github.com/verove-jordan/astronomy/internal/thumb"
@@ -57,13 +54,7 @@ type Server struct {
 	agentTurns     *turns.Sessions       // live turns (supervised-job conversations), streamed over SSE
 	toolHealth     *toolhealth.Checker   // environment health (tool deep probes + catalogue presence)
 	sirilRunner    *siril.Runner         // one-off synchronous Siril work (star-annotation re-solve); nil-safe for tests
-	devices        *deviceProxy          // reverse proxy onto the separate device-server process
-	capture        *capture.Runner       // the auto-run sequencer (drives the device server)
 	starsFlight    singleflight.Group // dedupes concurrent star-annotation computes per run dir
-	// conditionsLog records the sky the running session is shooting under. Held so the logbook can
-	// explain an empty chart; an atomic pointer because it is replaced on every start and read from
-	// request goroutines. nil is the normal idle state and every use is nil-safe.
-	conditionsLog atomic.Pointer[skylog.Logger]
 }
 
 // New builds the API server. hub is the shared turn transport (also handed to the job manager) so a
@@ -98,11 +89,7 @@ func New(mgr *job.Manager, st *store.Store, cfg *config.Config, hub *turns.Sessi
 		agentTurns:     hub,
 		toolHealth:     toolhealth.New(cfg),
 		sirilRunner:    siril.New(cfg.SirilBin, siril.Limits{MaxCPUs: cfg.MaxCPUs, MemRatio: cfg.SirilMemRatio, Nice: cfg.SirilNice}),
-		devices:        newDeviceProxy(cfg.DeviceAddr),
 	}
-	// The sequencer lives here rather than in the device server: a session is a statement about a
-	// target and a night, so its state belongs with the database.
-	s.capture = capture.NewRunner(capture.NewClient(cfg.DeviceAddr), captureRecorder{store: st})
 	return s
 }
 
@@ -161,30 +148,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sky/targets", s.skyTargets)
 	mux.HandleFunc("GET /api/sky/events", s.skyEvents)
 	mux.HandleFunc("GET /api/sky/series", s.skyEventSeries)
-	mux.HandleFunc("GET /api/sky/align", s.skyAlign)
-	mux.HandleFunc("GET /api/sky/align/profiles", s.skyAlignProfiles)
 	mux.HandleFunc("GET /api/sky/geocode", s.geocode)
-	mux.HandleFunc("POST /api/capture/start", s.startCapture)
-	mux.HandleFunc("POST /api/capture/center", s.centerCapture)
-	mux.HandleFunc("POST /api/capture/pause", s.pauseCapture)
-	mux.HandleFunc("POST /api/capture/resume", s.resumeCapture)
-	mux.HandleFunc("POST /api/capture/abort", s.abortCapture)
-	mux.HandleFunc("GET /api/capture/status", s.captureStatus)
-	mux.HandleFunc("GET /api/capture/events", s.captureEvents)
-	mux.HandleFunc("GET /api/capture/sessions", s.listCaptureSessions)
-	mux.HandleFunc("GET /api/capture/sessions/{id}", s.getCaptureSession)
-	mux.HandleFunc("POST /api/capture/sessions/{id}/resume", s.resumeCaptureSession)
-	mux.HandleFunc("GET /api/capture/sessions/{id}/conditions", s.captureConditions)
-	mux.HandleFunc("GET /api/capture/sequences", s.listCaptureSequences)
-	mux.HandleFunc("POST /api/capture/sequences", s.saveCaptureSequence)
-	mux.HandleFunc("DELETE /api/capture/sequences/{id}", s.deleteCaptureSequence)
-	mux.HandleFunc("GET /api/tracking/report/{id}", s.trackingReport)
-	mux.HandleFunc("GET /api/tracking/sessions", s.trackingSessions)
-	mux.HandleFunc("POST /api/capture/calibration/plan", s.calibrationPlan)
-	mux.HandleFunc("GET /api/capture/filters", s.filterSlots)
-	mux.HandleFunc("POST /api/capture/filters", s.saveFilterSlots)
-	mux.HandleFunc("GET /api/device/status", s.deviceStatus)
-	mux.HandleFunc("/api/device/", s.deviceRequest)
 	mux.HandleFunc("GET /api/equipment", s.listEquipment)
 	mux.HandleFunc("POST /api/equipment", s.saveEquipment)
 	mux.HandleFunc("PUT /api/equipment/{id}", s.updateEquipment)

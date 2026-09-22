@@ -10,27 +10,6 @@ const router = createRouter({
       component: () => import("@/views/TonightView.vue"),
     },
     {
-      path: "/goto",
-      name: "goto",
-      component: () => import("@/views/GotoView.vue"),
-    },
-    {
-      path: "/capture",
-      name: "capture",
-      component: () => import("@/views/CaptureView.vue"),
-    },
-    {
-      path: "/logbook",
-      name: "logbook",
-      component: () => import("@/views/LogbookView.vue"),
-    },
-    {
-      path: "/logbook/:id",
-      name: "logbookSession",
-      component: () => import("@/views/LogbookSessionView.vue"),
-      props: true,
-    },
-    {
       path: "/mosaic",
       name: "mosaic",
       component: () => import("@/views/MosaicView.vue"),
