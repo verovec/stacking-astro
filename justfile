@@ -49,7 +49,7 @@ stack-build:
     GIT_DESCRIBE=$(git describe --tags --always --dirty) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%MZ) docker compose --profile stack build
 
 # Safe to re-run: the preflight is idempotent and reports only what it changed. The first run
-# builds a multi-GB image (Siril/GIMP/GraXpert/GDAL) and takes 15-40 minutes.
+# builds a multi-GB image (Siril/GIMP/GraXpert/ffmpeg) and takes 15-40 minutes.
 # Set up + build + run the whole app in containers (db + engine + frontend, no AI), then print the URL.
 stack:
     @scripts/stack-preflight.sh
@@ -132,9 +132,9 @@ graxpert-service-status:
 inspect DIR:
     go run ./cmd/astrostack inspect "{{DIR}}"
 
-# Rebuild the embedded deep star catalogue (internal/deepstars/catalogue/hyg_mag9.csv.gz) the
-# star-annotation endpoint uses for name labels (proper/Bayer/Flamsteed/HD). Fetches the HYG database
-# (network at generation time ONLY; same source pin as gen-skymap-data). MAG = faintest star kept.
+# Rebuild the embedded star catalogue (internal/deepstars/catalogue/hyg_mag9.csv.gz) behind the
+# mosaic planner's star field and nightpano's astrometric anchoring. Fetches the HYG database
+# (network at generation time ONLY). MAG = faintest star kept.
 # Re-run only to refresh or change depth; commit the regenerated file.
 gen-deepstars-data MAG="9.0":
     go run ./cmd/astrostack deepstars-data --mag "{{MAG}}"
@@ -160,7 +160,7 @@ download-catalogues:
 download-catalogues-spcc:
     @scripts/download-catalogues.sh --spcc
 
-# Run the full auto pipeline (host). MODE: deepsky|nebula|milkyway|planetary|comet  FORMAT: image|video|both
+# Run the full auto pipeline (host). MODE: deepsky|nebula|milkyway|nightpano|planetary|comet|mosaic|sun|eclipse  FORMAT: image|video|both
 # e.g. just process deepsky image ~/Astro/M31   ·   just process planetary video ~/Astro/moon.mp4
 process MODE FORMAT PATH *args:
     go run ./cmd/astrostack process {{args}} {{MODE}} {{FORMAT}} "{{PATH}}"
