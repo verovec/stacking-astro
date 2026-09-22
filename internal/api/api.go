@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/klauspost/compress/gzhttp"
@@ -60,8 +59,6 @@ type Server struct {
 	sirilRunner    *siril.Runner         // one-off synchronous Siril work (star-annotation re-solve); nil-safe for tests
 	devices        *deviceProxy          // reverse proxy onto the separate device-server process
 	capture        *capture.Runner       // the auto-run sequencer (drives the device server)
-	polar          *capture.PolarSession // polar alignment from the live camera, built on first use
-	polarOnce      sync.Once
 	starsFlight    singleflight.Group // dedupes concurrent star-annotation computes per run dir
 	// conditionsLog records the sky the running session is shooting under. Held so the logbook can
 	// explain an empty chart; an atomic pointer because it is replaced on every start and read from
@@ -164,20 +161,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sky/targets", s.skyTargets)
 	mux.HandleFunc("GET /api/sky/events", s.skyEvents)
 	mux.HandleFunc("GET /api/sky/series", s.skyEventSeries)
-	mux.HandleFunc("GET /api/sky/polar", s.skyPolar)
 	mux.HandleFunc("GET /api/sky/align", s.skyAlign)
 	mux.HandleFunc("GET /api/sky/align/profiles", s.skyAlignProfiles)
 	mux.HandleFunc("GET /api/sky/geocode", s.geocode)
 	mux.HandleFunc("POST /api/capture/start", s.startCapture)
 	mux.HandleFunc("POST /api/capture/center", s.centerCapture)
-	mux.HandleFunc("POST /api/capture/polar/start", s.startPolar)
-	mux.HandleFunc("POST /api/capture/polar/rough", s.roughPolar)
-	mux.HandleFunc("POST /api/capture/polar/next", s.nextPolar)
-	mux.HandleFunc("POST /api/capture/polar/adjust", s.adjustPolar)
-	mux.HandleFunc("POST /api/capture/polar/refresh", s.refreshPolar)
-	mux.HandleFunc("POST /api/capture/polar/stop", s.stopPolar)
-	mux.HandleFunc("GET /api/capture/polar", s.polarStatus)
-	mux.HandleFunc("GET /api/capture/polar/events", s.polarEvents)
 	mux.HandleFunc("POST /api/capture/pause", s.pauseCapture)
 	mux.HandleFunc("POST /api/capture/resume", s.resumeCapture)
 	mux.HandleFunc("POST /api/capture/abort", s.abortCapture)

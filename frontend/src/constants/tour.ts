@@ -15,15 +15,7 @@ export const TOURS: Record<string, readonly string[]> = {
   solarsystem: ["scene", "time", "scale", "bodies", "legend"],
 
   // Capture
-  capture: [
-    "devices",
-    "liveview",
-    "camera",
-    "filters",
-    "sequencer",
-    "focus",
-    "polar",
-  ],
+  capture: ["devices", "liveview", "camera", "filters", "sequencer", "focus"],
   logbook: ["list", "score", "filters"],
   logbookSession: ["shot", "order", "conditions"],
   mosaic: ["plan", "panels", "progress"],

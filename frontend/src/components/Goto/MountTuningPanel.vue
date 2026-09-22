@@ -13,10 +13,10 @@ import {
 } from "@/constants/mountTuning";
 import { input } from "@/constants/styles";
 
-// MountTuningPanel: "what's wrong with this mount & how to compensate" — a reference card mirroring
-// PolarTutorial (outer CollapsibleCard collapsed by default, one nested card per fix, tm() step
-// arrays). The model defaults from the alignment profile above until the user picks one explicitly;
-// an explicit pick is persisted and wins from then on.
+// MountTuningPanel: "what's wrong with this mount & how to compensate" — a reference card (outer
+// CollapsibleCard collapsed by default, one nested card per fix, tm() step arrays). The model
+// defaults from the alignment profile above until the user picks one explicitly; an explicit pick
+// is persisted and wins from then on.
 const { t, tm } = useI18n();
 const store = useGotoStore();
 

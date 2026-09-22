@@ -34,8 +34,8 @@ import type { SkyTarget } from "@/types";
 const { t } = useI18n();
 const store = useSkyStore();
 
-// In-page tabs: the deep-sky planner vs the dark-sky finder. Persisted across reloads. (The
-// polar-alignment aid moved to the GoTo alignment page; a stale saved "polar" falls back here.)
+// In-page tabs: the deep-sky planner vs the dark-sky finder. Persisted across reloads. (An
+// unrecognised saved value falls back to the targets tab.)
 const TAB_KEY = "astrostack.tonight.tab";
 const savedTab = localStorage.getItem(TAB_KEY);
 const tab = ref<"targets" | "darksky">(

@@ -1235,34 +1235,6 @@ export interface SkyEquipment {
   eyepieces?: SkyEyepiece[]; // the configured visual kit (visual mode)
 }
 
-// Polar-scope alignment: where the pole star sits on the reticle right now (GET /api/sky/polar).
-export interface PolarResult {
-  hemisphere: "north" | "south";
-  pole_star_name: string;
-  pole_star_ra_deg: number;
-  pole_star_dec_deg: number;
-  ha_deg: number;
-  position_angle_deg: number; // reticle angle, clockwise from 12 o'clock (inverting scope)
-  clock_hour: number; // position_angle_deg / 30, in [0,12)
-  separation_deg: number; // pole star → true celestial pole
-  alt_deg: number;
-  az_deg: number;
-  lst_deg: number;
-  pole_star_visible: boolean;
-  lat_too_low: boolean;
-}
-
-export interface PolarQueryEcho {
-  at_utc_ms: number;
-  at_local: string;
-  location: SkyLocation;
-}
-
-export interface PolarResponse {
-  query: PolarQueryEcho;
-  result: PolarResult;
-}
-
 export interface SkyQueryEcho {
   at_utc_ms: number;
   at_local: string;
@@ -2455,101 +2427,6 @@ export interface CaptureSessionRow {
   site_lon: number;
   site_elevation_m: number;
   conditions_summary: ConditionsSummary | Record<string, never>;
-}
-
-// --- Polar alignment from the live camera (/api/capture/polar) ---------------------------------
-//
-// Mirrors internal/capture.PolarState. The reticle types above (PolarResult) are the OPEN-LOOP
-// calculation for a polar scope; these are the measured ones, from frames the telescope actually took.
-
-export type PolarCamPhase =
-  "idle" | "measuring" | "solved" | "adjusting" | "failed";
-
-export interface PolarCamSample {
-  index: number;
-  ra_deg: number;
-  dec_deg: number;
-  at: string;
-  scale_arcsec_px: number;
-}
-
-export interface PolarCamAxis {
-  alt_deg: number;
-  az_deg: number;
-  radius_deg: number;
-  arc_deg: number;
-  residual_arcsec: number;
-  /** One-sigma uncertainty in the axis's worst-constrained direction. */
-  sigma_arcsec: number;
-  samples: number;
-  warnings?: string[];
-}
-
-export interface PolarCamCorrection {
-  /** Positive means the polar axis points too HIGH. */
-  alt_error_deg: number;
-  /** Positive means it lies EAST of the pole's meridian, as a true angle on the sky. */
-  az_error_deg: number;
-  /** The same error as the AZIMUTH the adjuster turns through — bigger by 1/cos(altitude). */
-  az_knob_deg: number;
-  total_arcmin: number;
-  /** "raise" | "lower" | "ok" — which way to turn the altitude adjuster. */
-  alt_move: string;
-  /** "east" | "west" | "ok" — which way to move the axis. */
-  az_move: string;
-  /** "excellent" | "good" | "fair" | "poor" */
-  quality: string;
-}
-
-export interface PolarCamTarget {
-  ra_deg: number;
-  dec_deg: number;
-  /** Sensor pixels, in the FITS axis frame. */
-  x: number;
-  y: number;
-  /** The same point as a fraction of the frame, which is what an overlay needs. */
-  nx: number;
-  ny: number;
-  offset_px: number;
-  /** True when the marker falls outside the image — normal on a first measurement. */
-  off_frame: boolean;
-  offset_arcmin: number;
-}
-
-export interface PolarCamLive {
-  target: PolarCamTarget;
-  remaining_arcmin: number;
-  quality: string;
-  /** The mount appears to have been moved, so the measurement behind the marker is stale. */
-  suspect?: boolean;
-}
-
-export interface PolarCamPoleView {
-  /** Where the celestial pole falls on the frame — where the telescope has to be aimed. */
-  pole: PolarCamTarget;
-  /** Polaris, or σ Octantis below the equator: what the eye is looking for. */
-  star: PolarCamTarget;
-  star_name: string;
-  star_visible: boolean;
-}
-
-export interface PolarCamState {
-  phase: PolarCamPhase;
-  step: number;
-  points: number;
-  step_arc_deg: number;
-  samples: PolarCamSample[];
-  axis?: PolarCamAxis;
-  correction?: PolarCamCorrection;
-  live?: PolarCamLive;
-  pole?: PolarCamPoleView;
-  /** "measured" from a rotation (arcminute class) or "rough" from one frame (polar-scope class). */
-  mode?: "measured" | "rough";
-  /** Codes the UI translates, never English. */
-  warnings?: string[];
-  error?: string;
-  busy: boolean;
-  tracking: boolean;
 }
 
 // --- the solar system (GET /api/solarsystem/*) ---------------------------------------------------
