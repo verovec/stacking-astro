@@ -14,10 +14,9 @@ into a single seamless image. Mode id: `mosaic`. Entry point: `pipeline.ProcessM
 1. **Plan** (web UI → Mosaic page): pick an object, the planner computes the tile grid from your
    optics (server-side `internal/mosaicplan`, persisted in `mosaic_plans` — see the plan JSON in
    `GET /api/mosaic/plans/{id}`). Default **20 % overlap**, one camera position angle for the whole
-   mosaic (EQ mount ⇒ no field rotation; set it once at the home position with the Capture tab's
-   star-chart preview).
-2. **Capture**: one folder per panel — `p01/`, `p02/`, … in serpentine order (the capture
-   assistant names them). `panel_1/` and `tile_A/` spellings are accepted too.
+   mosaic (EQ mount ⇒ no field rotation; set it once at the home position).
+2. **Capture**: one folder per panel — `p01/`, `p02/`, … in serpentine order. `panel_1/` and
+   `tile_A/` spellings are accepted too.
 3. **Process**: `POST /api/jobs {"path": …, "mode": "mosaic", "format": "image",
    "mosaic_plan_id": N}` (the plan reference is optional — without it panels are detected from the
    folder names, else clustered from the frames' OBJCTRA/OBJCTDEC pointing headers at 0.35× the
@@ -58,7 +57,7 @@ Assembly (`internal/mosaic`, pure Go):
    `union` = keep everything; `plan` = the plan's grid bbox.
 8. The per-channel canvases are written as `output/<object>/<run>/aligned_<tag>.fits` **with a real
    TAN WCS header** — then the UNCHANGED standard finish runs (`finishAligned`: GIMP LRGB+Ha
-   composite, SPCC — solve-free thanks to the header — GraXpert, star annotation, mono outputs).
+   composite, SPCC — solve-free thanks to the header — GraXpert, mono outputs).
    Post-run **Refine** (Tier A/B) works out of the box because refine reconstructs channels from
    those same `aligned_*` files. Tier-C re-stack and the editable-stage rerun are not wired for
    mosaic in v1.
@@ -86,7 +85,7 @@ Assembly (`internal/mosaic`, pure Go):
 ## v1 limits
 
 Mono + filter-wheel panels only (OSC panels: stack individually with the OSC path for now);
-cross-session reuse and the low-disk S3 stager are off; no Tier-C supervised re-stack; no relative
+cross-session reuse is off; no Tier-C supervised re-stack; no relative
 placement for unsolvable panels (they are dropped rather than star-matched to a neighbor).
 
 `run.json → mosaic_assembly` records the grid, per-panel solves + gains/offsets, pairwise overlap

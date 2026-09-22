@@ -36,7 +36,7 @@ builds the images, waits for the engine, prints which tools it found and what de
 one, and ends with the URL. Re-run it whenever — it is idempotent and reports only what it changed.
 
 The first build takes **15–40 minutes** and produces a multi-GB image, because it bakes in Linux
-Siril, GIMP, GraXpert, GDAL and ffmpeg. Later runs reuse it.
+Siril, GIMP, GraXpert and ffmpeg. Later runs reuse it.
 
 Then open the URL it prints (<http://localhost:8082> by default) and skip to
 [§5](#5-your-first-run).
@@ -71,8 +71,8 @@ just doctor           # every external tool, grouped by what its absence costs
 ```
 
 It groups them as **Required** (Siril, ffmpeg, Postgres — nothing runs without these),
-**Recommended** (GIMP, a raw developer), **Optional** (GraXpert, StarNet++, a local vision model,
-the device server) and the plate-solving catalogues, then lists a plain-language warning for
+**Recommended** (GIMP, a raw developer), **Optional** (GraXpert, StarNet++, a local vision
+model) and the plate-solving catalogues, then lists a plain-language warning for
 anything missing. `just stack` prints the same report from inside the container, so the two modes
 can be compared line for line.
 
@@ -233,8 +233,7 @@ match, or colour calibration that could not run because the field would not plat
 
 - [ui.md](ui.md) — every page of the web UI, and what each is for
 - [pipeline.md](pipeline.md) — what actually happens between "Run" and the final image
-- [modes/](modes/README.md) — the eight processing modes in depth
+- [modes/](modes/README.md) — the nine processing modes in depth
 - [calibration.md](calibration.md) — the master library, and how to shoot calibration frames
 - [configuration.md](configuration.md) — every environment variable
-- [mount.md](mount.md) — connecting a Celestron mount, and polar alignment from the camera
 - [verification.md](verification.md) — how to check a change did what it claimed

@@ -26,8 +26,10 @@ business rules BELOW this block (hoist a single line here if you want it always 
 ## Project rules (AstroStack)
 
 AstroStack auto-sorts and stacks astrophotography captures (Takahashi FC-100 DF + ZWO ASI 1600MM Pro,
-filters L/R/G/B/Ha) and drives **Siril** + **GIMP** to produce a final image. See
-`docs/architecture.md` and the approved plan for the full design.
+filters L/R/G/B/Ha) and drives **Siril** + **GIMP** to produce a final image. This fork is pruned to
+the **stacking/processing core** (epic E01): the capture/device/mount/polar, S3-mirroring, planner/
+weather and results-3D subsystems were removed; the web UI keeps Import, Tasks, Runs, Library and the
+Mosaic planner. See `docs/architecture.md` for the full design.
 
 **Language policy.** All code we write is **Go** (engine, CLI, Siril MCP) or **Vue 3 + TypeScript**
 (web UI). The only Python in the repo is the **vendored GIMP MCP** at `mcp-servers/gimp/server.py`
@@ -135,45 +137,12 @@ any group not at the East-left `det<0` convention). Groups are then co-registere
 the same input dir are **serialized** (`job.Manager.lockTarget`) and master writes are atomic
 (temp+rename in `calib`) so concurrent runs never corrupt the shared `library/`.
 
-**S3 storage.** Captures/results can mirror to S3 (import/process/results + sync + backup-everything) so
-local disk stays free without data loss. **S3 credentials** come from either a **UI-managed connection**
-(Processing → Storage) — endpoint/access-key/secret entered in the UI and stored in Postgres with the
-**secret AES-256-GCM encrypted at rest** (master key `ASTRO_ENCRYPTION_KEY` or an auto-generated key file
-kept OUTSIDE the backup roots; `internal/secret`) — **or** the legacy env `ASTRO_S3_*`. The **default**
-connection drives the pipeline (`s.s3Config(ctx)` / `m.s3ConfigResolved(ctx)` resolve default-connection →
-env). The **secret is decrypted only to build a client and NEVER returned to the UI or logged**
-(`store.S3Connection.SecretEnc` is `json:"-"`). Bucket + prefix are per-request UI state. Mirror layout
-under `<prefix>`: `data/`, `output/`, `backup/<stamp>/`. Transfers/backups/restores are **jobs** (own worker
-lane), `removeLocal` **verifies each file on S3 before deleting local** (aborts the folder otherwise), and
-freed previews/results serve local-first with an S3 fallback (frontend must tag file/preview/thumb URLs via
-`services/api.ts` `s3Suffix`/`withS3`). Full-S3 process mode pulls inputs → runs (engine stays local-only)
-→ pushes → frees. Backup gathers **browser-only** state (favorites/setups + AI-chat IndexedDB) UI-side
-(`utils/appstate.ts`); `.env` secrets are excluded. See `docs/architecture.md` → "S3 storage".
-
-**Polar alignment from the camera NEVER commands the mount.** `/capture` → Polar alignment measures the
-mount's polar axis by plate-solving frames along a rotation of the RA axis (`internal/polaralign` = pure
-geometry; `internal/capture/polar.go` = the session; `POST /api/capture/polar/*`). The user turns the RA
-axis **by hand** between frames — the fit needs to know that it moved, not how far — and that is
-deliberate, not an unfinished feature: it is what makes the whole thing work on a mount we cannot drive,
-including one with no electronics at all. Do not "improve" it by adding a motorised sweep as the default.
-Two other decisions are load-bearing and tested: the target marker uses the rotation the ADJUSTING BOLTS
-apply, not the shortest rotation onto the pole (they differ by a first-order twist of az·sin(lat)), and
-the azimuth figure shown to the user is the KNOB angle, which is 1/cos(lat) larger than the sky error.
-Frames come from the live view via `POST /live/save` so the picture being measured is the picture on
-screen. There are TWO ways in and they must never be conflated in the UI: the four-frame measurement
-(arcminute class) and `POST /polar/rough`, which answers from ONE frame by asserting the tube looks
-down the RA axis (`polaralign.RoughAxis`) — polar-scope class, ~0.5°, and it carries `WarnAssumedOnAxis`
-plus a candid `SigmaArcsec` for exactly that reason. `polaralign.Locate` draws the pole itself and is
-assumption-free. Simulated frames cannot be plate-solved, so `ASTRO_SIM_SOLVER=1` + a sim polar error is
-the only way to exercise this indoors. See `docs/mount.md` → "Polar alignment with the camera".
-
 **Filters have ONE canonical list.** `internal/filters` (Go) and `frontend/src/constants/filters.ts`
 (mirrored, pinned by `filters.spec.ts`) own the canonical set `L,R,G,B,Ha,OIII,SII`, its aliases
 (`s2`/`sulfur`→SII, `O3`→OIII, Johnson `V`→G), the display order and `IsNarrowband`. **Never re-declare
 a filter list** — that drift is exactly why SII was half-supported (two copies stopped at `Ha`, so a
-6th/7th wheel slot could only be named `"S6"`). Capture writes the filter into the **folder, the file
-name and the FITS header**; the slot→filter map is user-assigned (Capture → Filter slots,
-`app_settings["capture.filter_slots"]`) because a 5-slot wheel gets swapped between sessions. The three
+6th/7th wheel slot could only be named `"S6"`). Inspect reads the filter from the **folder, the file
+name and the FITS header** (the capture side that wrote them left the fork with E01). The three
 emission screens (Hα/OIII/SII) are one table in `internal/pipeline/emissionscreen.go` — add a line
 there, not a fourth copy of the block. `oiii_screen`/`sii_screen` default to 0 so existing runs stay
 byte-identical. See `docs/architecture.md` → "Filters" and "The emission screens".
@@ -214,7 +183,7 @@ run it inline — `astrostack process` / `just process …` / `go run ./cmd/astr
 Instead `POST /api/jobs` to the running engine (`astrostack serve`, started by **`just dev`**, host
 `:8080`) with a `job.RunRequest` JSON body — minimum `{"path","mode","format"}`; `path` must resolve
 **inside `ASTRO_DATA_DIR`** (the capture root, e.g. `input/M31/…`) or the API returns 400; `mode` ∈
-`deepsky|nebula|milkyway|nightpano|planetary|comet|livestack|mosaic|sun|eclipse`, `format` ∈ `image|video|both`, fine-knob
+`deepsky|nebula|milkyway|nightpano|planetary|comet|mosaic|sun|eclipse`, `format` ∈ `image|video|both`, fine-knob
 overrides in `params`. Example: `curl -sS -XPOST localhost:8080/api/jobs -H 'content-type:
 application/json' -d '{"path":"input/M31/2024-01-01","mode":"deepsky","format":"image"}'` → `202
 {"id":N}`; then follow the run with `GET /api/jobs/{id}` (or stream `GET /api/jobs/{id}/events`) to

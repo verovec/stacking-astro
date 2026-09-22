@@ -2,8 +2,7 @@
 
 Everything "agentic" in AstroStack runs against a **local, OpenAI-compatible vision model** — no
 cloud calls, opt-in everywhere, and every path soft-fails to the deterministic pipeline. One model
-serves three surfaces: the **finish supervisor**, **AstroAgent chat**, and **supervised
-conversations** (steerable runs).
+serves two surfaces: the **finish supervisor** and **supervised conversations** (steerable runs).
 
 ## Bring up the model
 
@@ -13,7 +12,8 @@ conversations** (steerable runs).
 | Linux + NVIDIA GPU | **Ollama** container | `just stack-ai` (or `just ai-up`) + `just ai-pull` · `ASTRO_LLM_URL=http://ai:11434/v1`, `ASTRO_LLM_MODEL=qwen2.5vl:32b` |
 | anywhere | any OpenAI-compatible server | set `ASTRO_LLM_URL` + `ASTRO_LLM_MODEL` |
 
-`just ia-model-status` health-checks it; `/api/agent/status` is what the UI polls.
+`just ia-model-status` health-checks it; the UI reads model reachability from
+`GET /api/environment`.
 
 ## The finish supervisor (render → judge → re-tune → keep best)
 
@@ -47,19 +47,6 @@ byte-identical to a non-supervised run.
 an existing run — no re-stack; **Retry tuned** re-processes with explicit params. **Series
 campaigns** chain goal-driven retries into a durable "keep improving this target" loop
 (`/api/series`: auto-continue, max attempts, target score, best-job tracking).
-
-## AstroAgent chat (`/astroagent`)
-
-A ReAct-style loop (`internal/agent`) over the same model, with live tools wired to the running
-services: jobs (list/launch/tune), mode params, setup and environment, sky/conditions, files and
-storage. Guardrails:
-
-- **Read tools run freely; every mutating tool is confirmation-gated** — the UI shows the action
-  and you approve or reject it.
-- ≤ 12 steps per turn; responses stream over SSE.
-- An attached image is first measured (background, casts, clipping, gradient, trails) and the
-  numbers are given to the model as ground truth beside the pixels — critiques are anchored, not
-  hallucinated.
 
 ## Supervised conversations
 

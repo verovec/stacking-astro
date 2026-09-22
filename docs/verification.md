@@ -57,7 +57,7 @@ Open the run's `output/<object>/<runID>/run.json` and check:
 ## one-shot colour (any mode)
 
 Colour is auto-detected, so the same folder must work through the same command as a mono one. Run a
-DSLR/colour set through **deepsky** (or comet/mosaic/livestack) rather than a colour-specific mode:
+DSLR/colour set through **deepsky** (or comet/mosaic) rather than a colour-specific mode:
 
 ```bash
 just inspect input/<colour-folder>   # first: does it even read as colour?
@@ -102,9 +102,9 @@ just process milkyway image input/MilkyWay/13_05_2026/DNG    # any input/MilkyWa
   registration requires the same Siril version — use an amd64 engine or accept the arm64 distro
   Siril ~1.2 caveat in `docs/architecture.md`).
 - **Background level** — the sky background should sit near the preset target **0.05**
-  (`Preset.BackgroundLevel`, "balanced"). Objective check: in the AstroAgent chat run
-  `view_result_image` on the job — the grounding report prints the measured `Background`
-  (`pipeline.ResultImagePayload`); expect ≈ 0.05 ± 0.02 for the default brightness.
+  (`Preset.BackgroundLevel`, "balanced"). Objective check: measure the median sky level of
+  `final.png` (any image tool; a supervised run also prints the measured `Background` in its
+  metrics — `pipeline.ResultImagePayload`); expect ≈ 0.05 ± 0.02 for the default brightness.
 - **No banding** — inspect the smooth sky gradient at 100 %: the dithered 8-bit export
   (`to8Dithered` in `internal/nightscape/nightscape.go`) must show fine grain, never posterized
   contours.
@@ -146,7 +146,7 @@ just process comet image input/C2019/c2019_y4
 - Sanity: pinpoint stars (no comet smear in the star layer), no R/G/B colour separation on the
   coma (the `alignCometMasters` cross-registration).
 
-## Agent mode (supervised runs + chat loop)
+## Agent mode (supervised runs)
 
 Start the model (`just run-ia-model`), then launch any run with the supervisor (Import → "Run with
 local AI agent", or `--supervise`). Verify in the job log / supervisor panel:
@@ -159,48 +159,10 @@ local AI agent", or `--supervise`). Verify in the job log / supervisor panel:
 - the loop respects budgets and stops on plateau or `done` + target score
   (`internal/pipeline/supervise.go`).
 
-Then exercise the **chat closed loop** (AstroAgent):
-
-1. `get_mode_params` for the run's mode → returns defaults + the knob menu
-   (`internal/agent/tools_params.go`);
-2. `view_result_image` on the finished job → the model receives the full frame + 100 % centre crop
-   and the objective measurement report;
-3. `retry_run_tuned` with a small param change (`restack:false`) → a new refine job appears,
-   inherits the target's warm-start memory, and its result reflects the change.
-
-## Weather grid
-
-```bash
-curl -s 'http://localhost:8080/api/sky/weather/grid' | jq '{nx:.grid.nx, ny:.grid.ny, layers:(.grid.layers|keys), steps:(.grid.timesteps|length)}'
-```
-
-Pass: `nx = ny = 32` (default `ASTRO_WEATHER_GRID_SIZE`) and the layers include **`clouds`,
-`clouds_low`, `clouds_mid`, `clouds_high`** (the composite expansion in
-`internal/weather/provider.go` `expandGridLayers`), with a non-empty `timesteps`. On the Tonight
-map, the cloud overlay animates with play/scrub and shows the per-altitude composite.
-
-## S3 (transfer safety)
-
-Local MinIO one-liner:
-
-```bash
-docker run --rm -d --name minio -p 9000:9000 -p 9001:9001 \
-  -e MINIO_ROOT_USER=astro -e MINIO_ROOT_PASSWORD=astrosecret \
-  minio/minio server /data --console-address ":9001"
-```
-
-Point a connection at it (Processing → Storage: endpoint `localhost:9000`, no SSL — or
-`ASTRO_S3_*` env), create a bucket, **sync** a capture folder up, then:
-
-- **removeLocal refusal** — corrupt one local file *keeping its size*
-  (e.g. `dd if=/dev/zero of=<file> bs=1 count=16 conv=notrunc`), then run "Free local" on the
-  folder. Pass: the job **aborts with
-  `remove-local aborted — <file> is not safely backed up on S3 (nothing deleted)`** and no local
-  file is removed — the verifier compares content MD5 (upload metadata / single-part ETag), so a
-  same-size-different-bytes object can never cost the only good copy
-  (`verifyMirrored` in `internal/transfer/removelocal.go`).
-- Restore the file (re-sync) and re-run "Free local": it now deletes, and previews/results still
-  serve via the S3 fallback.
+Then exercise the **post-run loop**: **Refine** on the finished job (job page, or
+`POST /api/jobs/{id}/refine`) → a new refine job appears, inherits the target's warm-start memory,
+and re-runs only the finish; **Retry tuned** with a small param change → the result reflects the
+change without a re-stack.
 
 ## Provenance
 

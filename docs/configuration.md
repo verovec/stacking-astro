@@ -51,17 +51,6 @@ UI shows at `GET /api/environment`.
 | `DCRAW_BIN` | `dcraw_emu` | LibRaw's developer — **preferred** for camera raws (no auto-brightening, no baked orientation, an exactly-known transfer curve). `brew install libraw` |
 | `SIPS_BIN` | `sips` | macOS fallback raw developer. Works, but applies Apple's opaque tone curve and cannot disable white balance — install LibRaw for narrowband-safe development |
 
-## Devices
-
-The camera/mount/filter-wheel server is a separate process (`just device`), reached over HTTP.
-
-| Variable | Default | Description |
-|---|---|---|
-| `ASI_SDK_LIB` | auto | Path to the ZWO camera library. Auto-detected from an ASIStudio install; ZWO ship no arm64 macOS build, hence `just device-x86` |
-| `EFW_SDK_LIB` | auto | Path to the ZWO filter-wheel library, same story |
-| `ASTRO_WORM_PERIOD_SEC` | `478` | Mount worm period, for the periodic-error analysis |
-| `ASTRO_TRACKING_SOLVE_EVERY` | `1` | Plate-solve every Nth sub when measuring tracking |
-
 ## Performance opt-ins
 
 | Variable | Default | Description |
@@ -82,7 +71,7 @@ See [agent.md](agent.md). The model server is never started implicitly.
 | `ASTRO_LLM_MODEL` | — | Chat/vision model id (e.g. `mlx-community/Qwen2.5-VL-32B-Instruct-6bit`) |
 | `ASTRO_LLM_IMAGE_FORMAT` | `openai` | Vision wire format: `openai` \| `mlxvlm` |
 | `ASTRO_LLM_TIMEOUT_SEC` | `3600` | Max wall-clock per completion (0 = unlimited) |
-| `ASTRO_LLM_ASSIST_PROMPT_EXTRA` | — | Extra text appended to the AstroAgent chat system prompt |
+| `ASTRO_LLM_ASSIST_PROMPT_EXTRA` | — | Extra text appended to the vision-assist system prompt |
 | `ASTRO_SUPERVISE_HISTORY` | — | `off` disables the supervisor's cross-run warm-start memory |
 
 ## Resource limits
@@ -142,4 +131,4 @@ upstream; `just stack` sets `engine:8080`), `ENGINE_PORT` (8080), `WEB_PORT_PROD
 `ASTRO_DATA_DIR` points at `./input` and the LLM URL at `http://host.docker.internal:1234/v1`.
 
 Host-orchestration variables used by scripts/recipes rather than the engine: `ASTRO_LLM_PORT`
-(model server port for `just run-ia-model`), `HF_TOKEN` (gated model downloads),
+(model server port for `just run-ia-model`) and `HF_TOKEN` (gated model downloads).
