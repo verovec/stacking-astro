@@ -274,7 +274,25 @@
     "mosaic": "Union canvas (multi-night, keep every night's full field)",
     "mosaicHint": "Multi-night runs land on the UNION of all sessions' footprints instead of cropping to the anchor night's frame — a bigger image, no pixel lost. The final is trimmed to the area where every channel has real data (params: mosaic_fill).",
     "sunHint": "Point this at the whole capture folder. The run measures the solar disc in every file and groups what can actually be stacked together — different zooms, resolutions and exposures are sorted out for you, and the grouping is saved as triage.json beside the result.",
-    "eclipseHint": "A partially eclipsed Sun. The Moon is measured as a second circle and masked out of the stack, so the crescent registers on the Sun rather than on whichever body the fit happened to lock onto. Point it at one clip or at the whole folder."
+    "eclipseHint": "A partially eclipsed Sun. The Moon is measured as a second circle and masked out of the stack, so the crescent registers on the Sun rather than on whichever body the fit happened to lock onto. Point it at one clip or at the whole folder.",
+    "colorModel": "Sensor",
+    "colorModelHint": "How this capture records colour. Leave it on the detected value unless the scan got it wrong.",
+    "colorModelAuto": "Detected — {detected}",
+    "colorModelMono": "Monochrome (filter wheel)",
+    "colorModelOsc": "One-shot colour",
+    "colorModelDetected": {
+      "mono": "monochrome, stacked per filter",
+      "osc": "one-shot colour, stacked as one RGB channel",
+      "mixed": "mixed — this folder holds both, and one run cannot stack them together; the monochrome lights are kept and the colour ones dropped",
+      "unknown": "not yet inspected"
+    },
+    "optics": "This session's optics",
+    "opticsHint": "Focal length and pixel size for plate-solving (and therefore colour calibration).",
+    "opticsFocal": "Focal length (mm)",
+    "opticsPixel": "Pixel size (µm)",
+    "opticsWarning": "Left empty, the engine falls back to its configured telescope. A camera-lens session solved at the wrong scale cannot plate-solve at all.",
+    "opticsRig": "Fill from a saved rig",
+    "opticsRigPlaceholder": "Choose a rig…"
   },
   "reuse": {
     "title": "Reuse prior data",

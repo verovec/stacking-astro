@@ -55,6 +55,15 @@ export interface CreateOpts {
   // Imaging target for plate-solve/SPCC seeding — a catalogue name ("M66") or "RA,Dec" — for
   // captures whose headers/folders can't identify the field. Never renames the run.
   target?: string;
+  // Is this a monochrome (filter-wheel) or a one-shot-colour stack? "auto" defers to the inventory's
+  // own verdict — the behaviour of every run before this knob existed — so only an explicit override
+  // is ever sent. An assertion drops the lights that contradict it rather than guessing.
+  colorModel?: "auto" | "mono" | "osc";
+  // THIS session's optics, overriding the engine's configured rig for plate-solving (and therefore
+  // SPCC). A camera lens carries no focal length in the header, so without these a DSLR/lens session
+  // is solved at the configured telescope's scale and cannot solve at all. Omitted when empty.
+  focalMm?: number;
+  pixelUm?: number;
   // Advanced AI parameters: a free-text objective the agent carries for the run, fine tunable-knob
   // overrides (same whitelist/clamps as the supervisor), its re-entry ceiling and iteration cap.
   goal?: string;
@@ -263,6 +272,12 @@ export const useJobsStore = defineStore("jobs", () => {
     if (opts.buildMasters) body.build_masters = true;
     if (opts.calibPlan) body.calib_plan = opts.calibPlan;
     if (opts.target) body.target = opts.target;
+    // "auto" is the engine default — sending it would stamp a value on every stored job for no
+    // behaviour change, so only an explicit mono/osc assertion travels.
+    if (opts.colorModel && opts.colorModel !== "auto")
+      body.color_model = opts.colorModel;
+    if (opts.focalMm) body.focal_mm = opts.focalMm;
+    if (opts.pixelUm) body.pixel_um = opts.pixelUm;
     if (opts.goal) body.goal = opts.goal;
     if (opts.params && Object.keys(opts.params).length)
       body.params = opts.params;

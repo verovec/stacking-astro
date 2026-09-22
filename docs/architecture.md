@@ -208,6 +208,24 @@ supervised finish, stage previews and per-stage rerun, instead of a parallel
 implementation drifting away from them. The seams are in `internal/pipeline/color.go`; see
 [modes/README.md](modes/README.md#monochrome-or-colour--the-same-modes) for what differs.
 
+**The user can overrule the verdict** — `color_model` on the run request, `auto | mono | osc`
+(`inspect.ParseColorChoice`, resolved by `inspect.ResolveColorModel`). Detection is inferred from
+headers and pixels, which is right almost always and *unrecoverable* when it is wrong: a header-less
+camera, a folder holding two rigs, a capture program stamping `BAYERPAT` on a mono sensor. `auto`
+(and an absent field) is a deliberate no-op, so every stored job and every client that never sends
+the field keeps the exact routing it had before the knob existed — each mode entry still owns its own
+reading of a mixed folder, and those readings differ (deepsky drops the colour lights and warns,
+mosaic does the same for anything not pure OSC, comet keeps every light, the per-stage rerun drops
+silently to mirror the run it replays). An explicit choice narrows the **lights** to the ones that
+match, rewrites the verdict so no entry ever sees `mixed`, and fails loudly when none match rather
+than stacking the wrong half of the folder.
+
+Only lights are filtered, never calibration frames. The matcher keys darks/flats/bias on
+gain/offset/bin, exposure and temperature — guarded by `calib.KeepMatchingDims`' sensor-dimension
+check — and `clearSpuriousBayer` deliberately strips `BAYERPAT` from calibration frames whenever the
+scan shows wheel evidence. "Drop every monochrome frame" would therefore delete a colour rig's own
+darks, silently, in exactly the mixed folder where the user reached for the knob.
+
 **Calibration order is load-bearing.** A raw CFA mosaic is calibrated CFA-aware and demosaiced
 *last* (`calibrate … -cfa -equalize_cfa -debayer`). Demosaicing first would interpolate every hot
 pixel and dust shadow across its neighbours, so the defect map and the flat would be correcting a

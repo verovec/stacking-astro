@@ -50,6 +50,17 @@ rejects anything else); two endpoints stream Server-Sent Events (SSE).
 | `POST /api/series` · `GET /api/series` · `GET /api/series/{id}` | Goal-driven improvement campaigns |
 | `POST /api/series/{id}/continue` · `/stop` | Resume / stop a campaign |
 
+### Run-request fields the engine otherwise guesses
+
+`POST /api/jobs` takes `{"path","mode","format"}` at minimum. Three fields are worth calling out
+because **omitting them is not neutral** — the engine substitutes its own answer:
+
+| Field | Values | Omitted → |
+|---|---|---|
+| `color_model` | `auto` \| `mono` \| `osc` | `auto`: the scan's own mono/OSC verdict decides. An explicit value drops the lights that contradict it and errors if none match. Invalid values are rejected with 400. |
+| `focal_mm` | mm, > 0 | the engine's **configured** telescope focal length. A camera-lens session solved at that scale cannot plate-solve at all. |
+| `pixel_um` | µm, > 0 | the frame's own `XPIXSZ`, else the configured rig's pixel size. |
+
 ## Supervised conversations
 
 | Method + path | Purpose |
