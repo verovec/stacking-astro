@@ -262,18 +262,77 @@ func finalizeInventory(inv *Inventory, opts ScanOptions) {
 // slot anywhere) are left untouched, as are unfiltered colour lights dropped into a mono folder — both
 // keep their Bayer flag and are still excluded from the mono pipeline downstream.
 func clearSpuriousBayer(inv *Inventory) {
-	monoRig := false
+	clearSpuriousBayerWith(inv, fits.ReadImage)
+}
+
+// clearSpuriousBayerWith is clearSpuriousBayer with the pixel reader injected (testable without
+// files). The veto runs PER INSTRUMENT and asks the pixels before it destroys anything.
+//
+// Two scopes changed, and each closes a real data-loss path:
+//
+//  1. Per instrument. The old veto was scan-wide: one mono rig anywhere in the folder stripped the
+//     BAYERPAT from EVERY calibration frame in it, including another camera's. A mixed intake — the
+//     ordinary case once a colour body joins a mono one — silently lost its colour calibration.
+//  2. Probe first. A frame whose pixels show genuine CFA structure is never wheel evidence and is
+//     never cleared, whatever its FILTER says. This is what a dual-band clip filter needs: an OSC
+//     camera stamped FILTER='L-eXtreme' is not behind a wheel, and treating it as one destroyed the
+//     session. See cfaprobe.go for why a name cannot answer this and the pixels can.
+//
+// A declined probe (cfaMaybe) keeps the OLD behaviour — the mono-rig reading — because that is what
+// every existing mono session depends on, but says so in a warning instead of clearing in silence.
+func clearSpuriousBayerWith(inv *Inventory, load imageLoader) {
+	byInstrument := map[string][]*Frame{}
 	for _, fr := range inv.Frames {
+		byInstrument[fr.Instrument] = append(byInstrument[fr.Instrument], fr)
+	}
+	cleared, declined := 0, 0
+	for _, frames := range byInstrument {
+		c, d := clearSpuriousBayerFor(frames, load)
+		cleared += c
+		declined += d
+	}
+	if cleared > 0 {
+		inv.Warnings = append(inv.Warnings, fmt.Sprintf(
+			"%d frame(s) carry a BAYERPAT card but the session uses a filter wheel (mono rig) — "+
+				"treating them as monochrome, not one-shot-color", cleared))
+	}
+	if declined > 0 {
+		inv.Warnings = append(inv.Warnings, fmt.Sprintf(
+			"%d frame(s) carry both a BAYERPAT card and a filter name, and their pixels do not settle "+
+				"whether the sensor is a colour mosaic — treating them as monochrome, as before. If this "+
+				"is a colour camera behind a clip filter, say so with the colour/mono selector", declined))
+	}
+}
+
+// clearSpuriousBayerFor applies the veto within ONE instrument, returning how many frames it cleared
+// and how many it cleared only because the probe declined.
+func clearSpuriousBayerFor(frames []*Frame, load imageLoader) (cleared, declined int) {
+	wheelEvidence := make([]*Frame, 0, len(frames))
+	for _, fr := range frames {
 		if fr.WheelSlot > 0 || isMonoFilter(fr.Filter) {
-			monoRig = true
-			break
+			wheelEvidence = append(wheelEvidence, fr)
 		}
 	}
-	if !monoRig {
-		return
+	if len(wheelEvidence) == 0 {
+		return 0, 0 // a genuine one-shot-color session: nothing to veto, exactly as before
 	}
-	cleared := 0
-	for _, fr := range inv.Frames {
+	// Ask the pixels of the frames that LOOK like wheel exposures and still carry a BAYERPAT. If they
+	// are a real mosaic, the "wheel" is a clip filter and there is nothing spurious to clear.
+	bayered := make([]*Frame, 0, len(wheelEvidence))
+	for _, fr := range wheelEvidence {
+		if fr.Bayer != "" {
+			bayered = append(bayered, fr)
+		}
+	}
+	if len(bayered) > 0 {
+		switch probeFramesCFA(bayered, load) {
+		case cfaYes:
+			return 0, 0 // a colour sensor behind a clip filter — leave the whole instrument alone
+		case cfaMaybe:
+			declined = len(bayered)
+		}
+	}
+	for _, fr := range frames {
 		if fr.Bayer == "" {
 			continue
 		}
@@ -282,11 +341,7 @@ func clearSpuriousBayer(inv *Inventory) {
 			cleared++
 		}
 	}
-	if cleared > 0 {
-		inv.Warnings = append(inv.Warnings, fmt.Sprintf(
-			"%d frame(s) carry a BAYERPAT card but the session uses a filter wheel (mono rig) — "+
-				"treating them as monochrome, not one-shot-color", cleared))
-	}
+	return cleared, declined
 }
 
 // isMonoFilter reports whether f names a single mono filter-wheel slot (L/R/G/B/Ha/SII/OIII/…), as

@@ -122,6 +122,33 @@ Camera raws (NEF/CR2/CR3/ARW/RAF/DNG) are decoded by Siril's own libraw during `
 fails (Apple ProRAW is the known case) they are developed by LibRaw's `dcraw_emu` instead, in linear
 light — see `internal/rawconv`.
 
+## A clip filter is not a filter wheel
+
+Both rigs write a `FILTER` card, and the card alone cannot tell them apart:
+
+- an **ASI1600MM** (monochrome) behind a wheel, whose older ASICAP build stamps a `BAYERPAT` anyway.
+  The pattern is meaningless and must be cleared, or the session routes down the colour path and
+  loses every frame.
+- an **ASI2600MC** (colour) behind a **dual-band clip filter**, whose capture program writes
+  `FILTER='L-eXtreme'`. That name is not a wheel slot, the `BAYERPAT` is real, and clearing it
+  destroys the session.
+
+So the question is answered from the pixels (`internal/inspect/cfaprobe.go`). A genuine mosaic puts
+its four Bayer sub-lattices under different dyes — skyglow and flat-field QE split them by tens of
+percent — while the two greens, sharing a dye, stay together. A monochrome sensor is one response:
+its sub-lattices differ only by noise, and a vignette or gradient moves all four at once instead of
+separating R from B. As with filter sets, the sampled frames must AGREE or the probe declines.
+
+Two consequences for `clearSpuriousBayer`:
+
+- **It runs per instrument.** It used to be scan-wide, so one mono rig anywhere in a folder stripped
+  the `BAYERPAT` from *every* calibration frame in it — including another camera's. A mixed intake
+  silently lost its colour calibration.
+- **A probed-CFA frame is never wheel evidence** and is never cleared, whatever its `FILTER` says.
+
+A declined probe keeps the old mono-rig behaviour (every existing mono session depends on it) but
+says so in a warning rather than acting in silence.
+
 ## Filter sets on a one-shot-colour rig
 
 A colour camera has no filter wheel, so it writes no `FILTER` card: the same body shooting broadband
