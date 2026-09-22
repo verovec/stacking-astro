@@ -18,6 +18,7 @@ import FileBrowser from "@/components/Common/FileBrowser.vue";
 import Spinner from "@/components/Common/Spinner.vue";
 import CaptureSummary from "@/components/Common/CaptureSummary.vue";
 import RigPanel from "@/components/Common/RigPanel.vue";
+import ObjectTypeChips from "@/components/Common/ObjectTypeChips.vue";
 import FilterMappingEditor from "@/components/Common/FilterMappingEditor.vue";
 import ReusePanel from "@/components/Common/ReusePanel.vue";
 import CalibrationPanel from "@/components/Common/CalibrationPanel.vue";
@@ -1379,6 +1380,13 @@ function histChip(exists: boolean): string {
       <!-- Environment warnings (missing/broken tools, catalogues) — warn before the run, not after. -->
       <EnvWarnings class="mb-3" />
 
+      <!-- "What did you shoot?" — optional object-type chips that promote the recipes suited to the
+           target. Purely a re-ordering of the picker below; nothing is ever hidden. -->
+      <ObjectTypeChips
+        v-model:selected="presetsStore.selectedObjects"
+        :types="presetsStore.objectTypes"
+      />
+
       <!-- Processing presets: apply a built-in "best params per situation" recipe (or a saved one), and
            save the current params as a named preset. -->
       <div class="mb-3 flex flex-wrap items-center gap-2">
@@ -1393,7 +1401,7 @@ function histChip(exists: boolean): string {
         >
           <option value="">{{ t("preset.custom") }}</option>
           <optgroup
-            v-for="g in presetsStore.byCategory"
+            v-for="g in presetsStore.groups"
             :key="g.key"
             :label="
               g.key === 'mine' ? t('preset.my') : t('preset.category.' + g.key)

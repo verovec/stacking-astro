@@ -12,10 +12,17 @@ folders**, and *Inspect* them into one merged inventory — stat cards per frame
 mapping (overridable when detection confidence is low), light/calibration/file tables, and
 warnings. Then configure the run:
 
-- **Preset** — a catalog of 16 built-in "best params per situation" recipes (galaxy, faint galaxy,
-  star cluster, reflection/emission/planetary nebula, SHO/HOO/Foraxx narrowband, moon, planet,
-  comet, three milkyway looks) plus your own saved presets (Save… persists to the DB). A preset
-  prefills mode/format/palette/toggles/advanced params; everything stays editable.
+- **What did you shoot?** — optional object-type chips (galaxy, emission/planetary/reflection/dark
+  nebula, supernova remnant, oxygen cloud, star cluster, comet, moon, planet, sun, Milky Way). They
+  **re-order** the preset list — recipes suited to that target first, everything else under "other" —
+  and never hide anything, including your own presets. The taxonomy and its order are served by the
+  engine (`GET /api/presets` → `object_types`); the UI declares none of its own.
+- **Preset** — a catalog of 29 built-in "best params per situation" recipes (galaxy, faint galaxy,
+  star cluster, reflection/emission/planetary nebula, dark nebula, supernova remnant, oxygen cloud,
+  thin one-shot-colour broadband, camera-lens wide field, three stacking variants, SHO/HOO/Foraxx
+  narrowband, moon, planet, comet, five sun recipes, three milkyway looks) plus your own saved
+  presets (Save… persists to the DB). A preset prefills mode/format/palette/toggles/advanced params;
+  everything stays editable.
 - **Mode · Output** — the processing modes; image/video/both.
 - **Toggles + Advanced parameters** — SPCC, denoise, Ha handling, wheel-transition drop, palette,
   and the per-mode advanced knob editor; *Run with local AI agent* opts into the

@@ -585,6 +585,10 @@ export interface PresetItem {
   category?: string;
   builtin: boolean;
   favorite?: boolean; // user presets only — built-ins are never starred
+  // What this recipe is FOR: the target types it suits, served by the engine (internal/preset
+  // ObjectType — the single source; the frontend declares no taxonomy of its own). Built-ins carry
+  // at least one; user-saved presets carry none and are never filtered out by the picker's chips.
+  objects?: string[];
   payload: PresetPayload;
   created_at?: number;
   updated_at?: number;

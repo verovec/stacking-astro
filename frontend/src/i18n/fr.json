@@ -65,7 +65,9 @@
       "solar": "Système solaire",
       "comet": "Comète",
       "milkyway": "Voie lactée",
-      "sun": "Le Soleil"
+      "sun": "Le Soleil",
+      "matching": "Recommandés pour votre cible",
+      "other": "Autres recettes"
     },
     "builtin": {
       "galaxy-lrgb": {
@@ -163,8 +165,46 @@
       "stack-few-frames": {
         "label": "Seulement quelques poses",
         "desc": "Pour une poignée de poses dissemblables, où aucun sigma mesuré n'est fiable : écrêtage par percentile et aucune pondération, pour ne rien écarter deux fois."
+      },
+      "oxygen-cloud": {
+        "label": "Nuage d'oxygène (OIII)",
+        "desc": "Coquille ou filament dominé par l'OIII. Les poses sont pondérées sur la propreté du ciel plutôt que sur la finesse — l'OIII est le canal le plus faible et le plus sensible à la pollution lumineuse. Avec des poses Ha, préférez Narrowband HOO."
+      },
+      "supernova-remnant": {
+        "label": "Rémanent de supernova",
+        "desc": "Rémanent type Dentelles : les deux écrans Ha et OIII, forte réduction d'étoiles pour faire ressortir les filaments, et réjection linear_fit pour les gradients d'un grand champ."
+      },
+      "dark-nebula": {
+        "label": "Nébuleuse obscure",
+        "desc": "Bandes de poussière LDN/Barnard — la recette la moins étirée du catalogue. Le sujet est une absence de lumière : le ciel reste sombre et la poussière ténue vient du débruitage, pas d'un point noir relevé."
+      },
+      "osc-broadband": {
+        "label": "Couleur one-shot — nuit large bande courte",
+        "desc": "Caméra couleur, peu d'heures, pour la couleur des étoiles plutôt que la profondeur. Les quatre étages qui réduisent la chroma sont désactivés (ils divisent la couleur par deux sur un stack mince) et seules les poses bien guidées sont conservées."
+      },
+      "wide-field-lens": {
+        "label": "Objectif photo (très grand champ)",
+        "desc": "Un objectif photo et non un télescope. Les deux étages IA sont coupés — à cette focale ils prennent le ciel lui-même pour de la structure (agglomérats, dominante magenta) — et le gradient est modélisé par un simple plan. Un champ aussi large peut dépasser le domaine de l'astrométrie."
       }
-    }
+    },
+    "objects": {
+      "galaxy": "Galaxie",
+      "emission-nebula": "Nébuleuse en émission",
+      "planetary-nebula": "Nébuleuse planétaire",
+      "reflection-nebula": "Nébuleuse par réflexion",
+      "dark-nebula": "Nébuleuse obscure",
+      "supernova-remnant": "Rémanent de supernova",
+      "oxygen-cloud": "Nuage d'oxygène (OIII)",
+      "star-cluster": "Amas d'étoiles",
+      "comet": "Comète",
+      "moon": "Lune",
+      "planet": "Planète",
+      "sun": "Soleil",
+      "milkyway": "Voie lactée"
+    },
+    "objectsLabel": "Qu'avez-vous photographié ?",
+    "objectsHint": "Facultatif — remonte les recettes adaptées à votre cible. Rien n'est masqué.",
+    "objectsClear": "Effacer"
   },
   "run": {
     "mode": "Mode",

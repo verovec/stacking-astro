@@ -23,7 +23,7 @@ func Builtins() []Item {
 // natural palette, colour calibration + denoise on.
 func deepskyBuiltins() []Item {
 	return []Item{
-		builtin("galaxy-lrgb", CategoryDeepsky, Payload{
+		builtin("galaxy-lrgb", CategoryDeepsky, objects(ObjectGalaxy), Payload{
 			Mode: "deepsky", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// Bright core + faint outer arms: a touch more highlight headroom so the core keeps colour,
@@ -34,7 +34,7 @@ func deepskyBuiltins() []Item {
 				"stretch_headroom": 0.92, "star_reduce": 0.1, "denoise_lum": 0.4, "saturation": 0.20,
 			}),
 		}),
-		builtin("galaxy-faint", CategoryDeepsky, Payload{
+		builtin("galaxy-faint", CategoryDeepsky, objects(ObjectGalaxy), Payload{
 			Mode: "deepsky", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// Low-SNR faint galaxy: stronger denoise, AI background extraction on the combined masters,
@@ -44,7 +44,7 @@ func deepskyBuiltins() []Item {
 				"combined_background_ai": true, "star_reduce": 0.15, "stretch_headroom": 0.88,
 			}),
 		}),
-		builtin("star-cluster", CategoryDeepsky, Payload{
+		builtin("star-cluster", CategoryDeepsky, objects(ObjectStarCluster), Payload{
 			Mode: "deepsky", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// Globular / open cluster: never reduce stars; tame the colour discs/mottle around bright
@@ -53,13 +53,61 @@ func deepskyBuiltins() []Item {
 				"star_reduce": 0, "star_desat": 0.6, "chroma_blur": 4, "lum_opacity": 1.0,
 			}),
 		}),
-		builtin("reflection-nebula", CategoryDeepsky, Payload{
+		builtin("reflection-nebula", CategoryDeepsky, objects(ObjectReflectionNebula), Payload{
 			Mode: "deepsky", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// Blue broadband reflection nebula: no Ha screen, a little more saturation to hold the blues,
 			// gentle star reduction.
 			Params: mustParams(map[string]any{
 				"ha_screen": 0, "saturation": 0.16, "denoise_lum": 0.45, "star_reduce": 0.1,
+			}),
+		}),
+		builtin("dark-nebula", CategoryDeepsky, objects(ObjectDarkNebula), Payload{
+			Mode: "deepsky", Format: "image", Palette: "natural",
+			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
+			// LDN/Barnard dark nebulae are the LOWEST-stretch case in the whole catalog: the subject is
+			// an absence of light, and every point of extra stretch fills the lane back in with sky. So
+			// background_level sits at the floor (0.05), no emission screen runs, and the faint dust is
+			// carried by denoise rather than by lifting the black point. Rejection is left untouched
+			// (winsorized) on purpose — see stacking-doc §8.3.
+			Params: mustParams(map[string]any{
+				"background_level": 0.05, "ha_screen": 0, "star_reduce": 0.05,
+				"denoise_lum": 0.6, "denoise_chroma": 0.7, "saturation": 0.12, "stretch_headroom": 0.9,
+			}),
+		}),
+		builtin("osc-broadband", CategoryDeepsky, objects(ObjectGalaxy, ObjectEmissionNebula, ObjectReflectionNebula, ObjectStarCluster), Payload{
+			Mode: "deepsky", Format: "image", Palette: "natural",
+			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
+			// A THIN one-shot-colour broadband night, shot for star colour rather than for depth. The
+			// deepsky default runs four chroma-reducing stages (AI colour denoise + chroma_smooth 6 +
+			// chroma_bg_smooth 24 + sky-chroma flattening); on a thin stack that is measured to HALVE
+			// the chroma (0.138 → 0.073), so all four are off here and the colour is defended instead
+			// by saturation at its ceiling. roundness_floor 0.66 keeps only well-guided subs (the 0.55
+			// default is ~1.8:1 elongation). Runbook: ngc7000-narrowband-plus-broadband §3.
+			//
+			// saturation is 0.35, not the runbook's 0.50: the deepsky clamp caps it at 0.35, so 0.50
+			// silently becomes this. The catalog states what the engine actually applies.
+			Params: mustParams(map[string]any{
+				"crop_frac": 0.03, "background_level": 0.08, "star_reduce": 0,
+				"roundness_floor": 0.66, "color_denoise_ai": false,
+				"chroma_smooth_px": 0, "chroma_bg_smooth_px": 0, "sky_chroma_flatten_px": 0,
+				"denoise_chroma": 0.35, "saturation": 0.35, "star_desat": 0,
+			}),
+		}),
+		builtin("wide-field-lens", CategoryDeepsky, objects(ObjectMilkyway, ObjectEmissionNebula, ObjectDarkNebula), Payload{
+			Mode: "deepsky", Format: "image", Palette: "natural",
+			Denoise: boolPtr(true),
+			// A camera LENS rather than a telescope (measured on a 20 mm f/1.8 OSC series, 151×60 s).
+			// At that focal length the frame is mostly sky, and the two AI stages read the sky itself as
+			// structure: the background extractor clumps, and the colour denoiser leaves a magenta cast.
+			// Both off, both sky-flattening passes off, and the gradient modelled as a simple plane
+			// (background_degree 1) — a higher-degree surface chases the Milky Way's own light.
+			//
+			// color_calibration is deliberately left at the form default: a field this wide often
+			// exceeds the plate solver's usable domain, so the run may fall back rather than solve.
+			Params: mustParams(map[string]any{
+				"color_denoise_ai": false, "background_ai": false,
+				"sky_chroma_flatten_px": 0, "sky_lum_flatten_px": 0, "background_degree": 1,
 			}),
 		}),
 	}
@@ -71,7 +119,7 @@ func deepskyBuiltins() []Item {
 // docs/stacking.md.
 func stackingBuiltins() []Item {
 	return []Item{
-		builtin("stack-moonlit-gradient", CategoryDeepsky, Payload{
+		builtin("stack-moonlit-gradient", CategoryDeepsky, objects(ObjectGalaxy, ObjectEmissionNebula, ObjectReflectionNebula, ObjectDarkNebula, ObjectStarCluster), Payload{
 			Mode: "deepsky", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// A sky that MOVED during the session (rising moon, drifting light pollution): linear-fit
@@ -81,7 +129,7 @@ func stackingBuiltins() []Item {
 				"stack_reject": "linear_fit", "stack_reject_low": 5, "stack_reject_high": 3.5,
 			}),
 		}),
-		builtin("stack-deep-session", CategoryDeepsky, Payload{
+		builtin("stack-deep-session", CategoryDeepsky, objects(ObjectGalaxy, ObjectEmissionNebula, ObjectPlanetaryNebula, ObjectStarCluster), Payload{
 			Mode: "deepsky", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// A long session (50+ subs) where the correlated leftovers matter more than raw depth:
@@ -92,7 +140,7 @@ func stackingBuiltins() []Item {
 				"stack_weight": "noise",
 			}),
 		}),
-		builtin("stack-few-frames", CategoryDeepsky, Payload{
+		builtin("stack-few-frames", CategoryDeepsky, objects(ObjectGalaxy, ObjectEmissionNebula, ObjectReflectionNebula, ObjectStarCluster), Payload{
 			Mode: "deepsky", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// A handful of dissimilar subs: no measured sigma is trustworthy, so clip a fixed share at
@@ -109,7 +157,7 @@ func stackingBuiltins() []Item {
 // nebulaBuiltins — broadband + Ha emission nebulae: mode nebula (Ha-forward), colour calibration on.
 func nebulaBuiltins() []Item {
 	return []Item{
-		builtin("emission-hargb", CategoryNebula, Payload{
+		builtin("emission-hargb", CategoryNebula, objects(ObjectEmissionNebula), Payload{
 			Mode: "nebula", Format: "image", Palette: "hargb",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true), HaExcludeStars: boolPtr(true),
 			// Ha blended into RGB: a strong Ha screen with a raised black point to keep the background
@@ -118,7 +166,7 @@ func nebulaBuiltins() []Item {
 				"ha_screen": 0.55, "ha_black_point": 0.12, "star_reduce": 0.4, "saturation": 0.15,
 			}),
 		}),
-		builtin("emission-broadband", CategoryNebula, Payload{
+		builtin("emission-broadband", CategoryNebula, objects(ObjectEmissionNebula), Payload{
 			Mode: "nebula", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true), HaExcludeStars: boolPtr(true),
 			// Broadband emission nebula (no dedicated Ha stack): a mild Ha screen, light star reduction.
@@ -126,13 +174,40 @@ func nebulaBuiltins() []Item {
 				"ha_screen": 0.35, "star_reduce": 0.3, "saturation": 0.14,
 			}),
 		}),
-		builtin("planetary-nebula", CategoryNebula, Payload{
+		builtin("planetary-nebula", CategoryNebula, objects(ObjectPlanetaryNebula), Payload{
 			Mode: "nebula", Format: "image", Palette: "natural",
 			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
 			// Small, bright planetary nebula: keep every star, extra saturation for the shell colours, a
 			// gentler stretch so the bright core does not blow out.
 			Params: mustParams(map[string]any{
 				"star_reduce": 0, "saturation": 0.18, "stretch_headroom": 0.9, "ha_screen": 0.45,
+			}),
+		}),
+		builtin("oxygen-cloud", CategoryNebula, objects(ObjectOxygenCloud), Payload{
+			Mode: "nebula", Format: "image", Palette: "natural",
+			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
+			// An [OIII]-dominant object (OU4's squid, big OIII shells). OIII is the faintest and the most
+			// light-pollution-sensitive channel there is, so sky CLEANLINESS beats PSF sharpness when
+			// weighting frames — stack_weight noise rather than the usual wfwhm. The teal shell is put
+			// on top by the OIII screen instead of by stretch, star reduction lets it read over the star
+			// field, and the remaining noise is denoised away rather than stretched. stacking-doc §8.2.
+			// With Ha frames in hand, prefer the narrowband-hoo recipe — it owns its own colour.
+			Params: mustParams(map[string]any{
+				"oiii_screen": 0.5, "star_reduce": 0.45, "star_desat": 0.3,
+				"denoise_lum": 0.6, "background_level": 0.075, "stack_weight": "noise",
+			}),
+		}),
+		builtin("supernova-remnant", CategoryNebula, objects(ObjectSupernovaRemnant), Payload{
+			Mode: "nebula", Format: "image", Palette: "natural",
+			ColorCalibration: boolPtr(true), Denoise: boolPtr(true),
+			// Veil-class remnant: filaments in BOTH Ha and OIII, so both screens run — the structure is
+			// the interplay between them. These are wide fields, which means gradients, so linear-fit
+			// rejection models the changing sky level per pixel instead of treating it as noise. Heavy
+			// star reduction (0.5) is what makes the filaments readable at all. stacking-doc §8.3.
+			Params: mustParams(map[string]any{
+				"ha_screen": 0.45, "oiii_screen": 0.45, "star_reduce": 0.5, "star_desat": 0.35,
+				"saturation":   0.17,
+				"stack_reject": "linear_fit", "stack_reject_low": 5, "stack_reject_high": 3.5,
 			}),
 		}),
 	}
@@ -142,21 +217,21 @@ func nebulaBuiltins() []Item {
 // palettes do their own colour mapping) and the magenta star haloes tamed.
 func narrowbandBuiltins() []Item {
 	return []Item{
-		builtin("narrowband-sho", CategoryNarrowband, Payload{
+		builtin("narrowband-sho", CategoryNarrowband, objects(ObjectEmissionNebula, ObjectSupernovaRemnant), Payload{
 			Mode: "nebula", Format: "image", Palette: "sho",
 			ColorCalibration: boolPtr(false), Denoise: boolPtr(true), HaExcludeStars: boolPtr(true),
 			Params: mustParams(map[string]any{
 				"star_reduce": 0.5, "star_desat": 0.4, "saturation": 0.16,
 			}),
 		}),
-		builtin("narrowband-hoo", CategoryNarrowband, Payload{
+		builtin("narrowband-hoo", CategoryNarrowband, objects(ObjectEmissionNebula, ObjectOxygenCloud, ObjectSupernovaRemnant), Payload{
 			Mode: "nebula", Format: "image", Palette: "hoo",
 			ColorCalibration: boolPtr(false), Denoise: boolPtr(true), HaExcludeStars: boolPtr(true),
 			Params: mustParams(map[string]any{
 				"star_reduce": 0.4, "star_desat": 0.3, "saturation": 0.16,
 			}),
 		}),
-		builtin("narrowband-foraxx", CategoryNarrowband, Payload{
+		builtin("narrowband-foraxx", CategoryNarrowband, objects(ObjectEmissionNebula, ObjectSupernovaRemnant), Payload{
 			Mode: "nebula", Format: "image", Palette: "foraxx",
 			ColorCalibration: boolPtr(false), Denoise: boolPtr(true), HaExcludeStars: boolPtr(true),
 			Params: mustParams(map[string]any{
@@ -169,7 +244,7 @@ func narrowbandBuiltins() []Item {
 // solarBuiltins — Moon & planets via lucky imaging: mode planetary.
 func solarBuiltins() []Item {
 	return []Item{
-		builtin("moon", CategorySolar, Payload{
+		builtin("moon", CategorySolar, objects(ObjectMoon), Payload{
 			Mode: "planetary", Format: "image",
 			// Bright full disk: reserve highlight headroom so it does not burn. True lucky-imaging
 			// selection: the 2026-07-12 run forensics showed a bigger kept fraction only dilutes the
@@ -190,7 +265,7 @@ func solarBuiltins() []Item {
 				"limb_balance": 0.55,
 			}),
 		}),
-		builtin("planet", CategorySolar, Payload{
+		builtin("planet", CategorySolar, objects(ObjectPlanet), Payload{
 			Mode: "planetary", Format: "both",
 			// Small bright disk: strict frame selection, alignment-point warping, a mild luminance
 			// deconvolution and a saturation boost for the real disc colour.
@@ -205,7 +280,7 @@ func solarBuiltins() []Item {
 // cometBuiltins — moving comet: mode comet (dual star/comet stack + star-layer recomposite).
 func cometBuiltins() []Item {
 	return []Item{
-		builtin("comet", CategoryComet, Payload{
+		builtin("comet", CategoryComet, objects(ObjectComet), Payload{
 			Mode: "comet", Format: "image",
 			// A gentle coma-gradient removal and a touch of saturation for the ion/dust tail colour; the
 			// dual star/comet stacking is handled by the mode itself.
@@ -220,13 +295,13 @@ func cometBuiltins() []Item {
 // nightscape renderer owns the rest); no Advanced knobs.
 func milkywayBuiltins() []Item {
 	return []Item{
-		builtin("milkyway-natural", CategoryMilkyway, Payload{
+		builtin("milkyway-natural", CategoryMilkyway, objects(ObjectMilkyway), Payload{
 			Mode: "milkyway", Format: "image", Look: "natural", Brightness: "balanced",
 		}),
-		builtin("milkyway-iphone", CategoryMilkyway, Payload{
+		builtin("milkyway-iphone", CategoryMilkyway, objects(ObjectMilkyway), Payload{
 			Mode: "milkyway", Format: "image", Look: "iphone", Brightness: "balanced",
 		}),
-		builtin("milkyway-deep", CategoryMilkyway, Payload{
+		builtin("milkyway-deep", CategoryMilkyway, objects(ObjectMilkyway, ObjectDarkNebula), Payload{
 			Mode: "milkyway", Format: "image", Look: "deepsky", Brightness: "brighter",
 		}),
 	}
@@ -246,7 +321,7 @@ func milkywayBuiltins() []Item {
 // the prominences, which palette, how much local contrast.
 func sunBuiltins() []Item {
 	return []Item{
-		builtin("sun_ha_full", CategorySun, Payload{
+		builtin("sun_ha_full", CategorySun, objects(ObjectSun), Payload{
 			Mode: "sun", Format: "both",
 			// The default: disc detail and prominences in one frame, which is what an Hα scope is for.
 			Params: mustParams(map[string]any{
@@ -254,7 +329,7 @@ func sunBuiltins() []Item {
 				"sharpen_medium": 1.35, "palette": "gold",
 			}),
 		}),
-		builtin("sun_ha_disk", CategorySun, Payload{
+		builtin("sun_ha_disk", CategorySun, objects(ObjectSun), Payload{
 			Mode: "sun", Format: "image",
 			// Chromosphere detail only: the limb is flattened hard and the prominences are pulled back
 			// so nothing competes with filaments and plage across the surface.
@@ -263,7 +338,7 @@ func sunBuiltins() []Item {
 				"sharpen_small": 1.3, "sharpen_medium": 1.6, "palette": "gold", "contrast": 1.15,
 			}),
 		}),
-		builtin("sun_ha_prominence", CategorySun, Payload{
+		builtin("sun_ha_prominence", CategorySun, objects(ObjectSun), Payload{
 			Mode: "sun", Format: "image",
 			// Limb-forward: the off-limb material is stretched hard and the disc is left dark, the way
 			// a prominence close-up is normally presented.
@@ -272,7 +347,7 @@ func sunBuiltins() []Item {
 				"stretch": 0.7, "palette": "gold",
 			}),
 		}),
-		builtin("sun_whitelight", CategorySun, Payload{
+		builtin("sun_whitelight", CategorySun, objects(ObjectSun), Payload{
 			Mode: "sun", Format: "image",
 			// Photosphere through a solar film: sunspots and faculae, neutral rendering, no prominences
 			// to show (a white-light filter passes none).
@@ -281,7 +356,7 @@ func sunBuiltins() []Item {
 				"palette": "neutral", "saturation": 0.6,
 			}),
 		}),
-		builtin("sun_iphone_video", CategorySun, Payload{
+		builtin("sun_iphone_video", CategorySun, objects(ObjectSun), Payload{
 			Mode: "sun", Format: "both",
 			// A phone clip through the eyepiece. The starlet gains are pulled back because the camera
 			// pipeline has already sharpened once, and double-sharpening haloes every limb and filament.

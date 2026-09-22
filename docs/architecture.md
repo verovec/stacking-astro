@@ -53,7 +53,7 @@ feeds are fetched at runtime and cached, and both soft-fail.
 | `internal/dither` | Pointing-pattern diagnosis from registration offsets (dithered / drift / static) — the walking-noise advisory. |
 | `internal/noise` · `internal/imgops` · `internal/optics` | Noise measurement/starlet denoiser, shared image ops, flat-defect QC. |
 | `internal/pipeline` | Orchestrate inspect → masters → calibrate → grade → register → stack → combine; soft-fail AI steps in `enhance.go`; palettes, supervisor, per-stage rerun. |
-| `internal/preset` | The built-in "best params per situation" catalog (16 recipes) merged with user presets. |
+| `internal/preset` | The built-in "best params per situation" catalog (29 recipes) merged with user presets, plus the object-type taxonomy (`ObjectType`) that drives the launch form's target chips. |
 | `internal/postprocess` | LRGB+Ha channel combine, color calibration, stretch; optional GIMP touch-ups. |
 | `internal/graxpert` | Optional host CLI: GraXpert AI background-gradient extraction / denoise (`GRAXPERT_BIN`). |
 | `internal/starnet` | Optional host CLI: StarNet star removal for star-reduced finishing + the star-presence set (`STARNET_BIN`; both the positional StarNet++ v2 and flag-style StarNet2 CLIs, auto-detected). |
