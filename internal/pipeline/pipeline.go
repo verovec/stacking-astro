@@ -879,8 +879,7 @@ func reStack(ctx context.Context, opts Options, preset *mode.Preset, inv *inspec
 		groups := plan.byFilter[filter]
 		var ch ChannelResult
 		if useFastPath(plan, groups) {
-			set := inspect.Set{Key: groups[0].Key, Frames: groups[0].Frames, Count: len(groups[0].Frames)}
-			ch = processChannel(ctx, ro, set, masters, workRun, outDir, g, prog)
+			ch = processChannel(ctx, ro, groups[0].asSet(), masters, workRun, outDir, g, prog)
 		} else {
 			// Zero-position stepRef: a nested re-stack must never advance the main run's bar; its
 			// per-session lines ride at the last position exactly like its other index-less lines.
@@ -1735,7 +1734,7 @@ func processChannel(ctx context.Context, opts Options, set inspect.Set, masters 
 	// would accept a wrong-sized master, skip the correction and still report success, and striking
 	// one from the finished result would cost that role its fallback (see calib/dims.go).
 	usable, dimNote := calib.KeepMatchingDims(masters, firstFramePath(set.Frames))
-	sel := calib.MatchForLightExcluding(set.Key, usable, opts.CalibExclude, opts.ForceCalibration)
+	sel := calib.MatchForRef(calib.LightRef{Key: set.Key, FilterSet: set.FilterSet}, usable, opts.CalibExclude, opts.ForceCalibration)
 	if dimNote != "" {
 		sel.Notes = append(sel.Notes, dimNote)
 	}

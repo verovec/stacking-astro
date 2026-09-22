@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/verove-jordan/astronomy/internal/filters"
 	"github.com/verove-jordan/astronomy/internal/inspect"
 )
 
@@ -35,19 +34,6 @@ func (s Selection) Masters() (dark, flat, bias string) {
 		bias = s.Bias.Path
 	}
 	return
-}
-
-// LightRef identifies the light set being calibrated: its key, plus the clip filter its night was
-// shot through. The filter set is carried BESIDE the key rather than inside it because SetKey.ID() is
-// the token the UI sends back in exclude_sets — folding a measured value into it would churn stored
-// tokens the moment a detection threshold moved (see internal/inspect/filterset.go).
-//
-// The zero value is a light with no known filter set, which is every monochrome light and every
-// colour night the pixels could not settle — and which reproduces the pre-filter-set matching
-// exactly.
-type LightRef struct {
-	Key       inspect.SetKey
-	FilterSet filters.FilterSet
 }
 
 // MatchForLight picks the most appropriate dark, flat and bias masters for a light set (no forcing,
@@ -296,36 +282,6 @@ func bestFlat(light inspect.SetKey, masters []Master) *Master {
 	return pickFlat(light, masters, false)
 }
 
-// keepSameFilterSet removes the flats shot through a DIFFERENT clip filter than the light, returning
-// the surviving pool and how many were dropped.
-//
-// It pre-filters the candidate pool rather than ranking inside pickFlat, for the reason dims.go
-// documents at length: striking a master after the match has already chosen it loses the fallback,
-// while filtering first lets the remaining passes find the next-best candidate. It also keeps
-// pickFlat and flatBeats exactly as they were, so every existing ranking guarantee still holds.
-//
-// Both sides must be KNOWN for the gate to fire — either one unknown leaves the pool untouched and
-// reproduces the pre-filter-set behaviour byte for byte. force_calibration_frames drops it like
-// every other gate: the user asked for their masters to be applied.
-func keepSameFilterSet(ref LightRef, masters []Master, force bool) ([]Master, int) {
-	if force || !ref.FilterSet.Known() {
-		return masters, 0
-	}
-	kept := make([]Master, 0, len(masters))
-	dropped := 0
-	for _, m := range masters {
-		if m.Type == MasterFlat && m.FilterSet.Known() && m.FilterSet != ref.FilterSet {
-			dropped++
-			continue
-		}
-		kept = append(kept, m)
-	}
-	if dropped == 0 {
-		return masters, 0
-	}
-	return kept, dropped
-}
-
 // pickFlat selects a flat master, optionally requiring its filter to match the light; among
 // candidates it prefers the light's own capture night, then matching camera settings, then depth.
 func pickFlat(light inspect.SetKey, masters []Master, requireFilter bool) *Master {
@@ -428,12 +384,4 @@ func bestBias(light inspect.SetKey, masters []Master, force bool) *Master {
 
 func sameCamera(light inspect.SetKey, m *Master) bool {
 	return m.Gain == light.Gain && m.Offset == light.Offset && m.Bin == light.Bin
-}
-
-// otherSet names the opposite filter set, for the exclusion note.
-func otherSet(f filters.FilterSet) filters.FilterSet {
-	if f == filters.FilterSetDualband {
-		return filters.FilterSetBroadband
-	}
-	return filters.FilterSetDualband
 }

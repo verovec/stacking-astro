@@ -14,6 +14,7 @@ import (
 	"sort"
 
 	"github.com/verove-jordan/astronomy/internal/calib"
+	"github.com/verove-jordan/astronomy/internal/filters"
 	"github.com/verove-jordan/astronomy/internal/inspect"
 	"github.com/verove-jordan/astronomy/internal/store"
 )
@@ -70,6 +71,15 @@ type PlanGroup struct {
 	Flat        *PlanMaster `json:"flat,omitempty"`
 	Bias        *PlanMaster `json:"bias,omitempty"`
 	Notes       []string    `json:"notes,omitempty"`
+	// FilterSet is the clip filter these lights were shot through (one-shot-colour only). It is what
+	// makes the flat row readable: "library flat, 30 frames" says nothing until you can see that the
+	// lights are dual-band and the flat is not.
+	FilterSet filters.FilterSet `json:"filter_set,omitempty"`
+	// FlatFallback marks a group whose FLAT is not the clean case — refused for being cross-set,
+	// borrowed from another capture night, forced past the set gate, or missing entirely. The Notes
+	// have always said so in prose; this is the same truth in a shape the UI can raise a chip on,
+	// which is the difference between a warning the user reads and one they scroll past.
+	FlatFallback bool `json:"flat_fallback,omitempty"`
 }
 
 // PlanMaster is one master a group would use, with its provenance.
@@ -133,39 +143,71 @@ func planGroupFor(ctx context.Context, provider ReuseProvider, g lightGroup, can
 		ExposureMs: g.Key.ExposureMs, Gain: g.Key.Gain, Offset: g.Key.Offset,
 		TempBucketC: g.Key.TempBucket, Bin: g.Key.Bin, Frames: len(g.Frames),
 	}
-	sel := calib.MatchForLightExcluding(g.Key, candidates, nil, force)
+	if fs := g.ref().FilterSet; fs.Known() {
+		pg.FilterSet = fs
+	}
+	sel := calib.MatchForRef(g.ref(), candidates, nil, force)
 	pg.Notes = sel.Notes
 	pg.Dark = planMasterFor(g.Key, calib.RoleDark, sel.Dark)
 	pg.Bias = planMasterFor(g.Key, calib.RoleBias, sel.Bias)
 	if g.Current {
 		pg.Flat = planMasterFor(g.Key, calib.RoleFlat, sel.Flat)
-		return pg
+	} else {
+		flat, notes := planPriorFlat(ctx, provider, g)
+		pg.Flat, pg.Notes = flat, append(pg.Notes, notes...)
 	}
-	// Prior group: the run rebuilds the flat from that session's own raw flats (per night) —
-	// mirror flatCache.sessionFlat through the shared pure helper over the same provider rows.
+	pg.FlatFallback = flatFallback(g, pg.Flat)
+	return pg
+}
+
+// planPriorFlat resolves a prior group's flat the way the run's flatCache will: rebuilt from that
+// session's own raw flats (per night), through the SAME sessionFlatPaths helper over the same
+// RawCalibFrames rows — so the plan cannot drift from the run. nil flat = that session's frames go
+// un-flat-fielded, and the notes say why.
+func planPriorFlat(ctx context.Context, provider ReuseProvider, g lightGroup) (*PlanMaster, []string) {
 	if provider == nil {
-		return pg
+		return nil, nil
 	}
 	rows, err := provider.RawCalibFrames(ctx, store.CalibQuery{
 		Types: []string{string(inspect.Flat)}, Gain: g.Key.Gain, Offset: g.Key.Offset, Bin: g.Key.Bin, SessionID: g.SessionID,
 	})
 	if err != nil {
-		pg.Notes = append(pg.Notes, fmt.Sprintf("session %d: flat lookup failed: %v", g.SessionID, err))
-		return pg
+		return nil, []string{fmt.Sprintf("session %d: flat lookup failed: %v", g.SessionID, err)}
 	}
+	var notes []string
 	paths, missing, note := sessionFlatPaths(rows, g.Filter, g.Session)
 	if note != "" {
-		pg.Notes = append(pg.Notes, fmt.Sprintf("session %d: %s", g.SessionID, note))
+		notes = append(notes, fmt.Sprintf("session %d: %s", g.SessionID, note))
 	}
 	switch {
 	case len(paths) > 0:
-		pg.Flat = &PlanMaster{Source: planSourceSession, RawFlats: len(paths)}
+		return &PlanMaster{Source: planSourceSession, RawFlats: len(paths)}, notes
 	case missing > 0:
-		pg.Notes = append(pg.Notes, fmt.Sprintf("session %d: %d raw flat(s) missing on disk (freed to S3?) — flat correction skipped for its frames", g.SessionID, missing))
+		notes = append(notes, fmt.Sprintf("session %d: %d raw flat(s) missing on disk (freed to S3?) — flat correction skipped for its frames", g.SessionID, missing))
 	default:
-		pg.Notes = append(pg.Notes, fmt.Sprintf("session %d: no flats for filter %q — flat correction skipped for its frames", g.SessionID, g.Filter))
+		notes = append(notes, fmt.Sprintf("session %d: no flats for filter %q — flat correction skipped for its frames", g.SessionID, g.Filter))
 	}
-	return pg
+	return nil, notes
+}
+
+// flatFallback reports whether the planned FLAT departs from the clean case — no flat at all, one
+// borrowed from a different capture night (dust moves), or one shot through a different clip filter
+// than the lights (which only survives the match under force_calibration_frames).
+//
+// It reads the resolved plan rather than the notes: the notes are prose meant for a human, and a UI
+// that decided when to warn by matching substrings in them would break the first time one is reworded.
+func flatFallback(g lightGroup, flat *PlanMaster) bool {
+	if flat == nil {
+		return true
+	}
+	m := flat.Master
+	if m == nil {
+		return false // a session rebuild IS that night's own raw flats — the clean case for prior data
+	}
+	if m.Session != "" && g.Session != "" && m.Session != g.Session {
+		return true
+	}
+	return g.FilterSet.Known() && m.FilterSet.Known() && g.FilterSet != m.FilterSet
 }
 
 // planMasterFor wraps one matched master with its provenance; nil in → nil out (role skipped).

@@ -10,7 +10,6 @@ import (
 
 	"github.com/verove-jordan/astronomy/internal/calib"
 	"github.com/verove-jordan/astronomy/internal/grade"
-	"github.com/verove-jordan/astronomy/internal/inspect"
 	"github.com/verove-jordan/astronomy/internal/siril"
 )
 
@@ -36,8 +35,7 @@ func stackOneChannel(ctx context.Context, opts Options, plan *ReusePlan, object,
 	gradeOpts grade.Options, prog func(siril.Progress), ref stepRef) ChannelResult {
 	groups := plan.byFilter[filter]
 	if useFastPath(plan, groups) {
-		set := inspect.Set{Key: groups[0].Key, Frames: groups[0].Frames, Count: len(groups[0].Frames)}
-		return processChannel(ctx, opts, set, masters, workRun, outDir, gradeOpts, prog)
+		return processChannel(ctx, opts, groups[0].asSet(), masters, workRun, outDir, gradeOpts, prog)
 	}
 	return processChannelGroups(ctx, opts, object, filter, groups, masters, flats, parity, workRun, outDir, gradeOpts, prog, ref, plan.AnchorNight)
 }

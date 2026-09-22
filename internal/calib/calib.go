@@ -107,6 +107,7 @@ func BuildMasters(ctx context.Context, runner *siril.Runner, inv *inspect.Invent
 				warnings = append(warnings, err.Error())
 				continue
 			}
+			stampFlatFilterSet(&m, inv, set)
 			masters = append(masters, m)
 		}
 	}

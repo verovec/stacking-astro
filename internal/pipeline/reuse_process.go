@@ -33,7 +33,7 @@ func processChannelGroups(ctx context.Context, opts Options, object, filter stri
 		Object:     object,
 		Filter:     filter,
 		ExposureMs: rep.Key.ExposureMs,
-		Selection:  calib.MatchForLightExcluding(rep.Key, masters, opts.CalibExclude, opts.ForceCalibration), // representative selection (notes/UI)
+		Selection:  calib.MatchForRef(rep.ref(), masters, opts.CalibExclude, opts.ForceCalibration), // representative selection (notes/UI)
 	}
 
 	var calibrated []string         // calibrated frame paths, in registration order
@@ -483,7 +483,7 @@ func (c *flatCache) mastersFor(ctx context.Context, opts Options, g lightGroup,
 	// with untouched lights. Filtering the pool (not the result) keeps the fallback. See calib/dims.go.
 	light := firstFramePath(g.Frames)
 	usable, dimNote := calib.KeepMatchingDims(masters, light)
-	sel := calib.MatchForLightExcluding(g.Key, usable, opts.CalibExclude, opts.ForceCalibration)
+	sel := calib.MatchForRef(g.ref(), usable, opts.CalibExclude, opts.ForceCalibration)
 	var dimNotes []string
 	if dimNote != "" {
 		dimNotes = append(dimNotes, dimNote)

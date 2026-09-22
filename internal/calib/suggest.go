@@ -82,7 +82,9 @@ func PreviewCandidates(inv *inspect.Inventory, lib []Master) []Master {
 			if findExisting(lib, set) != nil {
 				continue // the run would reuse this library master, not rebuild
 			}
-			candidates = append(candidates, syntheticMaster(set))
+			m := syntheticMaster(set)
+			stampFlatFilterSet(&m, inv, set)
+			candidates = append(candidates, m)
 		}
 	}
 	return candidates
@@ -113,7 +115,7 @@ func SuggestForInventory(inv *inspect.Inventory, masters []Master, force bool) C
 		// cannot apply a master of the wrong size at all, so forcing one would promise a correction
 		// that silently never happens.
 		usable, dimNote := poolFor(set, masters)
-		sel := matchForRef(LightRef{Key: set.Key, FilterSet: set.FilterSet}, usable, force)
+		sel := matchForRef(RefFor(inv, set), usable, force)
 		if dimNote != "" {
 			sel.Notes = append(sel.Notes, dimNote)
 		}
