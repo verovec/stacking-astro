@@ -16,6 +16,8 @@ import (
 
 	"github.com/verove-jordan/astronomy/internal/capture"
 	"github.com/verove-jordan/astronomy/internal/localfs"
+	"github.com/verove-jordan/astronomy/internal/platesolve"
+	"github.com/verove-jordan/astronomy/internal/postprocess"
 	"github.com/verove-jordan/astronomy/internal/skylog"
 	"github.com/verove-jordan/astronomy/internal/store"
 )
@@ -269,7 +271,7 @@ func (s *Server) centerCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	solver := s.solver()
-	if err := s.polarSolverReady(r); err != nil {
+	if err := s.solverReady(r); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 			"error": err.Error(), "code": "solver_unavailable",
 		})
@@ -526,4 +528,29 @@ func (c captureRecorder) RecordFrame(ctx context.Context, sessionID int64, f cap
 		TempMilliC: f.TempMilliC, Panel: f.Panel, SequenceNo: f.Sequence,
 		StartedAt: f.StartedAt.UnixMilli(),
 	})
+}
+
+// solver builds the plate solver the capture-side features (GoTo centering, track monitor) use: the
+// simulator's truth-card solver under ASTRO_SIM_SOLVER, else Siril. Lived in polarcam.go until the
+// polar-alignment feature left (E01 card 0013).
+func (s *Server) solver() capture.Solver {
+	if s.cfg.SimSolver {
+		return platesolve.NewSimSolver()
+	}
+	solveOpts, _ := postprocess.SolveSpccFromConfig(s.cfg)
+	return platesolve.New(s.sirilRunner, solveOpts)
+}
+
+// solverReady reports whether the plate solver can actually run (Siril present), so a capture feature
+// can answer 503 instead of failing mid-sequence.
+func (s *Server) solverReady(r *http.Request) error {
+	type available interface{ Available(context.Context) error }
+	probe, ok := s.solver().(available)
+	if !ok {
+		return nil
+	}
+	if err := probe.Available(r.Context()); err != nil {
+		return fmt.Errorf("plate solving needs Siril: %w", err)
+	}
+	return nil
 }

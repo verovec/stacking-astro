@@ -429,105 +429,6 @@
       "body": "Centrer des étoiles bien réparties construit un modèle de pointage précis : la monture suit et pointe avec exactitude. Combiné à la mise en station ci-dessus, cela permet d'allonger les poses."
     }
   },
-  "polar": {
-    "title": "Mise en station",
-    "subtitle": "Placez l'étoile polaire au bon endroit sur le réticule de votre viseur polaire, pour maintenant.",
-    "hemisphere": {
-      "north": "Nord",
-      "south": "Sud"
-    },
-    "reticle": {
-      "placeHere": "Placez l'étoile dans le cercle orange",
-      "truePole": "pôle vrai",
-      "polaris": "Polaris",
-      "sigmaOct": "σ Octantis",
-      "cassiopeia": "Cassiopée",
-      "bigDipper": "Grande Ourse",
-      "crux": "Croix du Sud",
-      "octans": "Octant",
-      "invertedView": "Vue dans le viseur (inversée)",
-      "erectView": "Vue à l'œil nu (droite)",
-      "mirrored": "Miroir (renvoi coudé)"
-    },
-    "panel": {
-      "clock": "Position horaire",
-      "poleStar": "Étoile polaire",
-      "hemisphere": "Hémisphère",
-      "ha": "Angle horaire",
-      "separation": "Écart au pôle",
-      "alt": "Hauteur",
-      "az": "Azimut",
-      "lst": "Temps sidéral",
-      "latTooLow": "Le pôle céleste est trop bas ici pour un viseur polaire.",
-      "notVisible": "L'étoile polaire est sous l'horizon en ce moment."
-    },
-    "orientation": {
-      "inverting": "Inversée (viseur)",
-      "erect": "Droite (œil nu)",
-      "mirror": "Miroir (renvoi)",
-      "hint": "La plupart des viseurs polaires inversent l'image. Faites correspondre le réticule à l'écran à ce que vous voyez réellement."
-    },
-    "time": {
-      "specific": "Heure précise",
-      "autoRefresh": "Rafraîchir auto"
-    },
-    "tutorial": {
-      "title": "Comment régler et utiliser votre viseur polaire",
-      "intro": "Un guide pratique pour un viseur polaire SkyWatcher sur une Celestron Advanced VX — du réglage initial à l'utilisation sous un ciel sombre.",
-      "s1": {
-        "title": "À quoi sert la mise en station",
-        "body": "L'axe AD de la monture doit pointer le pôle céleste pour qu'un seul moteur suive le ciel. Le viseur polaire permet de viser l'étoile polaire et de la placer précisément.",
-        "tips": [
-          "Le pôle est proche — mais pas exactement — de l'étoile polaire.",
-          "Une bonne mise en station = poses longues à étoiles rondes et go-to fiable."
-        ]
-      },
-      "s2": {
-        "title": "Une fois : aligner le viseur sur l'axe AD",
-        "body": "Centrez un objet lointain sur le réticule, tournez l'axe AD de 180°, puis ajustez les trois vis pour corriger la moitié de l'écart. Répétez jusqu'à ce que l'objet reste fixe pendant la rotation.",
-        "tips": [
-          "À faire une fois, de jour sur un repère lointain (ou sur Polaris la nuit).",
-          "Réglez les vis du réticule, jamais les boulons alt/az de la monture.",
-          "De très petits réglages — les vis sont sensibles."
-        ]
-      },
-      "s3": {
-        "title": "Installer la monture (Advanced VX)",
-        "body": "Mettez le trépied de niveau, réglez l'échelle de latitude sur votre latitude, et visez le nord VRAI (ou sud), pas le nord magnétique.",
-        "tips": [
-          "Utilisez un niveau à bulle ; un trépied non nivelé fausse la latitude.",
-          "Corrigez la déclinaison magnétique entre nord boussole et nord vrai.",
-          "Pré-réglez le boulon de latitude proche de votre latitude avant de commencer."
-        ]
-      },
-      "s4": {
-        "title": "Voir le réticule la nuit",
-        "body": "La nuit, on voit les étoiles mais pas le réticule gravé. Éclairez-le faiblement : dirigez une lumière ROUGE en biais dans l'avant (objectif), ou utilisez l'illuminateur de la monture s'il existe.",
-        "tips": [
-          "Rouge uniquement — la lumière blanche ruine l'adaptation à l'obscurité.",
-          "Un écran de téléphone en rouge près de l'objectif dépanne très bien.",
-          "Restez faible ; trop fort masque la faible Polaris."
-        ]
-      },
-      "s5": {
-        "title": "Placer l'étoile polaire",
-        "body": "Tournez l'axe AD jusqu'à ce que le repère de l'étoile sur le réticule soit à la position horaire indiquée ci-dessus, puis utilisez les boulons ALT et AZ (pas l'AD) pour amener l'étoile dans le repère.",
-        "tips": [
-          "Faites correspondre l'orientation à l'écran (inversée/droite) à votre viseur.",
-          "Bougez avec les boulons alt/az ; laissez l'AD où vous l'avez réglé.",
-          "Centrez l'étoile dans le petit cercle, pas sur la croix du pôle vrai."
-        ]
-      },
-      "s6": {
-        "title": "Vérifier et affiner",
-        "body": "Recoupez avec la mise en station All-Star de la raquette Advanced VX, ou faites un contrôle de dérive rapide sur une étoile près du méridien et ajustez les boulons alt/az.",
-        "tips": [
-          "All-Star utilise n'importe quelle étoile brillante — pratique si Polaris est cachée.",
-          "Revérifiez après stabilisation de la monture ou si vous heurtez le trépied."
-        ]
-      }
-    }
-  },
   "processing": {
     "tabs": {
       "import": "Importer",
@@ -996,10 +897,6 @@
         "focus": {
           "title": "La mise au point",
           "body": "L’indicateur mesure la taille des étoiles (diamètre à demi-flux) image après image. Tournez jusqu’à ce que le nombre cesse de descendre : c’est bien plus fiable que de juger la netteté à l’œil."
-        },
-        "polar": {
-          "title": "Mise en station à la caméra",
-          "body": "Mesure où pointe réellement l’axe polaire en astrométrant des images pendant que vous tournez l’axe d’ascension droite À LA MAIN entre chacune. C’est justement parce que vous le tournez vous-même que cela fonctionne sur une monture sans la moindre électronique. La monture n’est jamais commandée."
         }
       }
     },
@@ -1556,88 +1453,6 @@
       "none": "Aucune série automatique lancée pour l'instant.",
       "untitled": "(sans objet)",
       "openLogbook": "Voir le journal →"
-    },
-    "polar": {
-      "title": "Mise en station (caméra)",
-      "subtitle": "Mesurez où pointe réellement l'axe polaire de la monture, à partir d'images prises par le télescope.",
-      "busy": "Pose et résolution astrométrique…",
-      "steps": {
-        "prepare": "Pointez le télescope et démarrez",
-        "measure": "Prenez des images le long d'une rotation de l'axe AD",
-        "result": "Lisez la correction",
-        "adjust": "Tournez les vis jusqu'à centrer le repère",
-        "find": "Trouver le pôle (facultatif, dix secondes)"
-      },
-      "prepare": {
-        "camera": "Connectez la caméra et activez la vue en direct.",
-        "focus": "Faites une mise au point suffisante pour que les étoiles soient ponctuelles : les images doivent être résolues astrométriquement.",
-        "field": "Pointez n'importe quel champ étoilé, idéalement près du méridien entre 0 et 40° de déclinaison et loin du zénith. L'étoile polaire n'a pas besoin d'être visible.",
-        "clutch": "Préparez-vous à tourner l'axe d'ascension droite à la main entre les images : desserrez le frein, ou utilisez la raquette.",
-        "needCamera": "Connectez d'abord une caméra.",
-        "orPole": "Pressé ? Placez la déclinaison sur son index 90°, pour que le tube regarde dans l'axe d'ascension droite, pointez approximativement le pôle et appuyez sur Trouver le pôle. Une seule image, aucune rotation."
-      },
-      "measure": {
-        "progress": "Image {step} sur {total} capturée.",
-        "turn": "Tournez maintenant l'axe d'ASCENSION DROITE d'environ {degrees}° — dans le sens que vous voulez, la valeur exacte n'a pas d'importance — sans toucher à la déclinaison, puis prenez l'image suivante."
-      },
-      "result": {
-        "alreadyGood": "Rien à faire — l'axe est déjà à moins d'une minute d'arc du pôle."
-      },
-      "adjust": {
-        "instruction": "Tournez les vis d'altitude et d'azimut jusqu'à amener le cercle affiché sur la croix centrale. Ne touchez ni à l'ascension droite ni à la déclinaison.",
-        "offFrame": "Le repère est hors du champ — continuez dans la direction de la flèche jusqu'à le voir apparaître.",
-        "suspect": "Le champ a bougé plus que les vis ne peuvent l'expliquer. La monture a sans doute été heurtée ou déplacée : refaites la mesure."
-      },
-      "actions": {
-        "start": "Lancer la mesure",
-        "next": "J'ai tourné l'axe — image suivante",
-        "adjust": "Régler avec le repère à l'écran",
-        "remeasure": "Refaire la mesure",
-        "cancel": "Annuler",
-        "done": "Terminer",
-        "rough": "Trouver le pôle"
-      },
-      "move": {
-        "raise": "Montez l'axe polaire de {angle}.",
-        "lower": "Descendez l'axe polaire de {angle}.",
-        "east": "Déplacez l'axe polaire vers l'EST de {angle}.",
-        "west": "Déplacez l'axe polaire vers l'OUEST de {angle}."
-      },
-      "stats": {
-        "total": "Erreur totale",
-        "altitude": "Altitude",
-        "azimuth": "Azimut (vis)",
-        "precision": "Précision",
-        "precisionHint": "Incertitude à un sigma de la mesure, dans sa direction la moins bien contrainte.",
-        "arc": "Arc parcouru",
-        "frames": "Images",
-        "remaining": "Restant",
-        "markerOffset": "Distance du repère"
-      },
-      "quality": {
-        "excellent": "Excellente",
-        "good": "Bonne",
-        "fair": "Moyenne",
-        "poor": "Mauvaise"
-      },
-      "warnings": {
-        "weak_arc": "L'axe n'a été tourné que faiblement : la réponse reste approximative. Le tourner d'environ 60° au total rend la mesure environ quatre fois plus précise.",
-        "near_pole": "Le télescope pointe près de l'axe de la monture, ce qui ne laisse qu'un petit cercle à ajuster. Pointez plus loin du pôle pour une réponse plus ferme.",
-        "no_residual": "Trois images passent toujours exactement par un cercle : rien n'a pu être recoupé. Une quatrième image détecterait un trépied heurté.",
-        "low_altitude": "Une image a été prise bas sur l'horizon, là où le modèle de réfraction est le moins fiable.",
-        "assumed_on_axis": "Ceci suppose que le télescope regarde exactement dans l'axe d'ascension droite. Toute erreur de cône, ou une déclinaison hors de son index, s'ajoute au résultat sans être mesurée.",
-        "drive_stopped": "L'entraînement de la monture est à l'arrêt : le ciel défile dans le champ jusqu'à 15 secondes d'arc par seconde. Sur une pose de quelques secondes, les étoiles s'allongent assez pour empêcher toute résolution astrométrique près de l'équateur céleste. Lancez le suivi, ou raccourcissez la pose."
-      },
-      "rough": {
-        "caveat": "Mesuré sur une seule image, en supposant que le tube regarde dans l'axe d'ascension droite. C'est aussi ce que suppose un viseur polaire : attendez-vous à la même précision, environ un demi-degré, fixée par votre erreur de cône. Lancez la mesure en quatre images pour descendre à la minute d'arc.",
-        "badge": "Une image"
-      },
-      "finder": {
-        "distance": "Le pôle est à {angle} du centre du champ.",
-        "offFrame": "Le pôle est hors de ce champ — déplacez la monture du côté du repère et réessayez.",
-        "star": "{name} est également repérée, pour vous orienter."
-      },
-      "poleMark": "Pôle"
     }
   },
   "logbook": {

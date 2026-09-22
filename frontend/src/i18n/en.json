@@ -429,105 +429,6 @@
       "body": "Centering well-spread stars builds an accurate pointing model, so the mount tracks and slews precisely. Combined with the polar alignment above, that lets you push longer exposures."
     }
   },
-  "polar": {
-    "title": "Polar alignment",
-    "subtitle": "Put the pole star at the right spot on your polar-scope reticle for right now.",
-    "hemisphere": {
-      "north": "Northern",
-      "south": "Southern"
-    },
-    "reticle": {
-      "placeHere": "Put the star in the orange circle",
-      "truePole": "true pole",
-      "polaris": "Polaris",
-      "sigmaOct": "σ Octantis",
-      "cassiopeia": "Cassiopeia",
-      "bigDipper": "Big Dipper",
-      "crux": "Crux",
-      "octans": "Octans",
-      "invertedView": "As seen through the scope (inverted)",
-      "erectView": "Naked-eye (erect) view",
-      "mirrored": "Mirrored (star diagonal)"
-    },
-    "panel": {
-      "clock": "Clock position",
-      "poleStar": "Pole star",
-      "hemisphere": "Hemisphere",
-      "ha": "Hour angle",
-      "separation": "Offset from pole",
-      "alt": "Altitude",
-      "az": "Azimuth",
-      "lst": "Sidereal time",
-      "latTooLow": "The celestial pole is too low here for a polar scope.",
-      "notVisible": "The pole star is below the horizon right now."
-    },
-    "orientation": {
-      "inverting": "Inverting (scope)",
-      "erect": "Erect (naked eye)",
-      "mirror": "Mirror (diagonal)",
-      "hint": "Most polar scopes invert the view. Match the on-screen reticle to what you actually see."
-    },
-    "time": {
-      "specific": "Specific time",
-      "autoRefresh": "Auto-refresh"
-    },
-    "tutorial": {
-      "title": "How to set up and use your polar scope",
-      "intro": "A practical walkthrough for a SkyWatcher polar scope on a Celestron Advanced VX — from one-time setup to using it under a dark sky.",
-      "s1": {
-        "title": "What polar alignment does",
-        "body": "Your mount's RA axis must point at the celestial pole so a single motor can track the sky. The polar scope lets you sight the pole star and place it precisely.",
-        "tips": [
-          "The pole is near — but not exactly at — the pole star.",
-          "Good alignment = long, round-star exposures and reliable go-to."
-        ]
-      },
-      "s2": {
-        "title": "One-time: collimate the polar scope to the RA axis",
-        "body": "Center a distant object on the reticle, rotate the RA axis 180°, and adjust the three grub screws to remove half the drift. Repeat until the object stays put as you rotate.",
-        "tips": [
-          "Do this once in daylight on a far landmark (or on Polaris at night).",
-          "Adjust the reticle grub screws, never the mount's alt/az bolts.",
-          "Tiny turns — the screws are sensitive."
-        ]
-      },
-      "s3": {
-        "title": "Set up the mount (Advanced VX)",
-        "body": "Level the tripod, set the latitude scale to your latitude, and aim the mount at TRUE north (or south), not magnetic north.",
-        "tips": [
-          "Use a bubble level; an unlevel tripod throws off the latitude setting.",
-          "Correct for magnetic declination between compass north and true north.",
-          "Pre-set the latitude bolt near your site latitude before you start."
-        ]
-      },
-      "s4": {
-        "title": "See the reticle at night",
-        "body": "At night you see stars but not the engraved reticle. Illuminate it dimly: shine a RED light obliquely into the front (objective) end, or use the mount's illuminator if fitted.",
-        "tips": [
-          "Red only — white light ruins your dark adaption.",
-          "A red phone screen held near the objective works in a pinch.",
-          "Keep it dim; too bright washes out faint Polaris."
-        ]
-      },
-      "s5": {
-        "title": "Place the pole star",
-        "body": "Rotate the RA axis until the reticle's pole-star marker is at the clock position shown above, then use the mount's ALT and AZ bolts (not RA) to move the star into the marker.",
-        "tips": [
-          "Match the on-screen orientation (inverting/erect) to your scope.",
-          "Move with the slow alt/az bolts; leave RA where you set it.",
-          "Center the star in the small circle, not on the true-pole cross."
-        ]
-      },
-      "s6": {
-        "title": "Verify and refine",
-        "body": "Cross-check with the Advanced VX hand controller's All-Star Polar Align, or do a quick drift check on a star near the meridian and tweak the alt/az bolts.",
-        "tips": [
-          "All-Star uses any bright star — handy when Polaris is hidden.",
-          "Re-check after the mount settles or if you bump the tripod."
-        ]
-      }
-    }
-  },
   "processing": {
     "tabs": {
       "import": "Import",
@@ -996,10 +897,6 @@
         "focus": {
           "title": "Focusing",
           "body": "The focus meter measures star size (half-flux diameter) frame by frame. Turn the focuser until the number stops falling; that is a far more reliable signal than judging sharpness by eye."
-        },
-        "polar": {
-          "title": "Polar alignment from the camera",
-          "body": "Measures where your mount's polar axis really points by plate-solving frames as you turn the RA axis BY HAND between them. Turning it yourself is what makes this work on a mount with no electronics at all. It never commands the mount."
         }
       }
     },
@@ -1556,88 +1453,6 @@
       "none": "No auto-run has been started yet.",
       "untitled": "(no object)",
       "openLogbook": "View logbook →"
-    },
-    "polar": {
-      "title": "Polar alignment (camera)",
-      "subtitle": "Measure where the mount's polar axis really points, from frames the telescope takes.",
-      "busy": "Exposing and solving…",
-      "steps": {
-        "prepare": "Point the telescope and start",
-        "measure": "Take frames along a turn of the RA axis",
-        "result": "Read the correction",
-        "adjust": "Turn the bolts until the marker is centred",
-        "find": "Find the pole (optional, ten seconds)"
-      },
-      "prepare": {
-        "camera": "Connect the camera and switch the live view on.",
-        "focus": "Focus well enough that stars are points — the frames have to plate-solve.",
-        "field": "Point anywhere with stars, ideally near the meridian at declination 0–40° and away from the zenith. Polaris does not need to be visible.",
-        "clutch": "Be ready to turn the right-ascension axis by hand between frames: release the clutch, or use the hand controller.",
-        "needCamera": "Connect a camera first.",
-        "orPole": "In a hurry? Set declination to its 90° index so the tube looks straight down the right-ascension axis, point roughly at the pole, and press Find the pole. One frame, no turning."
-      },
-      "measure": {
-        "progress": "Frame {step} of {total} captured.",
-        "turn": "Now turn the RIGHT-ASCENSION axis about {degrees}° — either way, the exact amount does not matter — leave declination alone, then take the next frame."
-      },
-      "result": {
-        "alreadyGood": "Nothing to do — the axis is already within an arcminute of the pole."
-      },
-      "adjust": {
-        "instruction": "Turn the altitude and azimuth bolts until the ring on the image sits on the centre crosshairs. Do not touch the right-ascension or declination axes.",
-        "offFrame": "The marker is off the edge of the frame — keep turning in the direction of the arrow until it comes into view.",
-        "suspect": "The field has moved further than the bolts can account for. The mount was probably knocked or slewed; measure again."
-      },
-      "actions": {
-        "start": "Start measuring",
-        "next": "I have turned the axis — next frame",
-        "adjust": "Adjust with the on-screen marker",
-        "remeasure": "Measure again",
-        "cancel": "Cancel",
-        "done": "Finish",
-        "rough": "Find the pole"
-      },
-      "move": {
-        "raise": "Raise the polar axis by {angle}.",
-        "lower": "Lower the polar axis by {angle}.",
-        "east": "Move the polar axis EAST by {angle}.",
-        "west": "Move the polar axis WEST by {angle}."
-      },
-      "stats": {
-        "total": "Total error",
-        "altitude": "Altitude",
-        "azimuth": "Azimuth (knob)",
-        "precision": "Precision",
-        "precisionHint": "One-sigma uncertainty of the measurement, in its worst-constrained direction.",
-        "arc": "Arc turned",
-        "frames": "Frames",
-        "remaining": "Remaining",
-        "markerOffset": "Marker distance"
-      },
-      "quality": {
-        "excellent": "Excellent",
-        "good": "Good",
-        "fair": "Fair",
-        "poor": "Poor"
-      },
-      "warnings": {
-        "weak_arc": "The axis was turned only a little, so this answer is rough. Turning it about 60° in total makes the measurement roughly four times more precise.",
-        "near_pole": "The telescope is pointing close to the mount's own axis, which leaves a small circle to fit. Point further from the pole for a firmer answer.",
-        "no_residual": "Three frames always fit a circle exactly, so nothing could be cross-checked. A fourth frame would catch a knocked tripod.",
-        "low_altitude": "A frame was taken low in the sky, where the refraction model is least reliable.",
-        "assumed_on_axis": "This assumed the telescope is looking straight down the right-ascension axis. Any cone error, or a declination axis off its index, is added to the answer unmeasured.",
-        "drive_stopped": "The mount's drive is stopped, so the sky drifts through the frame at up to 15 arcseconds per second. Over an exposure of a few seconds that trails the stars far enough to stop them being plate-solved anywhere near the celestial equator. Start tracking, or shorten the exposure."
-      },
-      "rough": {
-        "caveat": "Measured from a single frame, assuming the tube is looking down the right-ascension axis. That is what a polar scope assumes too, so expect the same accuracy — around half a degree, set by your cone error. Run the four-frame measurement for arcminutes.",
-        "badge": "One frame"
-      },
-      "finder": {
-        "distance": "The pole is {angle} from the middle of the frame.",
-        "offFrame": "The pole is outside this field — move the mount toward the marker's side and try again.",
-        "star": "{name} is marked too, so you can tell which way you are looking."
-      },
-      "poleMark": "Pole"
     }
   },
   "logbook": {

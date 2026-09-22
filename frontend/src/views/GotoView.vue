@@ -14,9 +14,6 @@ const StarChart = defineAsyncComponent(
 );
 import StarChartModal from "@/components/Goto/StarChartModal.vue";
 import MountTuningPanel from "@/components/Goto/MountTuningPanel.vue";
-import PolarScopeReticle from "@/components/Polar/PolarScopeReticle.vue";
-import PolarAlignPanel from "@/components/Polar/PolarAlignPanel.vue";
-import PolarTutorial from "@/components/Polar/PolarTutorial.vue";
 import Spinner from "@/components/Common/Spinner.vue";
 import HelpButton from "@/components/Common/HelpButton.vue";
 import { card, input, btnGhost } from "@/constants/styles";
@@ -67,7 +64,7 @@ const phaseHint = computed(() => {
   });
 });
 
-// Time: "now" (default) or a specific instant entered in the site's local time (mirrors Polar/Tonight).
+// Time: "now" (default) or a specific instant entered in the site's local time (mirrors Tonight).
 const useCustomTime = ref(false);
 const customLocal = ref("");
 function applyTime() {
@@ -121,23 +118,9 @@ const mapExpanded = ref(false);
       <p class="text-sm text-slate-400">{{ t("goto.subtitle") }}</p>
     </header>
 
-    <!-- Step 1 — Mise en station: polar-align the mount before building the GoTo model. -->
-    <section class="space-y-3">
-      <div>
-        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-          {{ t("polar.title") }}
-        </h2>
-        <p class="text-xs text-slate-400">{{ t("polar.subtitle") }}</p>
-      </div>
-      <div class="grid gap-4 lg:grid-cols-2">
-        <PolarScopeReticle />
-        <PolarAlignPanel />
-      </div>
-    </section>
-
     <MosaicContinueCard />
 
-    <!-- Step 2 — GoTo star alignment. -->
+    <!-- GoTo star alignment. -->
     <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">
       {{ t("goto.sequence.title") }}
     </h2>
@@ -257,9 +240,6 @@ const mapExpanded = ref(false);
       </div>
     </div>
     <p v-if="store.error" class="text-sm text-danger-500">{{ store.error }}</p>
-
-    <!-- Reference material: the polar-scope setup walkthrough, collapsed by default. -->
-    <PolarTutorial />
 
     <!-- Known mount issues & free compensations, keyed to the selected mount model. -->
     <MountTuningPanel />

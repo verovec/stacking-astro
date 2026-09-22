@@ -14,7 +14,6 @@ import TrackingReport from "@/components/Capture/TrackingReport.vue";
 import LiveHistogram from "@/components/Capture/LiveHistogram.vue";
 import LiveView from "@/components/Capture/LiveView.vue";
 import MountPanel from "@/components/Capture/MountPanel.vue";
-import PolarCameraPanel from "@/components/Capture/PolarCameraPanel.vue";
 import SequenceRunner from "@/components/Capture/SequenceRunner.vue";
 import TileTargetCard from "@/components/Capture/TileTargetCard.vue";
 import { card } from "@/constants/styles";
@@ -306,10 +305,6 @@ const imageScale = computed(
               {{ t("capture.mount.title") }}
             </h2>
             <MountPanel />
-          </section>
-
-          <section :class="card" data-demo="capture-polar">
-            <PolarCameraPanel />
           </section>
 
           <section :class="card" data-demo="capture-filters">
