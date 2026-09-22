@@ -1,11 +1,11 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { apiGet, apiPost } from "@/services/api";
+import { apiGet } from "@/services/api";
 
-// External-drive browsing + "Copy to S3". Mirrors the S3 store's shape: all fetching lives here, the view
-// reads state and dispatches actions. Paths are absolute host paths under the backend's browse allowlist
-// (macOS /Volumes; Linux /media, /mnt, /run/media, plus ASTRO_BROWSE_ROOTS) — the backend re-validates
-// every path, so a crafted path is rejected server-side regardless of the UI.
+// External-drive browsing: all fetching lives here, the view reads state and dispatches actions.
+// Paths are absolute host paths under the backend's browse allowlist (macOS /Volumes; Linux /media,
+// /mnt, /run/media, plus ASTRO_BROWSE_ROOTS) — the backend re-validates every path, so a crafted
+// path is rejected server-side regardless of the UI.
 
 export interface DriveInfo {
   name: string;
@@ -151,22 +151,6 @@ export const useDrivesStore = defineStore("drives", () => {
     selected.value = [];
   }
 
-  // copyToS3 enqueues a smart, content-verified copy (upload only missing/corrupted files) of an
-  // external-drive folder to S3, mirrored under <prefix>/<folderName>/. Returns the new job id — the caller
-  // navigates to the job page, where the shared job SSE stream drives the live progress bar.
-  async function copyToS3(
-    sourcePath: string,
-    bucket: string,
-    prefix: string,
-  ): Promise<number> {
-    const data = await apiPost<{ id: number }>("/api/local/upload", {
-      path: sourcePath,
-      bucket,
-      prefix,
-    });
-    return data.id;
-  }
-
   return {
     drives,
     sources,
@@ -186,6 +170,5 @@ export const useDrivesStore = defineStore("drives", () => {
     isSelected,
     toggleSelected,
     clearSelected,
-    copyToS3,
   };
 });

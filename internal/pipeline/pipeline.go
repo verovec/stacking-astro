@@ -24,7 +24,6 @@ import (
 	"github.com/verove-jordan/astronomy/internal/grade"
 	"github.com/verove-jordan/astronomy/internal/graxpert"
 	"github.com/verove-jordan/astronomy/internal/inspect"
-	"github.com/verove-jordan/astronomy/internal/libmirror"
 	"github.com/verove-jordan/astronomy/internal/llm"
 	"github.com/verove-jordan/astronomy/internal/mode"
 	"github.com/verove-jordan/astronomy/internal/mosaic"
@@ -120,11 +119,8 @@ type Options struct {
 	// as plate-solve hints, and the canvas center. nil → panels are auto-detected.
 	MosaicPlan *mosaic.Plan
 
-	// LibraryMirror, when set, pulls a matched calibration master back from the S3 library mirror when its
 	// file is absent locally (the library is kept as a synced mirror, but a given machine may not hold every
 	// file), then frees the transiently-pulled copies after the run. nil → local-only (the default; the
-	// library must be on disk). See internal/libmirror + internal/job/libpuller.go.
-	LibraryMirror libmirror.Puller
 
 	// steps is the run's named-step progress tracker (set by Process; nil for OSC/refine/CLI and
 	// the supervised/star-fix re-entries, which must never advance the main bar). progress_steps.go.
@@ -229,22 +225,6 @@ func libraryDir(opts Options, workAbs string) (string, error) {
 		dir = filepath.Join(workAbs, "library")
 	}
 	return filepath.Abs(dir)
-}
-
-// ensureMasters pulls the given matched-master files back from the S3 library mirror if they are absent
-// locally (no-op when no mirror is configured, or a path is empty / already present). Called at each
-// calibration match site right before Siril reads the masters.
-func (o Options) ensureMasters(ctx context.Context, paths []string) {
-	if o.LibraryMirror != nil {
-		_ = o.LibraryMirror.Ensure(ctx, paths)
-	}
-}
-
-// freePulledMasters frees the master files the mirror transiently downloaded this run (deferred by Process).
-func (o Options) freePulledMasters(ctx context.Context) {
-	if o.LibraryMirror != nil {
-		o.LibraryMirror.FreePulled(ctx)
-	}
 }
 
 // Progress is a pipeline-level progress event (and forwarded Siril log lines). When Sample is
@@ -444,7 +424,6 @@ func Process(ctx context.Context, opts Options) (*Result, error) {
 	} else {
 		opts.OnProgress = func(p Progress) { timer.observe(p.Step) }
 	}
-	defer opts.freePulledMasters(ctx) // discard any masters pulled from the S3 library mirror this run
 	scanOpts := inspect.DefaultScanOptions()
 	scanOpts.FilterMapping = opts.FilterMapping
 	scanOpts.ExcludeSets = opts.ExcludeSets
@@ -1767,7 +1746,6 @@ func processChannel(ctx context.Context, opts Options, set inspect.Set, masters 
 	dark, flat, bias := sel.Masters()
 	// Pull from the S3 library mirror if absent locally — including the dark's defect sidecar (its
 	// absence is soft: calibration then falls back to -cc=dark).
-	opts.ensureMasters(ctx, []string{dark, flat, bias, calib.DefectsListPath(dark)})
 	cm := siril.CalibMasters{Dark: dark, Flat: flat, Bias: bias, DarkOptimize: sel.DarkOptimize,
 		BadPixelMap: calib.DefectsListFor(dark), CFA: needsDebayer(set.Frames)}
 

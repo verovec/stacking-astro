@@ -172,31 +172,6 @@ type Config struct {
 	ReuseDarkRecencyDays int
 	ReuseTempTolC        float64
 
-	// S3 env fallback. Credentials are read from the environment ONLY (never the UI, never
-	// logged). Endpoint empty → AWS S3 default for the region; non-empty targets any S3-compatible store
-	// (MinIO/Wasabi/Backblaze B2/Cloudflare R2). Bucket/prefix are supplied per-job by the request.
-	S3Endpoint        string
-	S3Region          string
-	S3AccessKeyID     string
-	S3SecretAccessKey string
-	S3UseSSL          bool
-	// S3Concurrency bounds how many files a transfer uploads/downloads in PARALLEL (0 → the transfer
-	// engine's default of 6). Raise it to saturate a fat uplink; lower it for a slow source drive whose
-	// parallel reads would thrash. Env ASTRO_S3_CONCURRENCY.
-	S3Concurrency int
-	// S3LowDisk enables the STAGED low-disk mode for full-S3 deep-sky/nebula processing runs: inputs are
-	// scanned remotely (ranged FITS-header reads) and downloaded/verified-freed one frame-type/channel wave
-	// at a time, so peak local disk ≈ one channel's frames instead of the whole dataset. The server default;
-	// a run can override it (RunRequest.LowDisk). Env ASTRO_S3_LOW_DISK (default true).
-	S3LowDisk bool
-
-	// EncryptionKey / SecretKeyFile secure the UI-managed S3 connections at rest (their secret access keys
-	// are AES-256-GCM encrypted in the DB). EncryptionKey (base64 std, 32 bytes) is the master key; when
-	// empty a random key is generated once and persisted to SecretKeyFile (default under the user config
-	// dir — deliberately OUTSIDE the data/library/output roots so it is never swept into a backup).
-	EncryptionKey string
-	SecretKeyFile string
-
 	// Light pollution. Per-site artificial sky brightness (VIIRS-derived) feeds the visibility scores
 	// (a sky-glow factor parallel to the Moon) and the location-map overlay. Sourcing is hybrid and
 	// soft-failing: the keyed online API (latest data) is primary, a locally-downloaded atlas
@@ -392,15 +367,6 @@ func Load() *Config {
 		ReuseTempTolC:        envFloat("ASTRO_REUSE_TEMP_TOL_C", 5.0),
 
 
-		S3Endpoint:        env("ASTRO_S3_ENDPOINT", ""),
-		S3Region:          env("ASTRO_S3_REGION", "us-east-1"),
-		S3AccessKeyID:     env("ASTRO_S3_ACCESS_KEY_ID", ""),
-		S3SecretAccessKey: env("ASTRO_S3_SECRET_ACCESS_KEY", ""),
-		S3UseSSL:          envBool("ASTRO_S3_USE_SSL", true),
-		S3Concurrency:     envInt("ASTRO_S3_CONCURRENCY", 0),
-		S3LowDisk:         envBool("ASTRO_S3_LOW_DISK", true),
-		EncryptionKey:     env("ASTRO_ENCRYPTION_KEY", ""),
-		SecretKeyFile:     env("ASTRO_SECRET_KEY_FILE", ""),
 
 		LightPollutionAPIURL: env("ASTRO_LIGHTPOLLUTION_API_URL", ""),
 		LightPollutionAPIKey: env("ASTRO_LIGHTPOLLUTION_API_KEY", ""),

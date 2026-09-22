@@ -9,7 +9,6 @@ vi.mock("@/services/api", () => ({
   ApiError: class extends Error {},
   apiGet: (url: string) => apiGet(url),
   apiPost: (url: string, body?: unknown) => apiPost(url, body),
-  withS3: (u: string) => u,
 }));
 
 import { canResumeSession, useLogbookStore } from "./logbook";

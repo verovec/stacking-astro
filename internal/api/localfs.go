@@ -1,13 +1,11 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/verove-jordan/astronomy/internal/job"
 	"github.com/verove-jordan/astronomy/internal/localfs"
 )
 
@@ -90,56 +88,4 @@ func (s *Server) localBrowse(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, listing)
 	}
-}
-
-// localUpload enqueues a SMART copy (content-verified sync — uploads only files missing or corrupted) of a
-// local folder to S3, mirroring it under <prefix>/<folderName>/. The source may be a removable drive OR one
-// of the app's own input/output/work dirs; the path is re-validated against the allow-list here — the
-// client's path is never trusted on its own. Symlinks are skipped (SkipSymlinks) so copying WorkDir does not
-// follow Siril's `link` frames and re-upload the whole input set. It reuses the whole transfer job lane +
-// SSE progress stack, so the frontend shows live progress via the returned job id.
-// POST /api/local/upload {path, bucket, prefix}
-func (s *Server) localUpload(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Path   string `json:"path"`
-		Bucket string `json:"bucket"`
-		Prefix string `json:"prefix"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		badRequest(w, "invalid body")
-		return
-	}
-	if body.Bucket == "" {
-		badRequest(w, "bucket is required")
-		return
-	}
-	abs, ok := localfs.Allowed(s.localAllowRoots(), body.Path)
-	if !ok {
-		badRequest(w, "path is outside the allowed browse roots")
-		return
-	}
-	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
-		badRequest(w, "path is not a directory")
-		return
-	}
-	req := job.RunRequest{
-		Path: abs, // target lock + session key; NOT confined to the data dir
-		Mode: "transfer",
-		Transfer: &job.TransferRequest{
-			Op:           "sync",
-			Verify:       true,               // upload only what is missing or corrupted
-			LocalRoot:    filepath.Dir(abs),  // key = <prefix>/<folderName>/<fileRel>
-			RelPath:      filepath.Base(abs), // the folder name
-			Bucket:       body.Bucket,
-			Prefix:       body.Prefix,
-			Namespace:    "",   // external mirror: no data/ segment, no classified plan
-			SkipSymlinks: true, // never follow work/ `link` frames (would balloon the upload)
-		},
-	}
-	id, err := s.mgr.Enqueue(r.Context(), req)
-	if err != nil {
-		serverError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"id": id})
 }

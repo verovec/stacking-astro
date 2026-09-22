@@ -14,19 +14,10 @@ import (
 	"github.com/verove-jordan/astronomy/internal/fits"
 	"github.com/verove-jordan/astronomy/internal/fsutil"
 	"github.com/verove-jordan/astronomy/internal/graxpert"
-	"github.com/verove-jordan/astronomy/internal/libmirror"
 	"github.com/verove-jordan/astronomy/internal/meteor"
 	"github.com/verove-jordan/astronomy/internal/rawconv"
 	"github.com/verove-jordan/astronomy/internal/siril"
 )
-
-// ensureMasters pulls the given matched phone-master files back from the S3 library mirror if they are
-// absent locally (no-op when no mirror is set / a path is empty or already present).
-func (o Options) ensureMasters(ctx context.Context, paths []string) {
-	if o.LibraryMirror != nil {
-		_ = o.LibraryMirror.Ensure(ctx, paths)
-	}
-}
 
 // Look bundles the per-render-style tunables, ported verbatim from the reference recipe's presets
 // (main.py lines ~1500–1569). natural ≈ a straight developed DNG; iphone ≈ an edited ProRAW (deep
@@ -144,9 +135,6 @@ type Options struct {
 	// (build-from-frames only). LibraryDir is where the master FITS are written.
 	PhoneCalib calib.PhoneCalibStore
 	LibraryDir string
-	// LibraryMirror pulls a matched phone master back from the S3 library mirror when its file is absent
-	// locally (then frees the transient copy after the run). nil → local-only. See internal/libmirror.
-	LibraryMirror libmirror.Puller
 
 	ForegroundFrame string // optional raw frame used as the clean foreground (and registration ref)
 	Orientation     string // auto|none|cw|ccw|180 (+ -flip)

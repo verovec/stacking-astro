@@ -50,7 +50,6 @@ func processChannelGroups(ctx context.Context, opts Options, object, filter stri
 		gr := groupResultFor(g, filter, cm, flatSrc)
 		// Pull from the S3 library mirror if absent locally, then resolve the dark's defect sidecar —
 		// after the pull, so a mirrored map is found (missing map = soft -cc=dark fallback).
-		opts.ensureMasters(ctx, []string{cm.Dark, cm.Flat, cm.Bias, calib.DefectsListPath(cm.Dark)})
 		cm.BadPixelMap = calib.DefectsListFor(cm.Dark)
 
 		grpDir := filepath.Join(workRun, fmt.Sprintf("light_%s_g%d", sanitize(filter), gi))

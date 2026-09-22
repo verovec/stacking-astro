@@ -30,10 +30,6 @@ const chips = computed<Chip[]>(() => {
   const p = props.params;
   if (!p) return [];
   const out: Chip[] = [];
-  if (p.storage_mode === "s3")
-    out.push({ key: "s3", label: t("run.chips.s3"), cls: ACCENT });
-  if (p.low_disk)
-    out.push({ key: "lowdisk", label: t("run.chips.s3LowDisk"), cls: NEUTRAL });
   if (p.palette && p.palette !== "natural")
     out.push({
       key: "palette",

@@ -8,7 +8,6 @@ vi.mock("@/services/api", () => ({
   apiPut: vi.fn(async () => ({})),
   apiDelete: vi.fn(async () => ({})),
   previewUrl: (p: string) => p,
-  withS3: (u: string) => u,
 }));
 
 import { useBrowseStore } from "./browse";

@@ -112,7 +112,6 @@ func ProcessNightpano(ctx context.Context, opts Options) (*Result, error) {
 	if err := opts.Runner.Available(ctx); err != nil {
 		return nil, fmt.Errorf("siril unavailable: %w", err)
 	}
-	defer opts.freePulledMasters(ctx)
 
 	frames, err := inspect.ListRawFramesMany(opts.scanRoots())
 	if err != nil {
@@ -292,7 +291,6 @@ func stackNightpanoPanels(ctx context.Context, opts Options, res *Result, panels
 			BiasFrames:            bias,
 			PhoneCalib:            opts.PhoneCalib,
 			LibraryDir:            libDir,
-			LibraryMirror:         opts.LibraryMirror,
 			Orientation:           opts.Preset.Orientation,
 			OnProgress:            prog,
 		})

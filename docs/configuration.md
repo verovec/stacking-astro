@@ -8,9 +8,6 @@ secret.**
 
 Precedence notes:
 
-- **S3 credentials**: a *default connection* saved in the UI (Processing → Storage) wins over the
-  `ASTRO_S3_*` env vars; the env vars are the fallback for headless/scripted use. Bucket + prefix
-  are always per-request UI state. See [storage-s3.md](storage-s3.md).
 - **Container overrides**: under `just stack`, compose points the engine at the repo's
   `input/ output/ library/ work/` dirs (mounted at identical absolute paths) and at
   `host.docker.internal` for the host-served AI model — see the [compose matrix](#container-stack-overrides).
@@ -143,21 +140,6 @@ actually points at, and under what licence, is in [third-party.md](third-party.m
 | `ASTRO_REUSE_CONE_DEG` | `0.5` | Same-target coordinate match radius (degrees) |
 | `ASTRO_REUSE_DARK_RECENCY_DAYS` | `0` | Max dark age for the deep pool (0 = unbounded) |
 | `ASTRO_REUSE_TEMP_TOL_C` | `5.0` | Dark temperature tolerance (°C) |
-
-## S3 (env fallback) + secrets
-
-A UI-saved default connection overrides these; see [storage-s3.md](storage-s3.md).
-
-| Variable | Default | Description |
-|---|---|---|
-| `ASTRO_S3_ENDPOINT` | — | Empty → AWS S3; else any S3-compatible endpoint (MinIO, Scaleway, …) |
-| `ASTRO_S3_REGION` | `us-east-1` | Region |
-| `ASTRO_S3_ACCESS_KEY_ID` / `ASTRO_S3_SECRET_ACCESS_KEY` | — | Credentials (env fallback only) |
-| `ASTRO_S3_USE_SSL` | `true` | TLS |
-| `ASTRO_S3_CONCURRENCY` | `0` | Parallel per-file transfers (0 → 6) |
-| `ASTRO_S3_LOW_DISK` | `true` | Full-S3 runs stage one channel wave at a time (peak disk ≈ one channel) |
-| `ASTRO_ENCRYPTION_KEY` | — | Base64 32-byte master key sealing UI-saved S3 secrets (AES-256-GCM) |
-| `ASTRO_SECRET_KEY_FILE` | user config dir | Auto-generated key file used when no master key is set; kept **outside** the backup roots |
 
 ## Container (`stack`) overrides
 

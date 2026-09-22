@@ -25,7 +25,6 @@ func ProcessOSC(ctx context.Context, opts Options) (*Result, error) {
 	if err := opts.Runner.Available(ctx); err != nil {
 		return nil, fmt.Errorf("siril unavailable: %w", err)
 	}
-	defer opts.freePulledMasters(ctx) // discard any phone masters pulled from the S3 library mirror this run
 	// One-shot-color source: raw stills (iPhone/DSLR), or — for older OSC captures — Bayer CFA FITS,
 	// which Siril demosaics with `convert -debayer`.
 	roots := opts.scanRoots()
@@ -261,7 +260,6 @@ func processNightscape(ctx context.Context, opts Options, res *Result, frames []
 		BiasFrames:            biasFrames,
 		PhoneCalib:            opts.PhoneCalib,
 		LibraryDir:            libDir,
-		LibraryMirror:         opts.LibraryMirror, // pull matched phone masters from S3 when absent locally
 		ForegroundFrame:       opts.Preset.ForegroundFrame,
 		Orientation:           opts.Preset.Orientation,
 		OnProgress:            opts.sirilLines("nightscape: register + composite"),

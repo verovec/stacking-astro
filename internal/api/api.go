@@ -31,9 +31,6 @@ import (
 	"github.com/verove-jordan/astronomy/internal/pipeline"
 	"github.com/verove-jordan/astronomy/internal/preview"
 	"github.com/verove-jordan/astronomy/internal/routing"
-	"github.com/verove-jordan/astronomy/internal/s3conn"
-	"github.com/verove-jordan/astronomy/internal/s3store"
-	"github.com/verove-jordan/astronomy/internal/secret"
 	"github.com/verove-jordan/astronomy/internal/siril"
 	"github.com/verove-jordan/astronomy/internal/skyevents"
 	"github.com/verove-jordan/astronomy/internal/skylog"
@@ -58,10 +55,8 @@ type Server struct {
 	canopy         *canopy.Provider
 	darksky        *darksky.Finder
 	weather        *weather.Provider
-	s3conn         *s3conn.Service       // UI-managed S3 connections; nil when encryption is unavailable
 	agentTurns     *turns.Sessions       // live turns (supervised-job conversations), streamed over SSE
 	toolHealth     *toolhealth.Checker   // environment health (tool deep probes + catalogue presence)
-	s3cache        *s3Cache              // reuses minio clients + memoizes listings so browsing stays fast
 	sirilRunner    *siril.Runner         // one-off synchronous Siril work (star-annotation re-solve); nil-safe for tests
 	devices        *deviceProxy          // reverse proxy onto the separate device-server process
 	capture        *capture.Runner       // the auto-run sequencer (drives the device server)
@@ -103,10 +98,8 @@ func New(mgr *job.Manager, st *store.Store, cfg *config.Config, hub *turns.Sessi
 		canopy:         cp,
 		darksky:        dk,
 		weather:        wx,
-		s3conn:         newS3ConnService(st, cfg),
 		agentTurns:     hub,
 		toolHealth:     toolhealth.New(cfg),
-		s3cache:        newS3Cache(),
 		sirilRunner:    siril.New(cfg.SirilBin, siril.Limits{MaxCPUs: cfg.MaxCPUs, MemRatio: cfg.SirilMemRatio, Nice: cfg.SirilNice}),
 		devices:        newDeviceProxy(cfg.DeviceAddr),
 	}
@@ -116,18 +109,6 @@ func New(mgr *job.Manager, st *store.Store, cfg *config.Config, hub *turns.Sessi
 	return s
 }
 
-// newS3ConnService builds the encrypted-connection service, or returns nil (the feature is disabled and env
-// S3 still works) when the master key can't be resolved — logged once, never fatal.
-func newS3ConnService(st *store.Store, cfg *config.Config) *s3conn.Service {
-	box, err := secret.NewBox(cfg.EncryptionKey, cfg.SecretKeyFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: S3 connection encryption unavailable (%v) — set ASTRO_ENCRYPTION_KEY\n", err)
-		return nil
-	}
-	return s3conn.New(st, box)
-}
-
-// Handler returns the HTTP handler with routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.health)
@@ -144,7 +125,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/selections/{id}", s.deleteSelection)
 	mux.HandleFunc("GET /api/masters", s.masters)
 	mux.HandleFunc("GET /api/phone-masters", s.phoneMasters)
-	mux.HandleFunc("POST /api/library/s3-sync", s.libraryS3Sync)
 	mux.HandleFunc("POST /api/reuse/preview", s.reusePreview)
 	mux.HandleFunc("POST /api/calib/preview", s.calibPreview)
 	mux.HandleFunc("POST /api/calib/plan", s.calibPlan)
@@ -169,7 +149,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/solarsystem/bodies", s.solarSystemBodies)
 	mux.HandleFunc("GET /api/solarsystem/state", s.solarSystemState)
 	mux.HandleFunc("GET /api/solarsystem/texture", s.solarSystemTexture)
-	mux.HandleFunc("POST /api/jobs/{id}/free-local", s.freeLocalJob)
 	mux.HandleFunc("GET /api/jobs/{id}/iterations", s.jobIterations)
 	mux.HandleFunc("GET /api/jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /api/series", s.createSeries)
@@ -232,35 +211,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/mosaic/plans/{id}", s.deleteMosaicPlan)
 	mux.HandleFunc("PUT /api/mosaic/plans/{id}/tiles/{index}", s.setMosaicTileStatus)
 	mux.HandleFunc("POST /api/mosaic/plans/{id}/reconcile", s.reconcileMosaicPlan)
-	mux.HandleFunc("GET /api/s3/status", s.s3Status)
-	mux.HandleFunc("POST /api/s3/transfer", s.s3Transfer)
-	mux.HandleFunc("GET /api/s3/browse", s.s3Browse)
-	mux.HandleFunc("POST /api/s3/import", s.s3Import)
 	mux.HandleFunc("GET /api/local/drives", s.localDrives)
 	mux.HandleFunc("GET /api/local/sources", s.localSources)
 	mux.HandleFunc("GET /api/local/browse", s.localBrowse)
-	mux.HandleFunc("POST /api/local/upload", s.localUpload)
-	mux.HandleFunc("GET /api/s3/connections", s.listConnections)
-	mux.HandleFunc("POST /api/s3/connections", s.createConnection)
-	mux.HandleFunc("POST /api/s3/connections/test", s.testConnection)
-	mux.HandleFunc("PUT /api/s3/connections/{id}", s.updateConnection)
-	mux.HandleFunc("DELETE /api/s3/connections/{id}", s.deleteConnection)
-	mux.HandleFunc("POST /api/s3/connections/{id}/default", s.setDefaultConnection)
-	mux.HandleFunc("POST /api/s3/connections/{id}/test", s.testSavedConnection)
-	mux.HandleFunc("GET /api/s3/manage/buckets", s.manageBuckets)
-	mux.HandleFunc("POST /api/s3/manage/buckets", s.manageCreateBucket)
-	mux.HandleFunc("DELETE /api/s3/manage/buckets", s.manageDeleteBucket)
-	mux.HandleFunc("GET /api/s3/manage/objects", s.manageObjects)
-	mux.HandleFunc("POST /api/s3/manage/folder", s.manageCreateFolder)
-	mux.HandleFunc("DELETE /api/s3/manage/object", s.manageDeleteObject)
-	mux.HandleFunc("POST /api/s3/manage/move", s.manageMove)
-	mux.HandleFunc("POST /api/s3/manage/tier", s.manageTier)
-	mux.HandleFunc("GET /api/s3/manage/download", s.manageDownload)
-	mux.HandleFunc("POST /api/s3/manage/upload", s.manageUpload)
-	mux.HandleFunc("POST /api/backup", s.createBackup)
-	mux.HandleFunc("GET /api/backup", s.listBackups)
-	mux.HandleFunc("POST /api/backup/restore", s.restoreBackup)
-	mux.HandleFunc("GET /api/backup/appstate", s.backupAppState)
 	mux.HandleFunc("GET /api/sky/point", s.skyPoint)
 	mux.HandleFunc("GET /api/sky/lightpollution", s.lightPollution)
 	mux.HandleFunc("GET /api/sky/lightpollution/atlas", s.atlasStatus)
@@ -332,6 +285,24 @@ func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, inv)
 }
 
+// browseEntry is one row of the capture-folder browser. Local is always true now that the S3 mirror
+// left the fork; the field survives so the UI contract stays stable.
+type browseEntry struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	IsDir bool   `json:"is_dir"`
+	Local bool   `json:"local,omitempty"`
+}
+
+// servableLocal returns the path when it exists on local disk. The S3 serve fallback left with the
+// mirroring feature (E01 card 0012) — results and previews now live on local disk only.
+func servableLocal(abs string) (string, bool) {
+	if _, err := os.Stat(abs); err != nil {
+		return "", false
+	}
+	return abs, true
+}
+
 func (s *Server) browse(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	path := q.Get("path")
@@ -360,16 +331,6 @@ func (s *Server) browse(w http.ResponseWriter, r *http.Request) {
 			dirs = append(dirs, it)
 		} else {
 			files = append(files, it)
-		}
-	}
-	// When a bucket is supplied and S3 is configured, fold in the mirror's folders so the browser can
-	// show local / cloud / both presence (and surface S3-only folders to download). Soft-fails to local.
-	// The config honors ?conn= so the mirror listing targets the connection the bucket was chosen under.
-	if bucket := q.Get("bucket"); bucket != "" {
-		if cfg, err := s.s3ConfigForRequest(r); err == nil && cfg.Configured() {
-			if merged, err := s.mergeRemoteDirs(r.Context(), cfg, abs, bucket, q.Get("prefix"), dirs, wantsFresh(r)); err == nil {
-				dirs = merged
-			}
 		}
 	}
 	out := append(dirs, files...)
@@ -682,23 +643,6 @@ func (s *Server) denoiseFinalJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]any{"id": newID})
 }
 
-// freeLocalJob frees the local input+output files of a finished full-S3 run — each verified present on S3
-// first — by enqueuing removeLocal transfers, and returns their job ids so the UI can follow the frees in
-// Tasks. POST /api/jobs/{id}/free-local
-func (s *Server) freeLocalJob(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		badRequest(w, "invalid job id")
-		return
-	}
-	ids, err := s.mgr.FreeLocal(r.Context(), id)
-	if err != nil {
-		serverError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"ids": ids})
-}
-
 // listJobs returns a page of jobs newest-first (id desc = date desc) with the total, so the Tasks page
 // paginates ("load more") instead of loading the entire history. GET /api/jobs?offset=&limit=
 func (s *Server) listJobs(w http.ResponseWriter, r *http.Request) {
@@ -804,13 +748,8 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "path must be inside the output directory")
 		return
 	}
-	// Local-first; if the local copy was freed to S3, pull it from the output mirror on demand.
-	served, outcome := s.resolveServable(r.Context(), r, abs, s.cfg.OutputDir, "output")
-	switch outcome {
-	case serveArchived:
-		writeArchived(w)
-		return
-	case serveMissing:
+	served, ok := servableLocal(abs)
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -834,13 +773,8 @@ func (s *Server) previewFile(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "unsupported file type for preview")
 		return
 	}
-	// Local-first; if the capture was freed to S3 (or lives only on S3), pull it from the data mirror.
-	served, outcome := s.resolveServable(r.Context(), r, abs, s.cfg.DataDir, "data")
-	switch outcome {
-	case serveArchived:
-		writeArchived(w)
-		return
-	case serveMissing:
+	served, ok := servableLocal(abs)
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -868,13 +802,8 @@ func (s *Server) serveThumb(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "path must be inside the output directory")
 		return
 	}
-	// Local-first; if the result PNG was freed to S3, pull it from the output mirror before thumbnailing.
-	served, outcome := s.resolveServable(r.Context(), r, abs, s.cfg.OutputDir, "output")
-	switch outcome {
-	case serveArchived:
-		writeArchived(w)
-		return
-	case serveMissing:
+	served, ok := servableLocal(abs)
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -930,12 +859,10 @@ type runSummary struct {
 // listRuns scans the output directory for run.json records so any past run can be reopened from disk,
 // independent of the database (e.g. CLI runs). Results are paginated (newest first) so a large gallery
 // stays fast: every run is cheaply stat-ed for ordering, but only the requested page is read+summarized.
-// runFileRef points at one run's run.json for the gallery: either on local disk (s3Key == "") or, when the
-// local output tree was freed, only on the S3 output mirror (s3Key set — read on demand for the page).
+// runFileRef points at one run's run.json for the gallery.
 type runFileRef struct {
-	path  string // absolute local run.json path (the path it occupies or, for S3-only runs, would occupy)
+	path  string // absolute local run.json path
 	mtime int64
-	s3Key string
 }
 
 func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
@@ -958,23 +885,7 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 		seen[p] = true
 	}
 
-	// S3 fallback: fold in runs whose local output tree was freed (present only on the S3 mirror). Their
-	// run.json is read from S3 on demand for the requested page only. Requires a chosen bucket; soft-fails.
-	// The config honors ?conn= so the mirror is read from the connection the bucket was chosen under.
 	q := r.URL.Query()
-	var s3cfg s3store.Config
-	if bucket := q.Get("bucket"); bucket != "" {
-		if cfg, err := s.s3ConfigForRequest(r); err == nil && cfg.Configured() {
-			s3cfg = cfg
-			for _, ref := range s.s3OutputRuns(r.Context(), cfg, bucket, q.Get("prefix"), outAbs) {
-				if seen[ref.path] {
-					continue
-				}
-				seen[ref.path] = true
-				files = append(files, ref)
-			}
-		}
-	}
 
 	sort.Slice(files, func(i, j int) bool { return files[i].mtime > files[j].mtime })
 
@@ -988,11 +899,7 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 
 	runs := make([]runSummary, 0, end-offset)
 	for _, f := range files[offset:end] {
-		if f.s3Key != "" {
-			runs = append(runs, s.summarizeS3Run(r.Context(), s3cfg, q.Get("bucket"), f.s3Key, f.path, f.mtime))
-		} else {
-			runs = append(runs, summarizeRun(f.path)) // ReadFile only for the page
-		}
+		runs = append(runs, summarizeRun(f.path)) // ReadFile only for the page
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"runs": runs, "total": total, "offset": offset, "limit": limit,
