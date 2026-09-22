@@ -74,7 +74,6 @@ const rows = computed<Row[]>(() =>
       // S3 copy (full-S3 run / standalone transfer / backup).
       pausable:
         j.status === "running" &&
-        j.params?.mode !== "livestack" &&
         (["deepsky", "nebula"].includes(j.params?.mode ?? "") ||
           j.params?.storage_mode === "s3" ||
           j.kind === "transfer" ||

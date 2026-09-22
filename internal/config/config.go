@@ -172,17 +172,7 @@ type Config struct {
 	ReuseDarkRecencyDays int
 	ReuseTempTolC        float64
 
-	// Live stacking. The source is polled every LivePollSec; a local file is only ingested once its
-	// size has been stable for LiveStabilitySec (so a half-written FITS is never read). The (full
-	// winsorized) re-stack is debounced: it runs after at least LiveRestackEvery new lights have been
-	// folded in AND at least LiveMinIntervalSec has elapsed since the previous re-stack — the knobs that
-	// trade live-preview freshness for CPU on long sessions.
-	LivePollSec        int
-	LiveStabilitySec   int
-	LiveRestackEvery   int
-	LiveMinIntervalSec int
-
-	// S3 source for live stacking. Credentials are read from the environment ONLY (never the UI, never
+	// S3 env fallback. Credentials are read from the environment ONLY (never the UI, never
 	// logged). Endpoint empty → AWS S3 default for the region; non-empty targets any S3-compatible store
 	// (MinIO/Wasabi/Backblaze B2/Cloudflare R2). Bucket/prefix are supplied per-job by the request.
 	S3Endpoint        string
@@ -401,10 +391,6 @@ func Load() *Config {
 		ReuseDarkRecencyDays: envInt("ASTRO_REUSE_DARK_RECENCY_DAYS", 0),
 		ReuseTempTolC:        envFloat("ASTRO_REUSE_TEMP_TOL_C", 5.0),
 
-		LivePollSec:        envInt("ASTRO_LIVESTACK_POLL_SEC", 3),
-		LiveStabilitySec:   envInt("ASTRO_LIVESTACK_STABILITY_SEC", 2),
-		LiveRestackEvery:   envInt("ASTRO_LIVESTACK_RESTACK_EVERY", 1),
-		LiveMinIntervalSec: envInt("ASTRO_LIVESTACK_MIN_INTERVAL_SEC", 0),
 
 		S3Endpoint:        env("ASTRO_S3_ENDPOINT", ""),
 		S3Region:          env("ASTRO_S3_REGION", "us-east-1"),

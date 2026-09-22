@@ -144,15 +144,6 @@ actually points at, and under what licence, is in [third-party.md](third-party.m
 | `ASTRO_REUSE_DARK_RECENCY_DAYS` | `0` | Max dark age for the deep pool (0 = unbounded) |
 | `ASTRO_REUSE_TEMP_TOL_C` | `5.0` | Dark temperature tolerance (°C) |
 
-## Live stacking
-
-| Variable | Default | Description |
-|---|---|---|
-| `ASTRO_LIVESTACK_POLL_SEC` | `3` | Source poll interval |
-| `ASTRO_LIVESTACK_STABILITY_SEC` | `2` | File must be size-stable this long before ingest |
-| `ASTRO_LIVESTACK_RESTACK_EVERY` | `1` | Re-stack after every N new lights |
-| `ASTRO_LIVESTACK_MIN_INTERVAL_SEC` | `0` | Minimum seconds between re-stacks |
-
 ## S3 (env fallback) + secrets
 
 A UI-saved default connection overrides these; see [storage-s3.md](storage-s3.md).

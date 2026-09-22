@@ -21,10 +21,10 @@ import (
 // internal/api ensureServable / summarizeS3Run).
 
 // wantsS3Storage reports whether this run should pull inputs from / push results to S3 and free the local
-// copies. Excludes transfer, live-stacking and refine jobs, which manage their own I/O.
+// copies. Excludes transfer and refine jobs, which manage their own I/O.
 func (p RunRequest) wantsS3Storage() bool {
 	return p.StorageMode == "s3" && p.S3 != nil && p.S3.Bucket != "" &&
-		p.Transfer == nil && p.Live == nil && p.Refine == nil
+		p.Transfer == nil && p.Refine == nil
 }
 
 // lowDiskActive reports whether this run should use the staged low-disk S3 mode: a full-S3 deep-sky/nebula

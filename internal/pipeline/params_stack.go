@@ -1,6 +1,6 @@
 // The stacking half of the param brain: the tunable knobs behind the launch form's "Stacking &
 // rejection" panel. They are Tier C by definition — changing how pixels are combined can only take
-// effect by re-stacking — and they apply to the SIRIL-BACKED modes (deepsky/nebula/livestack/mosaic/
+// effect by re-stacking — and they apply to the SIRIL-BACKED modes (deepsky/nebula/mosaic/
 // comet). Planetary and sun stack natively with their own lucky-imaging knobs (best_percent /
 // keep_percent / clip_sigma), and milkyway composites through the nightscape recipe, so none of these
 // keys is offered there.

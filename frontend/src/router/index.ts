@@ -58,11 +58,6 @@ const router = createRouter({
           component: () => import("@/views/ImportView.vue"),
         },
         {
-          path: "live",
-          name: "livestack",
-          component: () => import("@/views/LiveStackView.vue"),
-        },
-        {
           path: "tasks",
           name: "jobs",
           component: () => import("@/views/JobsListView.vue"),
@@ -95,7 +90,6 @@ const router = createRouter({
 
     // Back-compat: the old flat paths redirect to the nested routes (bookmarks / external links).
     { path: "/import", redirect: { name: "import" } },
-    { path: "/livestack", redirect: { name: "livestack" } },
     { path: "/jobs", redirect: { name: "jobs" } },
     {
       path: "/jobs/:id",

@@ -59,13 +59,6 @@ export interface CreateOpts {
   storageMode?: "local" | "s3";
   s3?: { bucket: string; prefix: string };
   lowDisk?: boolean; // staged low-disk S3 processing (download/free one channel at a time)
-  // Live stacking (mode "livestack"): which source to watch and the per-sub exposure.
-  live?: {
-    sourceKind: "local" | "s3";
-    bucket?: string;
-    prefix?: string;
-    exposureSec?: number;
-  };
   // Imaging target for plate-solve/SPCC seeding — a catalogue name ("M66") or "RA,Dec" — for
   // captures whose headers/folders can't identify the field. Never renames the run.
   target?: string;
@@ -285,13 +278,6 @@ export const useJobsStore = defineStore("jobs", () => {
     if (opts.forceCalibration) body.force_calibration_frames = true;
     if (opts.buildMasters) body.build_masters = true;
     if (opts.calibPlan) body.calib_plan = opts.calibPlan;
-    if (opts.live)
-      body.live = {
-        source_kind: opts.live.sourceKind,
-        bucket: opts.live.bucket,
-        prefix: opts.live.prefix,
-        exposure_sec: opts.live.exposureSec,
-      };
     if (opts.storageMode === "s3" && opts.s3?.bucket) {
       body.storage_mode = "s3";
       body.s3 = { bucket: opts.s3.bucket, prefix: opts.s3.prefix };

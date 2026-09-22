@@ -14,14 +14,9 @@ optional tool degrades the result, never fails the run), and the opt-in AI finis
 | `nightpano` | Sky panorama: a hand-swept arc of pointings, each stacked by the milkyway recipe, then plate-solved, fitted to ONE shared lens and reprojected onto a spherical canvas | `pipeline.ProcessNightpano` (`internal/pipeline/nightpano.go`) | [nightpano.md](nightpano.md) |
 | `planetary` | Lucky imaging (Moon/planets): native-res sharpness ranking, multi-point warp, AP-weighted stack, RL deconvolution | `pipeline.ProcessPlanetary` (`internal/pipeline/planetary.go`) → `planetary.Process` (`internal/planetary/planetary.go`) | [planetary.md](planetary.md) |
 | `comet` | Moving comet (mono or colour): one global star alignment, auto-fit motion track, dual star/comet stacks, StarNet star-layer recomposite | `pipeline.ProcessComet` (`internal/pipeline/comet.go`) | [comet.md](comet.md) |
-| `livestack` | Watch a folder/S3 prefix during capture: calibrate each new sub once, incrementally re-stack with a live preview, finalize with the full pipeline on Stop | `livestack.Run` (`internal/livestack`) → `pipeline.Process` | [livestack.md](livestack.md) |
 | `sun` | The Sun in Hα or white light: triage a mixed folder by measured disc size, limb-register, window, stack and finish in Go | `pipeline.ProcessSun` (`internal/pipeline/sunmode.go`) + `internal/solar` | [sun.md](sun.md) |
 | `eclipse` | A partially eclipsed Sun: the solar recipe measured against TWO circles, with the occulting Moon masked out of the stack and of every on-disc measurement; `sequence_panels` also renders the whole eclipse as one progression sheet | `pipeline.ProcessSun` via `mode.For(Eclipse)` + `internal/solar/pair.go`, `internal/eclipsegeom` | [eclipse.md](eclipse.md) |
 | `mosaic` | Tiled panels of one large object (mono or colour): per-panel deepsky stacks, one plate-solve per panel, WCS assembly onto a single photometrically-matched canvas, standard finish | `pipeline.ProcessMosaic` (`internal/pipeline/mosaicmode.go`) + `internal/mosaic` | [mosaic.md](mosaic.md) |
-
-`livestack` is not a separate *recipe*: the live session incrementally re-stacks while capturing
-and **finalizes through the deepsky path** — its preset is the deepsky preset retagged
-(`mode.For` in `internal/mode/preset.go`, `internal/pipeline/live.go`).
 
 ## Monochrome or colour — the same modes
 

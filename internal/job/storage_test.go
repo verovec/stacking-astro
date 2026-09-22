@@ -30,7 +30,7 @@ func TestDataInputRels(t *testing.T) {
 }
 
 // wantsS3Storage gates the full-S3 orchestration: only a run explicitly in "s3" mode with a bucket, and not
-// a transfer / live / refine job (those manage their own I/O), pulls-and-frees.
+// a transfer / refine job (those manage their own I/O), pulls-and-frees.
 func TestWantsS3Storage(t *testing.T) {
 	base := RunRequest{StorageMode: "s3", S3: &S3Target{Bucket: "b"}}
 	assert.True(t, base.wantsS3Storage())
@@ -38,10 +38,6 @@ func TestWantsS3Storage(t *testing.T) {
 	assert.False(t, RunRequest{StorageMode: "local", S3: &S3Target{Bucket: "b"}}.wantsS3Storage(), "local mode")
 	assert.False(t, RunRequest{StorageMode: "s3"}.wantsS3Storage(), "no S3 target")
 	assert.False(t, RunRequest{StorageMode: "s3", S3: &S3Target{}}.wantsS3Storage(), "empty bucket")
-
-	live := base
-	live.Live = &LiveRequest{}
-	assert.False(t, live.wantsS3Storage(), "live-stacking manages its own I/O")
 
 	xfer := base
 	xfer.Transfer = &TransferRequest{}

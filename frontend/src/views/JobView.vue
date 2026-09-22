@@ -295,9 +295,6 @@ const canRestart = computed(() => {
   return s === "failed" || s === "cancelled";
 });
 const restarting = ref(false);
-// Live-stacking jobs run until stopped; the "cancel" affordance is really "stop & finalize".
-const isLive = computed(() => job.value?.params?.mode === "livestack");
-
 // A paused job (manual pause, or auto-paused on a transient S3 error) can be continued from where it
 // left off. Not terminal — it shows Continue + Cancel.
 const isPaused = computed(() => liveStatus.value === "paused");
@@ -313,7 +310,6 @@ const isS3Copy = computed(
 const canPause = computed(
   () =>
     running.value &&
-    !isLive.value &&
     (PAUSABLE_MODES.includes(job.value?.params?.mode ?? "") || isS3Copy.value),
 );
 const pausing = ref(false);
@@ -386,7 +382,7 @@ async function denoiseFinalJob() {
 // in a single cheap stage, so the tier selector is hidden for them.
 const refineHasTiers = computed(() => {
   const mode = job.value?.params?.mode ?? "deepsky";
-  return mode === "deepsky" || mode === "nebula" || mode === "livestack";
+  return mode === "deepsky" || mode === "nebula";
 });
 const refining = ref(false);
 // Refine re-finishes an existing run from its stacked masters, so it reaches Tier A (composite) or B
@@ -789,7 +785,7 @@ async function savePresetFromRun() {
           {{ pausing ? t("job.pausing") : t("job.pause") }}
         </button>
         <button :class="btnDanger" :disabled="cancelling" @click="cancelJob">
-          {{ isLive ? t("job.stopFinalize") : t("job.cancel") }}
+          {{ t("job.cancel") }}
         </button>
       </div>
       <div v-else-if="isPaused" class="ml-auto flex gap-2">

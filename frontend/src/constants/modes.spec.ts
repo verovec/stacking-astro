@@ -5,8 +5,7 @@ import { groupsForMode } from "./paramDocs";
 
 describe("canonical mode set", () => {
   // The Go mirror check. internal/mode/preset.go ParseMode must accept exactly these, or the
-  // backend and the UI disagree about which modes exist. livestack is deliberately absent: it is
-  // launched from its own view rather than from the mode picker.
+  // backend and the UI disagree about which modes exist.
   it("matches internal/mode.ParseMode", () => {
     expect([...MODES]).toEqual([
       "deepsky",

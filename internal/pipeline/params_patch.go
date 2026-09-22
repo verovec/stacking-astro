@@ -76,7 +76,7 @@ func applyModeParamPatch(working mode.Preset, raw json.RawMessage) (mode.Preset,
 		return applyMosaicParamPatch(working, raw)
 	case mode.Sun, mode.Eclipse:
 		return applySunParamPatch(working, raw)
-	default: // deepsky / nebula / livestack share the full tiered whitelist
+	default: // deepsky / nebula share the full tiered whitelist
 		return applyDeepskyParamPatch(working, raw)
 	}
 }
@@ -361,7 +361,7 @@ func ParamsFor(p mode.Preset) map[string]any {
 	}
 }
 
-// deepskyParams is the deepsky-family tunable surface (deepsky/nebula/livestack; the mosaic mode
+// deepskyParams is the deepsky-family tunable surface (deepsky/nebula; the mosaic mode
 // extends it with the assembler knobs).
 func deepskyParams(p mode.Preset) map[string]any {
 	m := map[string]any{
@@ -585,7 +585,7 @@ func KnobRangesFor(m mode.Mode) map[string]KnobRange {
 		r["feather_frac"] = KnobRange{Min: 0.1, Max: 1}
 		r["min_panel_frames"] = KnobRange{Min: 1, Max: 50, Int: true}
 		return r
-	default: // deepsky / nebula / livestack share the full tiered surface
+	default: // deepsky / nebula share the full tiered surface
 		return deepskyKnobRanges()
 	}
 }

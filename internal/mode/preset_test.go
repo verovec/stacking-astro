@@ -12,8 +12,10 @@ func TestParseMode(t *testing.T) {
 		_, err := ParseMode(s)
 		assert.NoError(t, err, s)
 	}
-	_, err := ParseMode("bogus")
-	assert.Error(t, err)
+	for _, s := range []string{"bogus", "livestack"} { // livestack dropped with the capture side (E01)
+		_, err := ParseMode(s)
+		assert.Error(t, err, s)
+	}
 }
 
 func TestParseFormat(t *testing.T) {

@@ -520,25 +520,16 @@ func (s *Server) createJob(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "invalid body")
 		return
 	}
-	if req.Live != nil && req.Live.SourceKind == "s3" {
-		// A livestack S3 source uses a synthetic "s3://bucket/prefix" path as the lock/display key, not a
-		// filesystem path — skip data-dir confinement (and the rewrite that would corrupt the scheme).
-		if req.Live.Bucket == "" {
-			badRequest(w, "s3 live source requires a bucket")
-			return
-		}
+	roots, ok := s.resolveRoots(req.Path, req.Paths)
+	if !ok {
+		badRequest(w, "path must be inside the data directory")
+		return
+	}
+	req.Path = roots[0] // primary dir: session, target lock, run naming
+	if len(roots) > 1 {
+		req.Paths = roots // multi-folder selection, merged into one session
 	} else {
-		roots, ok := s.resolveRoots(req.Path, req.Paths)
-		if !ok {
-			badRequest(w, "path must be inside the data directory")
-			return
-		}
-		req.Path = roots[0] // primary dir: session, target lock, run naming
-		if len(roots) > 1 {
-			req.Paths = roots // multi-folder selection, merged into one session
-		} else {
-			req.Paths = nil // single folder → unchanged single-session run
-		}
+		req.Paths = nil // single folder → unchanged single-session run
 	}
 	if req.BuildMasters {
 		// A masters-only calibration build is not a pipeline mode — the job kind reads "masters" in

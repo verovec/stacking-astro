@@ -39,7 +39,6 @@ export const TOURS: Record<string, readonly string[]> = {
     "reuse",
     "launch",
   ],
-  livestack: ["source", "start", "preview", "finalize"],
   jobs: ["list", "status", "open"],
   job: ["progress", "controls", "previews", "results", "stages"],
   runs: ["gallery", "open"],

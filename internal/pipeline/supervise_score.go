@@ -70,7 +70,7 @@ func scoreFinishMode(m mode.Mode, fm finishMetrics, targetBg float64, iter0 fini
 			s -= 8 * maxf(0, fm.FgLumaMean-0.35)   // washed/lifted foreground
 		}
 		return clampf(s, 0, 10)
-	default: // deepsky / nebula / comet / livestack
+	default: // deepsky / nebula / comet
 		s := scoreFinish(fm, targetBg)
 		// Star-tint guard: a field whose bright star cores are UNIFORMLY warm is a calibration/finish
 		// failure the sky-median metrics cannot see (the "all stars orange" look).

@@ -61,7 +61,7 @@ const MASTER_STACK_GROUP: ParamGroup = {
   ],
 };
 
-// Deep-sky / nebula / livestack share the full tiered surface (supervisePatch).
+// Deep-sky / nebula share the full tiered surface (supervisePatch).
 const DEEPSKY_GROUPS: ParamGroup[] = [
   {
     titleKey: "paramDocs.groups.composite",
@@ -320,7 +320,6 @@ const ECLIPSE_GROUPS: ParamGroup[] = [...SUN_GROUPS, SEQUENCE_GROUP];
 const GROUPS_BY_MODE: Record<string, ParamGroup[]> = {
   deepsky: DEEPSKY_GROUPS,
   nebula: DEEPSKY_GROUPS,
-  livestack: DEEPSKY_GROUPS,
   planetary: PLANETARY_GROUPS,
   comet: COMET_GROUPS,
   milkyway: MILKYWAY_GROUPS,

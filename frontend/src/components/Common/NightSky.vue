@@ -9,7 +9,7 @@ const canvas = ref<HTMLCanvasElement | null>(null);
 
 // Pause the animation on live-work routes (job detail, live stacking) where the user watches real
 // rendering — no reason to spend frames on the decorative background there.
-const HEAVY_ROUTES = new Set(["job", "livestack"]);
+const HEAVY_ROUTES = new Set(["job"]);
 const route = useRoute();
 const active = () => !HEAVY_ROUTES.has(String(route.name));
 
