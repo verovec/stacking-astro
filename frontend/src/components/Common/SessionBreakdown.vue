@@ -2,8 +2,13 @@
 // Per-capture-night breakdown of a multi-night selection: one collapsible panel per night (date,
 // time window, per-config light counts, that night's own calibration counters) plus the read-only
 // per-night calibration mapping from the joined run plan (which dark/flat/bias each night's lights
-// will get — library / from this capture / rebuilt from that night's flats). Renders NOTHING for a
-// single-night (or undated) selection, keeping the Import view pixel-identical to before.
+// will get — library / from this capture / rebuilt from that night's flats), the clip filter a
+// one-shot-colour night was shot through, and a warning chip when the planned flat is a fallback.
+//
+// It renders for a SINGLE night too (card 0006). It used to hide itself below two nights to keep the
+// Import view pixel-identical for the common case — which left the single-night capture, i.e. most
+// captures, as the one case with no way to see what it was about to be calibrated with. It still
+// renders nothing when there are no nights at all (an undated scan reports none).
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import AccordionGroup from "@/components/Common/AccordionGroup.vue";
@@ -11,6 +16,7 @@ import StatGrid from "@/components/Common/StatGrid.vue";
 import FilterChip from "@/components/Common/FilterChip.vue";
 import Pill from "@/components/Common/Pill.vue";
 import { frameTypeAccentClass } from "@/constants/styles";
+import { isKnownFilterSet } from "@/constants/filters";
 import { humanizeMs } from "@/utils/format";
 import type {
   PlanGroup,
@@ -124,13 +130,34 @@ function sourceClass(pm: PlanMaster): string {
     return "bg-violet-500/10 text-violet-500 dark:text-violet-400";
   return "bg-slate-500/10 text-slate-400 dark:text-slate-500";
 }
+
+// The clip filter a role's own master was shot through, when the engine measured one. Only ever set
+// on a FLAT: a dark and a bias are closed-shutter, so no filter was in their light path at all.
+function masterFilterSet(pm: PlanMaster): string | undefined {
+  const fs = pm.master?.filter_set;
+  return isKnownFilterSet(fs) ? fs : undefined;
+}
+// A flat shot through a different clip filter than the lights. It only reaches the UI under
+// force_calibration_frames — unforced, the run refuses it and there is no flat row to mark — so
+// saying so on the row itself is the difference between "your master was applied" and "your master
+// was applied and it is the wrong one".
+function isCrossSet(g: PlanGroup, pm: PlanMaster): boolean {
+  const lights = g.filter_set;
+  const flat = masterFilterSet(pm);
+  return isKnownFilterSet(lights) && !!flat && flat !== lights;
+}
+const filterSetLabel = (fs: string) => t("import.filterSets." + fs);
 </script>
 
 <template>
-  <section v-if="sessions.length > 1" data-demo="session-breakdown">
+  <section v-if="sessions.length" data-demo="session-breakdown">
     <h3 class="font-semibold">{{ t("sessions.title") }}</h3>
     <p class="mb-2 text-xs text-slate-500 dark:text-slate-400">
-      {{ t("sessions.subtitle", { n: sessions.length }) }}
+      {{
+        sessions.length > 1
+          ? t("sessions.subtitle", { n: sessions.length })
+          : t("sessions.subtitleOne")
+      }}
     </p>
     <AccordionGroup :items="items" :default-open="openKeys">
       <template
@@ -208,16 +235,34 @@ function sourceClass(pm: PlanMaster): string {
         </h4>
         <div v-if="groupsFor(s).length" class="mt-1 space-y-2">
           <div v-for="({ filter, g }, gi) in groupsFor(s)" :key="gi">
-            <div class="mb-0.5 flex items-center gap-2 text-sm">
+            <div class="mb-0.5 flex flex-wrap items-center gap-2 text-sm">
               <FilterChip v-if="filter" :filter="filter" />
               <span class="text-xs text-slate-500 dark:text-slate-400">
                 {{ humanizeMs(g.exposure_ms) }} · gain {{ g.gain }}
               </span>
+              <!-- Which clip filter these lights were shot through (one-shot-colour only). -->
+              <Pill
+                v-if="isKnownFilterSet(g.filter_set)"
+                data-test="lights-filter-set"
+                :title="t('sessions.lightsFilterSetHint')"
+                color-class="bg-brand-500/10 text-brand-500"
+              >
+                {{ filterSetLabel(g.filter_set) }}
+              </Pill>
+              <!-- The flat is not the clean case. The notes below say which way. -->
+              <Pill
+                v-if="g.flat_fallback"
+                data-test="flat-fallback"
+                :title="t('sessions.flatFallbackHint')"
+                color-class="bg-warning/10 text-warning"
+              >
+                ⚠ {{ t("sessions.flatFallback") }}
+              </Pill>
             </div>
             <div
               v-for="r in roles(g)"
               :key="r.role"
-              class="flex items-center gap-2 pl-1 text-sm"
+              class="flex flex-wrap items-center gap-2 pl-1 text-sm"
             >
               <span
                 class="w-10 font-medium"
@@ -228,6 +273,33 @@ function sourceClass(pm: PlanMaster): string {
               <span class="text-slate-500 dark:text-slate-400">{{
                 masterLine(r.pm)
               }}</span>
+              <!-- A per-night master names its night: that is how a borrowed flat becomes visible. -->
+              <span
+                v-if="
+                  r.pm.master?.session &&
+                  r.pm.master.session !== (g.session ?? '')
+                "
+                data-test="master-night"
+                class="text-xs text-warning"
+                :title="t('sessions.flatOtherNightHint')"
+              >
+                {{ t("sessions.fromNight", { date: r.pm.master.session }) }}
+              </span>
+              <span
+                v-if="masterFilterSet(r.pm)"
+                data-test="master-filter-set"
+                class="text-xs"
+                :class="
+                  isCrossSet(g, r.pm)
+                    ? 'text-warning'
+                    : 'text-slate-500 dark:text-slate-400'
+                "
+                :title="
+                  isCrossSet(g, r.pm) ? t('sessions.flatCrossSetHint') : ''
+                "
+              >
+                {{ filterSetLabel(masterFilterSet(r.pm)!) }}
+              </span>
               <Pill class="ml-auto shrink-0" :color-class="sourceClass(r.pm)">
                 {{ t(sourceKey(r.pm)) }}
               </Pill>

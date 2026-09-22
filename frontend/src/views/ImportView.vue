@@ -1404,9 +1404,10 @@ function histChip(exists: boolean): string {
       />
     </div>
 
-    <!-- Multi-night selection: per-night breakdown + calibration mapping (renders nothing single-night). -->
+    <!-- Per-night breakdown + calibration mapping. Shown for a single night too: knowing which
+         masters a run is about to apply is not a multi-night privilege (card 0006). -->
     <SessionBreakdown
-      v-if="inv?.sessions && inv.sessions.length > 1"
+      v-if="inv?.sessions?.length"
       :sessions="inv.sessions"
       :plan="runPlan"
     />

@@ -99,11 +99,44 @@ on top of the warm/cold population.
 | dark | same gain/offset/bin **and same exposure**, nearest temperature within ±5 °C; deepest pool wins ties |
 | dark (no exact exposure) | a same-camera dark of a *different* exposure + a bias → Siril **dark optimization** (`-opt`) scales its thermal signal onto the lights |
 | flat | same filter preferred; else *any* session flat (most dust sits on the sensor window, common to every filter) — noted in the run |
+| flat (one-shot colour) | **same clip filter, required** when both the lights' night and the flat's are classified: a broadband flat is never a candidate for a dual-band night, and vice versa. Either side unclassified → the row above, unchanged |
 | bias | same gain/offset/bin, deepest pool |
 | bad-pixel map | the matched dark's `_defects.lst` sidecar when present |
 
 Every choice, fallback and skip is recorded as a human-readable note in `run.json`
 (`channels[].selection.notes`).
+
+### The clip-filter rule, in full
+
+A dual-band clip (Ha + OIII) passes two narrow windows; an unfiltered train passes the whole
+continuum. Their illumination profiles have nothing in common, so dividing dual-band lights by a
+broadband flat corrupts the colour response of every frame it touches. Calibration frames carry an
+empty `FILTER` and one-shot-colour lights read `RGB`, so the filter-matched pass above *always*
+missed for them and fell through to the filter-blind one — which handed over the wrong flat silently.
+
+- **Where the verdict comes from.** The pixel classifier measures LIGHT sets only
+  (`internal/inspect/filterset.go`); a flat is an evenly-lit panel with no sky to classify. A flat
+  therefore inherits its **capture night**, via `Inventory.NightFilterSet`, and only when that
+  night's light sets agree. A clip swapped mid-session leaves the night `unknown` rather than
+  guessing which half a flat belongs to.
+- **Darks, dark-flats and bias are never gated.** They are closed-shutter exposures: no light
+  reaches the sensor, so nothing in the optical train can have touched them. Gating them would
+  strand perfectly good masters.
+- **Unknown means "as before".** If either side is unclassified — every monochrome capture, every
+  colour night the pixels could not settle, every library master (`master_frames` has no filter-set
+  column) — the pool is untouched and ranking is bit-for-bit what it was.
+- **Prior sessions stay unknown.** The catalog never recorded a night's clip filter, so folded-in
+  prior groups are not gated. Guessing from the current night would gate a flat on a filter nobody
+  ever measured on it.
+- **`force_calibration_frames` overrides it**, like every other gate — the flat is applied and the
+  run says, in as many words, that these are *X* lights calibrated with a *Y* flat.
+- **A refusal is never silent.** When the only flats on offer were cross-set, the run names both
+  sets and says how many were excluded, so "no flat" can be told apart from "a flat I refused".
+
+Before the run, the Import view's per-night panel shows the same thing: each light set's clip
+filter, the night and clip filter of the flat it would get, and a **flat-fallback** chip whenever
+that flat is refused, borrowed from another night, forced, or missing
+(`RunPlanPreview` → `PlanGroup.filter_set` / `flat_fallback`).
 
 **Colour (one-shot) lights match the same way**, on gain/offset/bin/exposure/temperature — a colour
 sensor's darks and flats are no different in kind. Two things are specific to them:

@@ -410,7 +410,14 @@
     "anchorHint": "Every channel is registered onto this night's field — its framing defines the final canvas.",
     "missingChannels": "No {filters} this night — those channels come from the other night(s).",
     "calibTitle": "Calibration for this night",
-    "noCalib": "No matched calibration for this night."
+    "noCalib": "No matched calibration for this night.",
+    "subtitleOne": "One capture night — it is calibrated with its own frames.",
+    "lightsFilterSetHint": "The clip filter these lights were shot through, measured from the pixels. Flats must come from the same one.",
+    "flatFallback": "flat fallback",
+    "flatFallbackHint": "This set's flat is not the clean case — refused for being shot through a different clip filter, borrowed from another night, forced, or missing entirely. See the notes below.",
+    "flatOtherNightHint": "This flat was shot on a different night — dust may have moved since.",
+    "flatCrossSetHint": "This flat was shot through a different clip filter than the lights. Its illumination profile is the wrong one; shoot flats per filter set.",
+    "fromNight": "night of {date}"
   },
   "common": {
     "inspect": "Inspect",

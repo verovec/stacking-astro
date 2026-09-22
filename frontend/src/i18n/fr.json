@@ -410,7 +410,14 @@
     "anchorHint": "Chaque canal est aligné sur le champ de cette nuit — son cadrage définit le canevas final.",
     "missingChannels": "Pas de {filters} cette nuit — ces canaux proviennent de l'autre ou des autres nuits.",
     "calibTitle": "Calibration de cette nuit",
-    "noCalib": "Aucune calibration correspondante pour cette nuit."
+    "noCalib": "Aucune calibration correspondante pour cette nuit.",
+    "subtitleOne": "Une seule nuit de capture — elle est calibrée avec ses propres images.",
+    "lightsFilterSetHint": "Le filtre clip utilisé pour ces poses, mesuré sur les pixels. Les flats doivent venir du même.",
+    "flatFallback": "flat de repli",
+    "flatFallbackHint": "Le flat de ce lot n'est pas le cas propre — refusé car pris à travers un autre filtre clip, emprunté à une autre nuit, forcé, ou absent. Voir les notes ci-dessous.",
+    "flatOtherNightHint": "Ce flat a été pris une autre nuit — la poussière a pu bouger depuis.",
+    "flatCrossSetHint": "Ce flat a été pris à travers un filtre clip différent de celui des poses. Son profil d'illumination est le mauvais ; faites des flats par jeu de filtres.",
+    "fromNight": "nuit du {date}"
   },
   "common": {
     "inspect": "Inspecter",
