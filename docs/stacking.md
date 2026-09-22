@@ -17,7 +17,7 @@ list of algorithms anywhere in the frontend.
 
 | Mode | Combined by | Panel |
 |---|---|---|
-| deepsky, nebula, livestack, mosaic, comet | Siril `stack` (or the Go combiner) | yes |
+| deepsky, nebula, mosaic, comet | Siril `stack` (or the Go combiner) | yes |
 | planetary | Go lucky-imaging stack (`internal/planetary`) | no — see `best_percent`, `drizzle_scale`, `align_points` |
 | sun | Go solar stack (`internal/solar`) | no — see `keep_percent`, `clip_sigma`, `drizzle` |
 | milkyway | Go nightscape composite (`internal/nightscape`) | no — see `look`, `brightness` |

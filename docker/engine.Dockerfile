@@ -133,14 +133,6 @@ RUN if [ "$INSTALL_GRAXPERT" = "true" ]; then \
 RUN apt-get update && apt-get install -y --no-install-recommends libraw-bin \
  && rm -rf /var/lib/apt/lists/*
 
-# --- GDAL (gdal-bin): the canopy-height atlas downloader shells out to gdalwarp/gdalbuildvrt/gdalinfo to
-# stream + reproject the ETH 10 m canopy COGs over /vsicurl/ (internal/canopy/build.go — the DarkSky
-# finder's "download canopy for this area" button). Resolved by bare name on PATH (no *_BIN var), so
-# gdal-bin in /usr/bin is all that's needed; the feature soft-fails to a terrain-only horizon when absent.
-# Own layer (like libraw-bin) so it doesn't bust the Siril/GraXpert cache on rebuild.
-RUN apt-get update && apt-get install -y --no-install-recommends gdal-bin \
- && rm -rf /var/lib/apt/lists/*
-
 # --- Siril SPCC sensor/filter database: the GUI downloads it on first use, which a headless container
 # never does — without it `spcc` aborts even on a solved image (task #316: colours fell back to the
 # star-field gains and the stars came out green). Baked at a pinned commit (override with --build-arg

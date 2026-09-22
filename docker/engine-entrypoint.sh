@@ -6,8 +6,8 @@ set -euo pipefail
 
 WORK="${ASTRO_WORK_DIR:-/data/work}"
 
-# The pipeline writes here during a run. input/ is bind-mounted by compose (read-write, so the S3
-# import can land capture folders in it) and so is never created here.
+# The pipeline writes here during a run. input/ is bind-mounted by compose (read-write — imported
+# capture folders land in it) and so is never created here.
 mkdir -p "$WORK" "${ASTRO_OUTPUT_DIR:-/data/output}" "${ASTRO_LIBRARY_DIR:-/data/library}"
 
 # Siril and GIMP write their config/cache/venv under $HOME by default. When the container runs as an

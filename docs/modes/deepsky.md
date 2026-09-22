@@ -239,7 +239,7 @@ where it removes the correlated outliers (walking noise, trail remnants) a 3σ c
 From `mode.For(mode.Deepsky)` in `internal/mode/preset.go`. The **Agent** column marks knobs
 tunable through the shared param brain (`ParamsFor`/`ApplyParamPatch` in
 `internal/pipeline/params_patch.go` — the deepsky/nebula patch set, used identically by the in-run
-supervisor, `RunRequest.Params` and the AstroAgent chat tools), with the supervisor re-entry tier
+supervisor and `RunRequest.Params`), with the supervisor re-entry tier
 each knob requires.
 
 | Knob | Default | What it does | Agent |

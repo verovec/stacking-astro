@@ -48,5 +48,5 @@ foreground composite) is a different procedure, not a filter variant.
 Cross-mode reference material:
 
 - [../pipeline.md](../pipeline.md) — the shared pipeline stages, AI enhancement, cross-session reuse.
-- [../architecture.md](../architecture.md) — components, containerized mode, S3 storage.
+- [../architecture.md](../architecture.md) — components, containerized mode.
 - [../verification.md](../verification.md) — per-mode end-to-end verification recipes with pass criteria.

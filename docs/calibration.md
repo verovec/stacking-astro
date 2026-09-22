@@ -59,8 +59,8 @@ Pool hygiene and reuse:
   path|size|mtime). An unchanged pool reuses the on-disk master instead of re-stacking (minutes
   saved on large pools); writes are atomic (temp + rename) so concurrent runs sharing the library
   never see a half-written master.
-- **`dropMissing`** — catalogued frames whose file was freed to S3 are skipped with a counted
-  warning (one ghost path would sink the whole Siril stack).
+- **`dropMissing`** — catalogued frames whose file no longer exists on disk are skipped with a
+  counted warning (one ghost path would sink the whole Siril stack).
 - **`dropNonFITS`** — anything that isn't a FITS file is excluded from a pool with a counted
   warning (a processed image that once slipped into the catalog must never be stacked as
   calibration).
@@ -84,8 +84,8 @@ scanned per pixel (`calib.ScanDarkDefects`):
    0.5 % of the sensor keeping the strongest detections, so a pathological scan stays harmless.
 
 The result is written beside the master in Siril's `find_hot` format —
-`library/master_DARK_…_defects.lst` (`P x y H|C`, orientation-aware) — and mirrors to S3 with the
-library. At calibration time the matched dark's map is applied per frame as
+`library/master_DARK_…_defects.lst` (`P x y H|C`, orientation-aware). At calibration time the
+matched dark's map is applied per frame as
 **`calibrate … -cc=bpm <defects.lst>`**, replacing `-cc=dark`; without a map the classic
 `-cc=dark` still runs. On the reference ASI1600MM Pro this finds ~1,500 genuinely unstable pixels
 on top of the warm/cold population.
@@ -100,7 +100,7 @@ on top of the warm/cold population.
 | dark (no exact exposure) | a same-camera dark of a *different* exposure + a bias → Siril **dark optimization** (`-opt`) scales its thermal signal onto the lights |
 | flat | same filter preferred; else *any* session flat (most dust sits on the sensor window, common to every filter) — noted in the run |
 | bias | same gain/offset/bin, deepest pool |
-| bad-pixel map | the matched dark's `_defects.lst` sidecar when present (pulled from the S3 library mirror on demand) |
+| bad-pixel map | the matched dark's `_defects.lst` sidecar when present |
 
 Every choice, fallback and skip is recorded as a human-readable note in `run.json`
 (`channels[].selection.notes`).

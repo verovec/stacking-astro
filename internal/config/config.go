@@ -87,19 +87,11 @@ type Config struct {
 	FocalLenMM  float64
 	PixelSizeUm float64
 
-	// MountWormPeriodSec is the RA worm's revolution time, the period the tracking analysis folds
-	// on. 478 s is Celestron's figure for the Advanced VX; other mounts differ, and the fit searches
-	// around this value rather than trusting it.
-	MountWormPeriodSec float64
-
-	// TrackingSolveEveryNth solves one light in N to measure tracking. 1 is affordable at minute-long
-	// subs; raise it for short subs so the solves cannot fall behind the capture cadence.
-	TrackingSolveEveryNth int
-	SpccMonoSensor        string
-	SpccRFilter           string
-	SpccGFilter           string
-	SpccBFilter           string
-	SpccWhiteRef          string
+	SpccMonoSensor string
+	SpccRFilter    string
+	SpccGFilter    string
+	SpccBFilter    string
+	SpccWhiteRef   string
 	// NightscapeOSCSensor is the SPCC OSC sensor name for the milkyway/nightscape path (the one-shot
 	// camera, e.g. a DSLR). Empty (the default) disables SPCC for nightscapes — a phone sensor is rarely
 	// in Siril's SPCC database — so the run uses the background-neutralization colour path instead.
@@ -209,9 +201,6 @@ func Load() *Config {
 
 		FocalLenMM:  envFloat("ASTRO_FOCAL_MM", 740), // Takahashi FC-100 DF native
 		PixelSizeUm: envFloat("ASTRO_PIXEL_UM", 3.8), // ASI1600MM Pro
-
-		MountWormPeriodSec:    envFloat("ASTRO_WORM_PERIOD_SEC", 478), // Celestron Advanced VX
-		TrackingSolveEveryNth: envInt("ASTRO_TRACKING_SOLVE_EVERY", 1),
 
 		// SPCC names MUST match Siril's spcc-database exactly (case/spacing). The ASI1600MM Pro's
 		// sensor entry is "ZWO ASI1600MM" (no " Pro" — that name does not exist in the DB and makes

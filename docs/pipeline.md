@@ -162,7 +162,7 @@ the user can deselect (`POST /api/reuse/preview`):
   calibrated with `calibrate_single` instead, and a channel whose *total* integration is one
   calibrated frame skips registration/stacking and promotes that frame to the channel master with
   the shared linear finishing — one usable frame beats a dead channel, and the degraded path is
-  warned in the journal (same rules in the single-session and livestack paths).
+  warned in the journal (same rules in the single-session and grouped paths).
 - **Photometric normalization before the merge.** Groups shot at different exposure/gain/
   temperature are measured (`internal/photom`) and mapped onto the reference group's linear scale
   before co-registration — ON by default for deep-sky modes. The scale ladder: a measurable curve
@@ -236,8 +236,6 @@ AI supervisor · outputs · config* — see [docs/modes/README.md](modes/README.
 - **[comet](modes/comet.md)** — moving comet: one global star alignment to the mid frame,
   multi-scale coma detection + robust track fit, dual star/comet stacks (asymmetric rejection on
   the comet side), StarNet star-layer recomposite.
-- **[livestack](modes/livestack.md)** — watch a folder or S3 prefix during capture, calibrate each
-  new sub once, incrementally re-stack with a live preview, and run the full pipeline on Stop.
 
 The output `format` (`image`/`video`/`both`) additionally renders a Ken-Burns MP4 via
 `internal/videoout` (ffmpeg).
