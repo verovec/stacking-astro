@@ -53,3 +53,48 @@ func TestMasterStackOptions_PerFrameType(t *testing.T) {
 	assert.Equal(t, stackalg.NormNone, MasterStackOptions(MasterDarkFlat, m).Norm, "a flat's dark stacks like a dark")
 	assert.Equal(t, stackalg.NormMul, MasterStackOptions(MasterFlat, m).Norm, "flats are multiplicative")
 }
+
+func TestLonePromotionNote(t *testing.T) {
+	tests := []struct {
+		name string
+		mt   MasterType
+		want string
+	}{
+		{"a dark says no rejection", MasterDark,
+			"master m_x: single-frame pool — the lone frame was promoted unstacked (no outlier rejection)"},
+		{"a flat adds the flat-bias caveat", MasterFlat,
+			"master m_x: single-frame pool — the lone frame was promoted unstacked (no outlier rejection, no flat-bias calibration)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, lonePromotionNote("m_x", tt.mt))
+		})
+	}
+}
+
+func TestThinDarkPoolNote(t *testing.T) {
+	tests := []struct {
+		name     string
+		mt       MasterType
+		n        int
+		wantNote bool
+	}{
+		{"a 2-frame dark pool warns", MasterDark, 2, true},
+		{"a 2-frame dark-flat pool warns", MasterDarkFlat, 2, true},
+		{"3 frames is the rejection minimum — no warning", MasterDark, 3, false},
+		{"a 2-frame bias pool is noisy, not poisoned", MasterBias, 2, false},
+		{"a 2-frame flat pool is noisy, not poisoned", MasterFlat, 2, false},
+		{"1 frame is the promotion note's job, not this one's", MasterDark, 1, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			note := thinDarkPoolNote("m_x", tt.mt, tt.n)
+			if !tt.wantNote {
+				assert.Empty(t, note)
+				return
+			}
+			assert.Contains(t, note, "2-frame pool")
+			assert.Contains(t, note, "m_x")
+		})
+	}
+}

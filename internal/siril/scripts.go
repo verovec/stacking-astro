@@ -455,6 +455,18 @@ func ConvertScript(seq string) string {
 	return scriptHeader + fmt.Sprintf("convert %s -out=.\n", seq)
 }
 
+// PromoteLoneFrameScript converts a single-frame calibration pool and re-encodes the lone frame as
+// the master at outBase, so a promoted master carries the same 32-bit-float [0,1] pixels as a
+// stacked one. The re-encode needs all three steps: `convert` links compatible FITS without
+// touching pixels (the previous convert-and-copy promotion published a raw ushort camera file
+// among float masters — Siril renormalizes either kind on load, but any other reader that does not
+// is off by 65535×), a bare load+save STILL keeps the source bit depth (set32bits only governs
+// processed images, verified on Siril 1.4.4), and `fmul 1.0` is the mathematically-neutral
+// processing step that makes the save write 32-bit float.
+func PromoteLoneFrameScript(seq, outBase string) string {
+	return scriptHeader + fmt.Sprintf("convert %s -out=.\nload %s_00001\nfmul 1.0\nsave %s\n", seq, seq, outBase)
+}
+
 // ConvertDebayerScript is ConvertScript with demosaicing: the staged frames are camera raws whose
 // consumer has no later calibrate step to debayer them (the planetary lucky-imaging path), so the
 // mosaic must be interpolated here or it is stacked and sharpened as a checkerboard.

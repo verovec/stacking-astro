@@ -76,6 +76,25 @@ func TestBuildSets_Temperature(t *testing.T) {
 			want:  []string{"6@-17", "5@-12"},
 		},
 		{
+			name: "the span cap's trailing straggler rejoins its ramp instead of standing alone",
+			typ:  Dark,
+			// The real 2026-09-23 dawn run: darks captured while the cooler warmed from -20.3 to
+			// -10.2. The -15.3..-10.3 chain closes at exactly span 5.0, stranding the last frame
+			// (-10.2, a 0.1 °C step!) in a one-frame set — which was then PROMOTED UNSTACKED as a
+			// raw-copy master. A straggler within the gap tolerance of its neighbour is the span
+			// cap's fence-post, not a new thermal regime: it belongs with the ramp.
+			temps: []float64{-20.3, -19.3, -15.3, -12.6, -11.5, -11.1, -10.8, -10.5, -10.3, -10.2},
+			want:  []string{"2@-19", "8@-11"},
+		},
+		{
+			name: "a two-frame straggler rejoins too",
+			typ:  Dark,
+			// Same fence-post with two frames past the cap: {-10.9, -10.8} splits off a 6-frame
+			// chain whose span closed at 5.0; both steps are 0.1 °C.
+			temps: []float64{-16, -14, -12.5, -11.5, -11.2, -11, -10.9, -10.8},
+			want:  []string{"8@-11"},
+		},
+		{
 			name:  "genuinely different set points stay apart",
 			typ:   Dark,
 			temps: []float64{-20.1, -20.0, -19.9, -10.1, -10.0, -9.9},

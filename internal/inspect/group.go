@@ -161,6 +161,7 @@ func clusterByTemperature(key SetKey, members []*Frame) []tempCluster {
 	byTemp := append([]*Frame(nil), withTemp...)
 	sort.SliceStable(byTemp, func(i, j int) bool { return byTemp[i].TempMilliC < byTemp[j].TempMilliC })
 
+	var runs [][]*Frame
 	start := 0
 	for i := 1; i <= len(byTemp); i++ {
 		done := i == len(byTemp)
@@ -171,10 +172,65 @@ func clusterByTemperature(key SetKey, members []*Frame) []tempCluster {
 				continue
 			}
 		}
-		out = append(out, newTempCluster(byTemp[start:i]))
+		runs = append(runs, byTemp[start:i])
 		start = i
 	}
+	for _, r := range rejoinSpanStragglers(runs) {
+		out = append(out, newTempCluster(r))
+	}
 	return out
+}
+
+// tempStragglerMaxFrames bounds what counts as a straggler for rejoinSpanStragglers: a run this
+// small cannot build a real master (no outlier rejection), so stranding it is worse than any
+// temperature error rejoining can introduce.
+const tempStragglerMaxFrames = 2
+
+// rejoinSpanStragglers folds back the tiny runs the SPAN cap strands at the end of a long ramp.
+//
+// The span cap closes a cluster mid-ramp, so the next frame starts a new run even when it sits a
+// tenth of a degree away — and a ramp's last one or two frames then become a set of their own.
+// MEASURED on a real dawn dark run (cooler off, -20.3 → -10.2 °C): the -15.3..-10.3 chain closed at
+// exactly span 5.0 and the final -10.2 frame, 0.1 °C later, was stranded alone — then PROMOTED
+// UNSTACKED as a single-frame master that the matcher would happily hand to any light within 5 °C.
+//
+// A straggler is folded into its nearest neighbour only when the edge gap is within
+// tempClusterGapC — the signature of a fence-post split. A genuine isolate (a settling-cooler frame,
+// a different set point) has a real gap on both sides and stays alone, exactly as before. The merged
+// run may exceed tempClusterSpanC by up to the gap: that is the right trade, because the cap exists
+// to keep a -20 dark out of a -10 master, not to fabricate an unstackable one. Runs are adjacent
+// sub-slices of one temperature-sorted backing array, so appending a run onto its neighbour writes
+// each element onto itself and simply widens the slice — order is preserved by construction.
+func rejoinSpanStragglers(runs [][]*Frame) [][]*Frame {
+	for changed := true; changed; {
+		changed = false
+		for i := 0; i < len(runs); i++ {
+			if len(runs[i]) > tempStragglerMaxFrames || len(runs) == 1 {
+				continue
+			}
+			prevGap, nextGap := math.Inf(1), math.Inf(1)
+			if i > 0 {
+				prev := runs[i-1]
+				prevGap = runs[i][0].TempC() - prev[len(prev)-1].TempC()
+			}
+			if i+1 < len(runs) {
+				next := runs[i+1]
+				nextGap = next[0].TempC() - runs[i][len(runs[i])-1].TempC()
+			}
+			switch {
+			case prevGap <= tempClusterGapC && prevGap <= nextGap:
+				runs[i-1] = append(runs[i-1], runs[i]...)
+			case nextGap <= tempClusterGapC:
+				runs[i+1] = append(runs[i], runs[i+1]...)
+			default:
+				continue
+			}
+			runs = append(runs[:i], runs[i+1:]...)
+			changed = true
+			break
+		}
+	}
+	return runs
 }
 
 // newTempCluster labels a cluster with its MEDIAN temperature, in whole degrees. The median rather

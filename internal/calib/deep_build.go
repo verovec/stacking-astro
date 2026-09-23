@@ -275,16 +275,22 @@ func stackPooled(ctx context.Context, runner *siril.Runner, mt MasterType, key i
 	// shared library, two concurrent runs building the same-signature master must never let one read the
 	// other's half-written file; the rename publishes the whole master in one step (same filesystem).
 	tmpBase := filepath.Join(mastersDir, ".tmp_"+filepath.Base(workDir)+"_"+name)
+	var poolNote string
 	if len(paths) == 1 {
 		// A single-frame pool (S3-freed siblings) cannot be stacked — promote the lone frame
-		// (see stackMasterSet; the same #352 trade).
+		// (see stackMasterSet; the same #352 trade). Say so: this path used to promote silently,
+		// so a raw dawn dark could become a library master without a single warning in run.json.
 		if err := promoteLoneCalFrame(ctx, runner, seqDir, tmpBase, onProgress); err != nil {
 			return Master{}, "", fmt.Errorf("promote lone-frame master %s: %w", name, err)
 		}
-	} else if _, err := runner.Run(ctx, seqDir,
-		siril.StackMasterScript("cal", tmpBase, len(paths), stack),
-		onProgress); err != nil {
-		return Master{}, "", fmt.Errorf("stack master %s: %w", name, err)
+		poolNote = lonePromotionNote(name, mt)
+	} else {
+		if _, err := runner.Run(ctx, seqDir,
+			siril.StackMasterScript("cal", tmpBase, len(paths), stack),
+			onProgress); err != nil {
+			return Master{}, "", fmt.Errorf("stack master %s: %w", name, err)
+		}
+		poolNote = thinDarkPoolNote(name, mt, len(paths))
 	}
 	if err := os.Rename(tmpBase+".fits", outBase+".fits"); err != nil {
 		return Master{}, "", fmt.Errorf("publish master %s: %w", name, err)
@@ -294,7 +300,7 @@ func stackPooled(ctx context.Context, runner *siril.Runner, mt MasterType, key i
 		_ = buildDefectList(master.Path, paths) // soft: its note is user-visible on the session-build path
 	}
 	_ = os.RemoveAll(seqDir)
-	return master, "", nil
+	return master, poolNote, nil
 }
 
 // formatPoolSig renders the .sig sidecar (v2): line 1 the pool content hash, line 2 the pool depth —
