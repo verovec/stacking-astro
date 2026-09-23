@@ -115,6 +115,24 @@ func AlignMastersScript(seq string) string {
 	return b.String()
 }
 
+// AlignMastersRefScript is AlignMastersScript with the reference PINNED to the first image of the
+// sequence (setref), instead of letting Siril pick the best-scoring one.
+//
+// It registers in ONE pass on purpose: `-2pass` exists to choose a good reference by measuring every
+// frame first, and it overrides setref — asking for both would silently ignore the pin. Used when
+// the caller has a reason to decide the output grid itself, as a mixed broadband + dual-band run
+// does: the broadband stack is the colour base, and the narrowband pointing must not define the
+// final canvas. `-framing=min` still keeps only the field every master shares.
+func AlignMastersRefScript(seq string) string {
+	var b strings.Builder
+	b.WriteString(scriptHeader)
+	fmt.Fprintf(&b, "link %s -out=.\n", seq)
+	fmt.Fprintf(&b, "setref %s 1\n", seq)
+	fmt.Fprintf(&b, "register %s\n", seq)
+	fmt.Fprintf(&b, "seqapplyreg %s -framing=min\n", seq)
+	return b.String()
+}
+
 // AlignPairScript links a 2-image sequence (index 1 = an already-aligned reference, index 2 = the
 // image to align) and registers it with the reference PINNED to image 1 via setref — so r_<seq>_00002
 // lands on the reference's pixel grid no matter which image Siril would have ranked better. Star

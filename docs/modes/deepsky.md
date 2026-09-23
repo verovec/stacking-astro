@@ -292,6 +292,54 @@ each knob requires.
 | `Previews` | true | per-channel + milestone preview PNGs | — |
 | `Supervise` / `SuperviseMaxIters` / `SuperviseTier` / `SuperviseTargetScore` / `SuperviseConfirmRestack` | off / 0→4 / ""→C / 0→7.0 / **false** | the opt-in AI finish supervisor (see below) | — |
 
+## Mixed filter sets — broadband + dual-band in one run
+
+A one-shot-colour target is often shot twice: once unfiltered for star colour and a natural
+background, once through a dual-band clip (L-eXtreme / L-Ultimate) for the Ha and [OIII] emission.
+Both sets in one folder used to stack into **one** master, silently — the clip filter is deliberately
+not part of `SetKey` (it is measured, and folding it in would churn the `exclude_sets` tokens the UI
+stores), so two OSC sets differing only by the filter in front of the sensor shared a channel. The
+result averaged a full-continuum exposure with two ~3 nm windows: the emission diluted by continuum,
+the star colour polluted by two narrow bands. The documented workaround was two jobs and a
+hand-built composite.
+
+The run now separates them into two **lanes** (`internal/pipeline/filtersetlanes.go`):
+
+1. **Partition.** When the scan holds BOTH a classified broadband and a classified dual-band light
+   set ([card 0005](../architecture.md) detection), each stacks on its own. The broadband lane keeps
+   the plain filter name; the dual-band lane is suffixed `-dualband`. Each lane calibrates with its
+   own matched masters — including its own flats, per the clip-filter rule in
+   [calibration.md](../calibration.md#the-clip-filter-rule-in-full).
+2. **Registration.** The dual-band master is co-registered onto the **broadband** master's grid by
+   the ordinary channel-master alignment, with the reference **pinned** to the broadband image
+   (`setref`, one-pass — `-2pass` picks its own reference and would override the pin) and
+   `-framing=min` keeping the field the two share. The broadband stack is the colour base and
+   usually the wider exposure; the narrowband pointing must not define the final canvas.
+3. **Separation.** The **registered** dual-band master is split into pseudo-Ha (the red pixels) and
+   pseudo-[OIII] (the per-pixel max of green and blue — the 500.7 nm line straddles the two
+   passbands, so the maximum keeps whichever pixel caught it). Splitting before registration would
+   bake the lanes' pointing difference into the emission layers. The lane is then consumed: it is
+   not a colour channel, and leaving it in would hand `resolvePalette` a second RGB.
+4. **Finish.** The broadband stack is the colour base and the two emission lines **screen** over it
+   — the standard `natural` palette plus the Ha screen (on by default) and the [OIII] screen
+   (opt-in, `oiii_screen`). `hoo` / `foraxx` remain available and unchanged.
+
+The separated channels are recorded in `res.Channels` flagged `synthesized`, with no frame count and
+no exposure of their own — a pseudo-Ha separated from a colour master is not an Ha master stacked
+through a 3 nm filter, and a mixed run must not claim narrowband integration it never captured. They
+persist through the ordinary Tier-A checkpoint (`<outDir>/linear/ha.tif`, `oiii.tif`) so the finish
+can be re-tuned without re-stacking.
+
+### When it does not fire
+
+| Condition | Behavior |
+|-----------|----------|
+| only one filter set present (broadband-only, or the ordinary dual-band-only capture) | no split — one lane, byte-identical to before |
+| either set unclassified | no split. One classified set is not evidence about another, and an unclassified set is silence, not "the other kind" |
+| monochrome rig | never — a filter wheel has no clip filter |
+| the **broadband** lane produced no master | no split: the surviving dual-band lane becomes the colour channel and finishes as an ordinary dual-band capture. Splitting would leave Ha/[OIII] with no base to screen onto |
+| the dual-band master cannot be split (unreadable, not 3-plane) | the lane is dropped and the run finishes on the broadband base alone, with a note |
+
 ## Soft-fail fallbacks
 
 | Condition | Behavior |

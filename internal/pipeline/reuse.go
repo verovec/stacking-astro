@@ -36,7 +36,13 @@ type lightGroup struct {
 	// the night the group's flats are selected from.
 	Session string
 	Filter  string
-	Key     inspect.SetKey // for dark/bias/flat matching
+	// Lane is the CHANNEL this group stacks into — the key of ReusePlan.byFilter and the name of the
+	// master it produces. It is the filter for every ordinary run, and only differs when a
+	// one-shot-colour scan splits its broadband and dual-band exposures (filtersetlanes.go). It
+	// renames the stack, never the light: Key keeps the true filter, so calibration still matches on
+	// it. Empty on a prior-session group, which is never split — laneOf falls back to Filter.
+	Lane string
+	Key  inspect.SetKey // for dark/bias/flat matching
 	// FilterSet is the clip filter this group's night was shot through (one-shot-colour only), so a
 	// dual-band group is never flat-fielded through a broadband flat. Set from the scan for the
 	// CURRENT session's groups; always unknown for prior-session groups, whose nights the catalog
@@ -50,6 +56,15 @@ type lightGroup struct {
 // bypassed by a call site that forgot to pass the filter set.
 func (g lightGroup) ref() calib.LightRef {
 	return calib.LightRef{Key: g.Key, FilterSet: g.FilterSet}
+}
+
+// laneOf is the group's stacking lane, falling back to its filter for the groups that never carry
+// one (prior sessions, and every plan built before lanes existed).
+func (g lightGroup) laneOf() string {
+	if g.Lane != "" {
+		return g.Lane
+	}
+	return g.Filter
 }
 
 // asSet re-presents the group as the inspected set it came from, for the single-set fast path. One
@@ -174,11 +189,15 @@ func buildReusePlan(ctx context.Context, cfg ReuseConfig, inv *inspect.Inventory
 func assembleReusePlan(ctx context.Context, cfg ReuseConfig, inv *inspect.Inventory,
 	currentSession int64, tq targetQuery) (*ReusePlan, error) {
 	plan := &ReusePlan{byFilter: map[string][]lightGroup{}}
+	// A scan holding BOTH a broadband and a dual-band exposure of one object stacks them as two
+	// lanes; everything else keeps the single lane it has today. See filtersetlanes.go.
+	split := splitsFilterSets(inv)
 	for _, set := range inv.SetsOfType(inspect.Light) {
+		fs := calib.RefFor(inv, set).FilterSet
+		lane := laneFor(set.Key.Filter, fs, split)
 		g := lightGroup{SessionID: currentSession, Current: true, Session: set.Frames[0].Session,
-			Filter: set.Key.Filter, Key: set.Key, FilterSet: calib.RefFor(inv, set).FilterSet,
-			Frames: set.Frames}
-		plan.byFilter[set.Key.Filter] = append(plan.byFilter[set.Key.Filter], g)
+			Filter: set.Key.Filter, Lane: lane, Key: set.Key, FilterSet: fs, Frames: set.Frames}
+		plan.byFilter[lane] = append(plan.byFilter[lane], g)
 	}
 	if cfg.Provider == nil {
 		return plan, nil

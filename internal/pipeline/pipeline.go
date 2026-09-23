@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"time"
 
@@ -265,6 +266,11 @@ type ChannelResult struct {
 	PreviewPath   string          `json:"preview_path,omitempty"`
 	Selection     calib.Selection `json:"selection"`
 	Metrics       []grade.Metric  `json:"metrics,omitempty"`
+	// Synthesized marks a channel SEPARATED from another channel's master rather than stacked from
+	// frames of its own — the pseudo-Hα/[OIII] a dual-band exposure is split into (duoband.go,
+	// filtersetlanes.go). It carries no frame count and no exposure, because it captured neither:
+	// without the flag a mixed run would report narrowband integration it never shot.
+	Synthesized bool `json:"synthesized,omitempty"`
 	// Photom records the per-group photometric normalization applied before a heterogeneous merge
 	// (different exposure/gain/temperature sessions), so run.json shows how each group was scaled.
 	Photom []photom.GroupRecord `json:"photom,omitempty"`
@@ -879,7 +885,7 @@ func reStack(ctx context.Context, opts Options, preset *mode.Preset, inv *inspec
 		groups := plan.byFilter[filter]
 		var ch ChannelResult
 		if useFastPath(plan, groups) {
-			ch = processChannel(ctx, ro, groups[0].asSet(), masters, workRun, outDir, g, prog)
+			ch = processChannel(ctx, ro, groups[0].laneOf(), groups[0].asSet(), masters, workRun, outDir, g, prog)
 		} else {
 			// Zero-position stepRef: a nested re-stack must never advance the main run's bar; its
 			// per-session lines ride at the last position exactly like its other index-less lines.
@@ -953,7 +959,7 @@ func finishAligned(ctx context.Context, opts Options, channels map[string]string
 	if opts.Gimp != nil && opts.Preset != nil {
 		if err := opts.Gimp.Available(); err != nil {
 			res.Warnings = append(res.Warnings, "GIMP unavailable, using Siril finish: "+err.Error())
-		} else if final, method, err := finishWithGimp(ctx, opts, channels, workRun, outDir); err != nil {
+		} else if final, method, err := finishWithGimp(ctx, opts, channels, workRun, outDir, res); err != nil {
 			if ctx.Err() != nil {
 				// The run was cancelled mid-finish: don't dress the interruption up as a tool
 				// failure, and don't burn time on the Siril fallback the same cancel would kill.
@@ -1006,7 +1012,8 @@ func finishAligned(ctx context.Context, opts Options, channels map[string]string
 // finishWithGimp produces stretched per-component TIFFs with Siril, then composites them into a
 // layered image (with curves) in GIMP. It also reports which colour-calibration rung the prep
 // landed on, so the caller can surface a degraded ladder (SPCC unavailable) as a run warning.
-func finishWithGimp(ctx context.Context, opts Options, channels map[string]string, workRun, outDir string) (*postprocess.Result, postprocess.CalMethod, error) {
+func finishWithGimp(ctx context.Context, opts Options, channels map[string]string, workRun, outDir string,
+	res *Result) (*postprocess.Result, postprocess.CalMethod, error) {
 	stretchDir := filepath.Join(workRun, "05_stretched")
 	if err := fsutil.EnsureDir(stretchDir); err != nil {
 		return nil, postprocess.CalNone, err
@@ -1023,7 +1030,7 @@ func finishWithGimp(ctx context.Context, opts Options, channels map[string]strin
 		Enabled: opts.Preset.ColorCalibration, RemoveGreen: true, StarField: true,
 		Solve: solve, Spcc: opts.Spcc,
 	}
-	in, notes, method, err := prepGimpInputs(ctx, opts, opts.Runner, channels, outDir, stretchDir, deg, cc, opts.Preset.BackgroundLevel, opts.Preset.LinkedStretch)
+	in, notes, method, err := prepGimpInputs(ctx, opts, opts.Runner, channels, outDir, stretchDir, deg, cc, opts.Preset.BackgroundLevel, opts.Preset.LinkedStretch, res)
 	if err != nil {
 		return nil, method, err
 	}
@@ -1220,8 +1227,11 @@ func saveDisplayTif(name string) string {
 // as a linear, background-extracted image, color-calibrated (SPCC → neutralization fallback), then
 // stretched; L and Ha are stretched as luminance/structure layers (no color calibration). Returns
 // the GIMP inputs and any color-calibration notes.
+// res records the emission channels this prep SEPARATES from a colour master (nil to skip — the
+// supervisor's re-entry re-runs the prep over an already-recorded result and has nothing to add).
 func prepGimpInputs(ctx context.Context, opts Options, runner *siril.Runner, channels map[string]string,
-	outDir, stretchDir string, deg int, cc postprocess.ColorCalOptions, bgLevel float64, linked bool) (gimp.Inputs, []string, postprocess.CalMethod, error) {
+	outDir, stretchDir string, deg int, cc postprocess.ColorCalOptions, bgLevel float64, linked bool,
+	res *Result) (gimp.Inputs, []string, postprocess.CalMethod, error) {
 	var calMethod postprocess.CalMethod
 	has := func(f string) bool { _, ok := channels[f]; return ok }
 	// channels[f] is a Siril-relative basename (e.g. "aligned_L"): correct for the Siril commands below
@@ -1238,11 +1248,22 @@ func prepGimpInputs(ctx context.Context, opts Options, runner *siril.Runner, cha
 	// narrowband palettes below can map it (see duoband.go). Every other colour run is returned its
 	// own map unchanged and keeps the untouched pass-through. The has/cpath closures above capture
 	// the variable, so they follow this reassignment.
+	// A MIXED capture (broadband + dual-band of one object) stacked two lanes; its dual-band master
+	// has just been co-registered onto the broadband grid above, so separate it now into the emission
+	// channels and let the broadband stack be the colour base. Runs before the single-lane duo-band
+	// split below, and consumes the lane — so that split then finds an ordinary colour map.
+	channels, dualSetNote := dualSetChannels(channels, outDir)
 	channels, duoNote := duobandChannels(opts.Preset, channels, outDir)
+	// Whatever produced them, the separated emission channels are part of this run's result now —
+	// otherwise they are written, used once and invisible to every re-entry.
+	registerSynthesizedChannels(res, channels)
 	pal, palNote := resolvePalette(opts.Preset, channels)
 	base := filepath.Join(stretchDir, "base")
 	in := gimp.Inputs{Base: base + ".tif", Color: pal.Color}
 	var notes []string
+	if dualSetNote != "" {
+		notes = append(notes, dualSetNote)
+	}
 	if duoNote != "" {
 		notes = append(notes, duoNote)
 	}
@@ -1657,12 +1678,18 @@ func orderedFilters(masters map[string]string) []string {
 			seen[f] = true
 		}
 	}
+	// Everything the canonical list does not know — a one-shot-colour "RGB", a split lane — is
+	// appended SORTED. Ranging a map here made the order random per run, and since symlinkOrdered
+	// numbers the registration sequence from this slice, that randomised which master became the
+	// reference: two runs over identical input could land on different final canvases.
+	rest := make([]string, 0, len(masters))
 	for f := range masters {
 		if !seen[f] {
-			out = append(out, f)
+			rest = append(rest, f)
 		}
 	}
-	return out
+	sort.Strings(rest)
+	return append(out, rest...)
 }
 
 func fileExists(p string) bool {
@@ -1728,7 +1755,14 @@ func (o Options) masterStack(mt calib.MasterType) stackalg.Options {
 	return calib.MasterStackOptions(mt, o.masterStacks())
 }
 
-func processChannel(ctx context.Context, opts Options, set inspect.Set, masters []calib.Master,
+// processChannel stacks one channel from a single light set — the proven fast path.
+//
+// lane is the CHANNEL's name: what the result is labelled with, what its work dir and its
+// master_<tag>.fits are called. It equals the light's own filter for every ordinary run, and differs
+// only when a one-shot-colour scan splits its broadband and dual-band exposures into two lanes
+// (filtersetlanes.go), which must not both write master_RGB.fits. The light's key is untouched, so
+// calibration still matches on the real filter.
+func processChannel(ctx context.Context, opts Options, lane string, set inspect.Set, masters []calib.Master,
 	workRun, outDir string, gradeOpts grade.Options, onProgress func(siril.Progress)) ChannelResult {
 	// Masters from another sensor leave the POOL before the match, not the Selection after it: Siril
 	// would accept a wrong-sized master, skip the correction and still report success, and striking
@@ -1740,13 +1774,13 @@ func processChannel(ctx context.Context, opts Options, set inspect.Set, masters 
 	}
 	ch := ChannelResult{
 		Object:      set.Key.Object,
-		Filter:      set.Key.Filter,
+		Filter:      lane,
 		ExposureMs:  set.Key.ExposureMs,
 		InputFrames: set.Count,
 		Selection:   sel,
 	}
 
-	seqDir := filepath.Join(workRun, "light_"+sanitize(set.Key.Filter))
+	seqDir := filepath.Join(workRun, "light_"+sanitize(lane))
 	if _, err := fsutil.LinkFrames(seqDir, framePaths(set.Frames)); err != nil {
 		ch.Err = err.Error()
 		return ch
@@ -1766,21 +1800,21 @@ func processChannel(ctx context.Context, opts Options, set inspect.Set, masters 
 			ch.Err = err.Error()
 			return ch
 		}
-		warnChannel(opts, &ch, set.Key.Filter+": only 1 frame captured — using it as the channel master (no registration/stacking)")
+		warnChannel(opts, &ch, lane+": only 1 frame captured — using it as the channel master (no registration/stacking)")
 		promoteLoneCalibrated(ctx, opts, &ch,
-			calibratedFramePaths(seqDir, siril.CalibratedSeq("light", cm), 1)[0], set.Key.Filter, outDir, onProgress)
+			calibratedFramePaths(seqDir, siril.CalibratedSeq("light", cm), 1)[0], lane, outDir, onProgress)
 		_ = os.RemoveAll(seqDir)
 		return ch
 	}
 
 	// Calibrate + register (writes per-frame metrics to the calibrated sequence's .seq), then grade
 	// and stack the survivors.
-	if err := calibrateAndRegister(ctx, opts, &ch, seqDir, cm, ingest, set.Key.Filter, onProgress); err != nil {
+	if err := calibrateAndRegister(ctx, opts, &ch, seqDir, cm, ingest, lane, onProgress); err != nil {
 		ch.Err = err.Error()
 		return ch
 	}
 	finishStackedChannel(ctx, opts, seqDir, siril.CalibratedSeq("light", cm), siril.RegisteredSeq("light", cm),
-		set.Key.Filter, set.Frames, outDir, gradeOpts, opts.stackWeight(), onProgress, &ch, nil, nil,
+		lane, set.Frames, outDir, gradeOpts, opts.stackWeight(), onProgress, &ch, nil, nil,
 		(*regGeometry)(nil))
 	return ch
 }

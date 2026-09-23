@@ -92,6 +92,12 @@ func duobandChannels(p *mode.Preset, channels map[string]string, outDir string) 
 	if !isColorRun(p) || !wantsNarrowbandPalette(p) {
 		return channels, ""
 	}
+	// A mixed-filter-set run has already produced these from its dual-band lane (filtersetlanes.go),
+	// against the right master. Splitting again would overwrite them with the BROADBAND stack's
+	// planes — pure continuum sold as emission lines.
+	if _, ok := channels["Ha"]; ok {
+		return channels, ""
+	}
 	src := oscSource(channels)
 	if src == "" {
 		return channels, ""

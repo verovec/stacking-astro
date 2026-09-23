@@ -29,7 +29,13 @@ func alignChannels(ctx context.Context, opts Options, masters map[string]string,
 	if len(masters) < 2 {
 		return unaligned // single channel: nothing to co-register
 	}
-	ordered := orderedFilters(masters)
+	// A split mixed capture pins its own reference: the broadband master leads and the dual-band one
+	// is resampled onto it (see dualbandLast / AlignMastersRefScript).
+	ordered := dualbandLast(orderedFilters(masters))
+	alignScript := siril.AlignMastersScript
+	if dualbandLaneOf(masters) != "" {
+		alignScript = siril.AlignMastersRefScript
+	}
 	// Same-canvas pre-flight: Siril only registers equal-size images, so mixed master dimensions
 	// (the task #312 failure) would fail the joint register AND the pair rescue AND rgbcomp. Name
 	// the mismatch once, honestly, instead of surfacing three cryptic Siril errors.
@@ -44,7 +50,7 @@ func alignChannels(ctx context.Context, opts Options, masters map[string]string,
 		res.Warnings = append(res.Warnings, "alignment skipped: "+err.Error())
 		return unaligned
 	}
-	if _, err := opts.Runner.Run(ctx, alignDir, siril.AlignMastersScript("ch"), onProgress); err != nil {
+	if _, err := opts.Runner.Run(ctx, alignDir, alignScript("ch"), onProgress); err != nil {
 		res.Warnings = append(res.Warnings, "cross-channel alignment failed, using unaligned channels: "+err.Error())
 		return unaligned
 	}

@@ -52,6 +52,10 @@ Nebula runs the **same engine path** as deepsky — `pipeline.Process` in
 8. **Finish-quality stamp** — every run is measured and warned exactly as deepsky
    (`internal/pipeline/finishquality.go`).
 
+## Mixed filter sets — broadband + dual-band in one run
+
+Identical to deepsky, and nebula is the mode most likely to meet it: a dual-band clip is shot precisely for emission nebulae. A folder holding both an unfiltered and a dual-band exposure of one target stacks them as two lanes, registers the dual-band master onto the broadband grid, separates it into pseudo-Ha/[OIII] and screens those over the broadband colour base. See [deepsky → Mixed filter sets](deepsky.md#mixed-filter-sets--broadband--dual-band-in-one-run) for the full rule and the cases where it does not fire.
+
 ## Preset knobs & defaults
 
 From `mode.For(mode.Nebula)` in `internal/mode/preset.go`. Only the values that differ from
