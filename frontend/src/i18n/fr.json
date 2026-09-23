@@ -930,7 +930,9 @@
         "wfwhm": "Par la finesse (wFWHM)",
         "nbstars": "Par le nombre d'étoiles",
         "nbstack": "Par le nombre de sous-poses"
-      }
+      },
+      "nb_blend": "Dosage narrowband",
+      "oiii_boost": "Renfort [OIII]"
     }
   },
   "paramDocs": {
@@ -1126,7 +1128,9 @@
     "master_dark_flat_combine": "Méthode de combinaison de l'image maîtresse dark-flat — le dark propre aux flats ; il calibre les flats, donc il s'empile comme un dark.",
     "master_dark_flat_reject": "Rejet des pixels de l'image maîtresse dark-flat. « auto » s'adapte à la profondeur de CE lot, en général très différente du nombre de poses.",
     "master_dark_flat_low": "Paramètre BAS du rejet de l'image maîtresse dark-flat, dans les unités de son algorithme. 0 = valeur par défaut de l'algorithme.",
-    "master_dark_flat_high": "Paramètre HAUT du rejet de l'image maîtresse dark-flat, mêmes unités que le bas. 0 = valeur par défaut de l'algorithme."
+    "master_dark_flat_high": "Paramètre HAUT du rejet de l'image maîtresse dark-flat, mêmes unités que le bas. 0 = valeur par défaut de l'algorithme.",
+    "nb_blend": "Quelle part de la contribution narrowband arrive dans l'image finale, en un seul poids sur LES DEUX couches d'émission. N'a de sens que si le run a mélangé une pose dual-band et une pose broadband. 1 = pleine puissance (le composite tel qu'avant ce réglage) ; baissez-le quand le bruit du dual-band arrive avec son signal ; 0 = la base broadband seule.",
+    "oiii_boost": "Relève la couche [OIII] via une épaule douce qui ne sature jamais : le sarcelle faible des tons moyens reçoit le facteur entier tandis que les cœurs brillants s'infléchissent avant le blanc, gardant leur structure au lieu de s'aplatir en une plaque de couleur. 1 = désactivé, 1,25 subtil, 1,35 marqué, 1,6 excessif. À préférer à l'augmentation de l'opacité [OIII], qui relève les bords en même temps que les cœurs."
   },
   "denoiseFinal": {
     "title": "Débruiter l'image finale (GraXpert)",

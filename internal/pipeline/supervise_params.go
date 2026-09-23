@@ -74,6 +74,10 @@ type composeParams struct {
 	HighlightCeil     float64
 	StarDesat         float64
 	HaExcludeStars    bool
+	// NBBlend and OIIIBoost are Tier-A by nature: both act on layers the linear/ checkpoint already
+	// holds, so a re-mix re-composites and never re-stacks.
+	NBBlend   float64
+	OIIIBoost float64
 }
 
 func presetComposeParams(p *mode.Preset) composeParams {
@@ -97,6 +101,8 @@ func presetComposeParams(p *mode.Preset) composeParams {
 		HighlightCeil:     p.HighlightCeil,
 		StarDesat:         p.StarDesat,
 		HaExcludeStars:    p.HaExcludeStars,
+		NBBlend:           p.NBBlend,
+		OIIIBoost:         p.OIIIBoost,
 	}
 }
 
@@ -109,6 +115,8 @@ type supervisePatch struct {
 	HaScreen          *float64 `json:"ha_screen,omitempty"`
 	HaBlackPoint      *float64 `json:"ha_black_point,omitempty"`
 	OIIIScreen        *float64 `json:"oiii_screen,omitempty"`
+	NBBlend           *float64 `json:"nb_blend,omitempty"`
+	OIIIBoost         *float64 `json:"oiii_boost,omitempty"`
 	OIIIBlackPoint    *float64 `json:"oiii_black_point,omitempty"`
 	SIIScreen         *float64 `json:"sii_screen,omitempty"`
 	SIIBlackPoint     *float64 `json:"sii_black_point,omitempty"`
@@ -173,6 +181,8 @@ func (patch supervisePatch) apply(p mode.Preset) mode.Preset {
 	setF(&p.HaScreen, patch.HaScreen)
 	setF(&p.HaBlackPoint, patch.HaBlackPoint)
 	setF(&p.OIIIScreen, patch.OIIIScreen)
+	setF(&p.NBBlend, patch.NBBlend)
+	setF(&p.OIIIBoost, patch.OIIIBoost)
 	setF(&p.OIIIBlackPoint, patch.OIIIBlackPoint)
 	setF(&p.SIIScreen, patch.SIIScreen)
 	setF(&p.SIIBlackPoint, patch.SIIBlackPoint)
@@ -242,6 +252,10 @@ func clampPreset(p mode.Preset) mode.Preset {
 	p.HaScreen = clampf(p.HaScreen, 0, 0.8)
 	p.HaBlackPoint = clampf(p.HaBlackPoint, 0, 0.3)
 	p.OIIIScreen = clampf(p.OIIIScreen, 0, 0.8)
+	p.NBBlend = clampf(p.NBBlend, 0, 1)
+	// Never below 1: the boost may only ADD light. A factor under 1 would quietly turn the
+	// anti-clipping curve into an attenuator, which is what oiii_screen is for.
+	p.OIIIBoost = clampf(p.OIIIBoost, 1, 1.6)
 	p.OIIIBlackPoint = clampf(p.OIIIBlackPoint, 0, 0.3)
 	p.SIIScreen = clampf(p.SIIScreen, 0, 0.8)
 	p.SIIBlackPoint = clampf(p.SIIBlackPoint, 0, 0.3)
@@ -332,6 +346,8 @@ func composeChanged(prev, next mode.Preset) bool {
 		floatChanged(prev.HaScreen, next.HaScreen) ||
 		floatChanged(prev.HaBlackPoint, next.HaBlackPoint) ||
 		floatChanged(prev.OIIIScreen, next.OIIIScreen) ||
+		floatChanged(prev.NBBlend, next.NBBlend) ||
+		floatChanged(prev.OIIIBoost, next.OIIIBoost) ||
 		floatChanged(prev.OIIIBlackPoint, next.OIIIBlackPoint) ||
 		floatChanged(prev.SIIScreen, next.SIIScreen) ||
 		floatChanged(prev.SIIBlackPoint, next.SIIBlackPoint) ||
@@ -366,6 +382,8 @@ func paramsMap(p mode.Preset) map[string]float64 {
 		"ha_screen":             p.HaScreen,
 		"ha_black_point":        p.HaBlackPoint,
 		"oiii_screen":           p.OIIIScreen,
+		"nb_blend":              p.NBBlend,
+		"oiii_boost":            p.OIIIBoost,
 		"oiii_black_point":      p.OIIIBlackPoint,
 		"sii_screen":            p.SIIScreen,
 		"sii_black_point":       p.SIIBlackPoint,

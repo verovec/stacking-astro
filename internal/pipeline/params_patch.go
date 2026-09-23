@@ -367,6 +367,7 @@ func deepskyParams(p mode.Preset) map[string]any {
 	m := map[string]any{
 		"saturation": p.Saturation, "ha_screen": p.HaScreen, "ha_black_point": p.HaBlackPoint,
 		"oiii_screen": p.OIIIScreen, "oiii_black_point": p.OIIIBlackPoint,
+		"nb_blend": p.NBBlend, "oiii_boost": p.OIIIBoost,
 		"sii_screen": p.SIIScreen, "sii_black_point": p.SIIBlackPoint, "sii_tint": p.SIITint,
 		"lum_opacity": p.LumOpacity, "lum_boost": p.LumBoost,
 		"chroma_blur": p.ChromaBlur, "crop_frac": p.CropFrac,
@@ -597,6 +598,8 @@ func deepskyKnobRanges() map[string]KnobRange {
 		"ha_screen":             {Min: 0, Max: 0.8},
 		"ha_black_point":        {Min: 0, Max: 0.3},
 		"oiii_screen":           {Min: 0, Max: 0.8},
+		"nb_blend":              {Min: 0, Max: 1},
+		"oiii_boost":            {Min: 1, Max: 1.6},
 		"oiii_black_point":      {Min: 0, Max: 0.3},
 		"sii_screen":            {Min: 0, Max: 0.8},
 		"sii_black_point":       {Min: 0, Max: 0.3},

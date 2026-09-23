@@ -364,6 +364,15 @@ type Preset struct {
 	OIIIScreen float64
 	// OIIIBlackPoint is the OIII layer's black-point clip before it is teal-screened (as HaBlackPoint).
 	OIIIBlackPoint float64
+	// NBBlend scales BOTH emission screens together — the single "how much narrowband" weight for a
+	// capture that mixes a dual-band exposure into a broadband base. At full strength the dual-band's
+	// noise comes in with its signal, so the contribution is a user choice. 1 (default) = full, i.e.
+	// exactly the composite produced before this knob existed; 0 = the broadband base alone.
+	NBBlend float64
+	// OIIIBoost lifts the [OIII] layer through a soft shoulder that never clips (gimp.oiiiBoost).
+	// 1 (default) = off. The runbook's range is 1.25 subtle / 1.35 marked / 1.6 over-cooked. Prefer it
+	// over raising OIIIScreen, which lifts the rims along with the cores.
+	OIIIBoost float64
 	// SIIScreen is the [SII] layer's screen opacity — the third emission twin, composited beside the
 	// red Ha and teal OIII screens on the natural family. 0 (default) → off, byte-identical to before
 	// the knob, exactly like OIIIScreen: the user opts in per run.
@@ -548,6 +557,16 @@ func For(m Mode) Preset {
 	}
 	if p.Masters == (stackalg.MasterOptions{}) {
 		p.Masters = stackalg.DefaultMasters()
+	}
+	// The narrowband weight is FULL and the [OIII] boost OFF in every mode, filled here rather than in
+	// each literal. Both have to be 1, not the Go zero value: "blend at zero" would erase the emission
+	// screens of every run that never mentions the knob, and a zero boost factor is not a meaningful
+	// curve at all.
+	if p.NBBlend == 0 {
+		p.NBBlend = 1
+	}
+	if p.OIIIBoost < 1 {
+		p.OIIIBoost = 1
 	}
 	return p
 }

@@ -53,6 +53,20 @@ type Inputs struct {
 	SIIScreen float64
 	SIIBlack  float64
 	SIITint   string
+	// NBBlend scales BOTH emission screen opacities together — the single "how much narrowband"
+	// weight. Mixing a dual-band exposure into a broadband base at full strength drags the dual-band's
+	// noise in with its signal, so the contribution has to be a user choice; and it scales the two
+	// screens TOGETHER because turning them down one at a time changes the Ha/[OIII] colour balance as
+	// a side effect, which is what the per-line screen knobs are already for.
+	//
+	// ZERO MEANS UNSET, not "blend at zero": the zero value has to leave an existing composite exactly
+	// as it was, so a run that never asks for this knob keeps its emission layers. Ask for silence
+	// with a small positive value instead — below nbBlendEpsilon the layers are dropped entirely.
+	NBBlend float64
+	// OIIIBoost is the soft-shoulder lift on the [OIII] layer (1 = off; the runbook's range is
+	// 1.25 subtle / 1.35 marked / 1.6 over-cooked). Prefer it over raising OIIIScreen, which lifts the
+	// rims along with the cores. See oiiiBoost.
+	OIIIBoost float64
 	// SIIScreenFactor is the wash-gate attenuation measured at prep time (as OIIIScreenFactor).
 	SIIScreenFactor float64
 
@@ -151,6 +165,24 @@ func BuildImage(c *Client, in Inputs, curve []float64, haScreen, saturation floa
 
 // composeScript builds the Script-Fu program for the layered composite (pure, for testing).
 func composeScript(in Inputs, curve []float64, haScreen, saturation float64, res *Result) string {
+	// One weight over the whole narrowband contribution, applied before either screen is written.
+	// Scoped to runs that actually ask for it: an unset (or full) blend must leave the script it
+	// would have produced completely untouched, down to the inert zero-opacity Ha layer that an
+	// ha_screen=0 run has always emitted.
+	if in.NBBlend > 0 && in.NBBlend < 1 {
+		haScreen = nbBlended(in.NBBlend, haScreen)
+		in.OIIIScreen = nbBlended(in.NBBlend, in.OIIIScreen)
+		// A screen blended away to nothing is DROPPED, not written at zero opacity: the point of
+		// nb_blend=0 is to see the broadband base alone, and a loaded inert layer is a slower way of
+		// producing the same pixels. ([SII] is untouched — a dual-band clip passes no sulphur, so it
+		// is never part of what this weight is weighing.)
+		if haScreen == 0 {
+			in.Ha = ""
+		}
+		if in.OIIIScreen == 0 {
+			in.OIII = ""
+		}
+	}
 	var b strings.Builder
 	b.WriteString("(let* ((image (car (gimp-file-load RUN-NONINTERACTIVE " + sf(in.Base) + " " + sf(in.Base) + "))))\n")
 
@@ -205,6 +237,13 @@ func composeScript(in Inputs, curve []float64, haScreen, saturation float64, res
 		}
 		if ob := clamp01(in.OIIIBlack); ob > 0 {
 			fmt.Fprintf(&b, "    (gimp-drawable-levels oiii HISTOGRAM-VALUE %.4f 1 TRUE 1 0 1 TRUE)\n", ob)
+		}
+		// The soft-shoulder boost runs on the layer's OWN values — before the red channel is killed
+		// and before the screen — so the roll-off sees the [OIII] signal itself rather than whatever
+		// the tint and the blend mode have already made of it.
+		if in.OIIIBoost > 1 {
+			fmt.Fprintf(&b, "    (gimp-drawable-curves-explicit oiii HISTOGRAM-VALUE %d %s)\n",
+				coreShoulderSamples, floatVec(oiiiBoostLUT(in.OIIIBoost)))
 		}
 		b.WriteString("    (gimp-drawable-levels oiii HISTOGRAM-RED 0 1 TRUE 1 0 0 TRUE)\n") // kill red → teal
 		b.WriteString("    (gimp-layer-set-mode oiii LAYER-MODE-SCREEN)\n")

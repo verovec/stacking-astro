@@ -930,7 +930,9 @@
         "wfwhm": "By sharpness (wFWHM)",
         "nbstars": "By star count",
         "nbstack": "By sub-count"
-      }
+      },
+      "nb_blend": "Narrowband blend",
+      "oiii_boost": "[OIII] boost"
     }
   },
   "paramDocs": {
@@ -1126,7 +1128,9 @@
     "master_dark_flat_combine": "Combination method for the dark-flat master — the flats' own dark; it calibrates the flats, so it stacks like a dark.",
     "master_dark_flat_reject": "Pixel rejection for the dark-flat master. \"auto\" adapts to THAT pool's own depth, which is usually very different from the light count.",
     "master_dark_flat_low": "The dark-flat master's rejection LOW parameter, in its algorithm's own units. 0 = the algorithm's default.",
-    "master_dark_flat_high": "The dark-flat master's rejection HIGH parameter, same units as the low one. 0 = the algorithm's default."
+    "master_dark_flat_high": "The dark-flat master's rejection HIGH parameter, same units as the low one. 0 = the algorithm's default.",
+    "nb_blend": "How much of the narrowband contribution reaches the final image, as one weight over BOTH emission screens. Only meaningful when the run mixed a dual-band exposure with a broadband one. 1 = full strength (the composite as it was before this knob); lower it when the dual-band's noise is coming in with its signal; 0 = the broadband base alone.",
+    "oiii_boost": "Lifts the [OIII] layer through a soft shoulder that never clips: the faint mid-tone teal gets the full factor while bright cores roll off short of white, so they keep their structure instead of flattening into a plate of colour. 1 = off, 1.25 subtle, 1.35 marked, 1.6 over-cooked. Prefer this over raising the [OIII] opacity, which lifts the rims along with the cores."
   },
   "denoiseFinal": {
     "title": "Denoise the final (GraXpert)",
