@@ -14,6 +14,7 @@ package inspect
 
 import (
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/verove-jordan/astronomy/internal/filters"
@@ -28,6 +29,34 @@ const (
 	dualbandMaxPer120   = 10.0 // measured 2–6, with headroom for a brighter-than-typical night
 	broadbandMinPer120  = 20.0 // measured 30–45, with headroom for a darker-than-typical site
 	normalizeExposureMs = 120_000.0
+)
+
+// The sky level is read as a SYMMETRIC trimmed mean rather than a plain mean.
+//
+// A mean of every photosite reports the stars as well as the sky. On a dense field that inflation
+// is worth a couple of ADU, and since the thresholds above are only 10 ADU apart it is enough to
+// push a genuine dual-band night out of its band and into the "no verdict" gap — measured on a real
+// IC 1848 capture: 9.1 ADU per 120 s read robustly, 10.9 read as a mean, against the 10.0 bound.
+// The night then finished as plain broadband colour, which is exactly the silent mis-stack this
+// file exists to prevent.
+//
+// A mean, not a median, because a median of 16-bit integers cannot resolve a 2–4 ADU sky at 60 s —
+// that is why the plain mean was chosen in the first place, and a trimmed mean keeps the sub-ADU
+// resolution while dropping the tails. SYMMETRIC, because the same reader measures the bias
+// pedestal, whose noise is symmetric: trimming only the bright tail would drag the floor down and
+// read every sky as brighter than it is. On real frames the symmetric trim leaves the floor
+// unmoved (499.82 ADU either way) and only the star-contaminated lights change.
+const (
+	skyTrimLo = 0.10 // drop the darkest tenth…
+	skyTrimHi = 0.90 // …and the brightest tenth, which is where the stars are
+	// skyTrimMinSamples is the sample count below which the trim is skipped and a plain mean
+	// returned. A trim over a handful of values is noise, not robustness; real frames bring
+	// millions, so this only ever exempts synthetic fixtures.
+	skyTrimMinSamples = 64
+	// skySampleCap bounds the per-channel sample the trimmed mean sorts. A quarter of a million
+	// photosites pins the mean far tighter than the 1 ADU the thresholds need, and it keeps inspect
+	// interactive on folders of 24 MP subs.
+	skySampleCap = 250_000
 )
 
 // ChannelSky is a set's per-channel sky level, in ADU ABOVE the scan's bias/dark floor. Floats, not
@@ -91,54 +120,88 @@ var bayerOffsets = map[string]struct{ r, g1, g2, b [2]int }{
 	"GBRG": {r: [2]int{0, 1}, g1: [2]int{0, 0}, g2: [2]int{1, 1}, b: [2]int{1, 0}},
 }
 
-// cfaChannelSky reads the per-channel mean of an undebayered mosaic by sampling each primary at its
+// cfaChannelSky reads the per-channel sky of an undebayered mosaic by sampling each primary at its
 // own position in the 2×2 cell. ok is false for an unknown pattern or a frame too small to sample.
 func cfaChannelSky(pix []float32, w, h int, pattern string) (ChannelSky, bool) {
 	off, known := bayerOffsets[strings.ToUpper(strings.TrimSpace(pattern))]
 	if !known || w < 2 || h < 2 || len(pix) < w*h {
 		return ChannelSky{}, false
 	}
-	var rSum, gSum, bSum float64
-	var rN, gN, bN int
-	for y := 0; y+1 < h; y += 2 {
-		for x := 0; x+1 < w; x += 2 {
+	stride := cellStride(w/2, h/2)
+	var rs, gs, bs []float64
+	for y := 0; y+1 < h; y += 2 * stride {
+		for x := 0; x+1 < w; x += 2 * stride {
 			at := func(o [2]int) float64 { return float64(pix[(y+o[1])*w+(x+o[0])]) }
-			rSum += at(off.r)
-			rN++
-			gSum += at(off.g1) + at(off.g2)
-			gN += 2
-			bSum += at(off.b)
-			bN++
+			rs = append(rs, at(off.r))
+			gs = append(gs, at(off.g1), at(off.g2))
+			bs = append(bs, at(off.b))
 		}
 	}
-	if rN == 0 || gN == 0 || bN == 0 {
+	if len(rs) == 0 || len(gs) == 0 || len(bs) == 0 {
 		return ChannelSky{}, false
 	}
-	return ChannelSky{R: rSum / float64(rN), G: gSum / float64(gN), B: bSum / float64(bN)}, true
+	return ChannelSky{R: trimmedMean(rs), G: trimmedMean(gs), B: trimmedMean(bs)}, true
 }
 
-// planeChannelSky reads the per-channel mean of an already-debayered RGB frame (three planes).
+// cellStride subsamples the mosaic so each channel contributes at most skySampleCap values, keeping
+// the sort bounded on a 24 MP frame. The sky is a property of the whole frame, so an evenly spread
+// subsample measures it exactly as well as every pixel would.
+func cellStride(cellsX, cellsY int) int {
+	cells := cellsX * cellsY
+	if cells <= skySampleCap || cells <= 0 {
+		return 1
+	}
+	return int(math.Ceil(math.Sqrt(float64(cells) / float64(skySampleCap))))
+}
+
+// planeChannelSky reads the per-channel sky of an already-debayered RGB frame (three planes).
 func planeChannelSky(planes [][]float32) (ChannelSky, bool) {
 	if len(planes) < 3 {
 		return ChannelSky{}, false
 	}
-	mean := func(p []float32) (float64, bool) {
+	sky := func(p []float32) (float64, bool) {
 		if len(p) == 0 {
 			return 0, false
 		}
-		var sum float64
-		for _, v := range p {
-			sum += float64(v)
+		step := 1
+		if len(p) > skySampleCap {
+			step = len(p) / skySampleCap
 		}
-		return sum / float64(len(p)), true
+		vals := make([]float64, 0, len(p)/step+1)
+		for i := 0; i < len(p); i += step {
+			vals = append(vals, float64(p[i]))
+		}
+		return trimmedMean(vals), true
 	}
-	r, okR := mean(planes[0])
-	g, okG := mean(planes[1])
-	b, okB := mean(planes[2])
+	r, okR := sky(planes[0])
+	g, okG := sky(planes[1])
+	b, okB := sky(planes[2])
 	if !okR || !okG || !okB {
 		return ChannelSky{}, false
 	}
 	return ChannelSky{R: r, G: g, B: b}, true
+}
+
+// trimmedMean is the mean of vals between the skyTrimLo and skyTrimHi quantiles — the sky level,
+// with the star tail (and the symmetric dark tail) removed. See the constants for why it is a
+// trimmed MEAN and why the trim is symmetric. Samples below skyTrimMinSamples are meaned whole.
+func trimmedMean(vals []float64) float64 {
+	if len(vals) == 0 {
+		return 0
+	}
+	lo, hi := 0, len(vals)
+	if len(vals) >= skyTrimMinSamples {
+		sort.Float64s(vals)
+		lo, hi = int(float64(len(vals))*skyTrimLo), int(float64(len(vals))*skyTrimHi)
+		if lo >= hi { // a degenerate window measures nothing — fall back to the whole sample
+			lo, hi = 0, len(vals)
+		}
+	}
+	var sum float64
+	for _, v := range vals[lo:hi] {
+		sum += v
+	}
+	return sum / float64(hi-lo)
 }
 
 // subtractFloor removes the bias/dark pedestal the thresholds are written ABOVE. The floor is a
