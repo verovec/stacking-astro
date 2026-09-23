@@ -1238,11 +1238,19 @@ func prepGimpInputs(ctx context.Context, opts Options, runner *siril.Runner, cha
 	// narrowband palettes below can map it (see duoband.go). Every other colour run is returned its
 	// own map unchanged and keeps the untouched pass-through. The has/cpath closures above capture
 	// the variable, so they follow this reassignment.
+	// A MIXED capture (broadband + dual-band of one object) stacked two lanes; its dual-band master
+	// has just been co-registered onto the broadband grid above, so separate it now into the emission
+	// channels and let the broadband stack be the colour base. Runs before the single-lane duo-band
+	// split below, and consumes the lane — so that split then finds an ordinary colour map.
+	channels, dualSetNote := dualSetChannels(channels, outDir)
 	channels, duoNote := duobandChannels(opts.Preset, channels, outDir)
 	pal, palNote := resolvePalette(opts.Preset, channels)
 	base := filepath.Join(stretchDir, "base")
 	in := gimp.Inputs{Base: base + ".tif", Color: pal.Color}
 	var notes []string
+	if dualSetNote != "" {
+		notes = append(notes, dualSetNote)
+	}
 	if duoNote != "" {
 		notes = append(notes, duoNote)
 	}

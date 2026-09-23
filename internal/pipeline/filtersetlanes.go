@@ -14,6 +14,9 @@
 package pipeline
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/verove-jordan/astronomy/internal/filters"
 	"github.com/verove-jordan/astronomy/internal/inspect"
 )
@@ -58,4 +61,51 @@ func laneFor(filter string, fs filters.FilterSet, split bool) string {
 		return filter + dualbandLaneSuffix
 	}
 	return filter
+}
+
+// dualbandLaneOf returns the channel map's dual-band lane key, or "" when the run did not split.
+func dualbandLaneOf(channels map[string]string) string {
+	for lane := range channels {
+		if strings.HasSuffix(lane, dualbandLaneSuffix) {
+			return lane
+		}
+	}
+	return ""
+}
+
+// dualSetChannels turns the dual-band LANE into the two emission channels it always was, once its
+// master has been registered onto the broadband grid.
+//
+// It splits the REGISTERED master on purpose. Pseudo-Hα and pseudo-[OIII] are composited
+// pixel-for-pixel against the broadband base, so splitting before registration would bake the two
+// lanes' pointing difference into the emission layers — precisely the misalignment that registering
+// the masters exists to remove.
+//
+// The lane is then dropped from the map whatever happens. It is not a colour channel: leaving it in
+// would hand resolvePalette a second RGB it has no meaning for, and the finish would have to guess
+// which of the two was the real one. A master that cannot be split costs only its own emission
+// layers — the broadband base is a complete image on its own, and the run says so and finishes.
+//
+// Unlike duobandChannels this is NOT gated on a narrowband palette. The whole point of a mixed
+// capture is the runbook's composite: a natural broadband base with the emission lines screened over
+// it, which needs Ha/OIII present while the palette stays "natural".
+func dualSetChannels(channels map[string]string, outDir string) (map[string]string, string) {
+	lane := dualbandLaneOf(channels)
+	if lane == "" {
+		return channels, ""
+	}
+	out := make(map[string]string, len(channels)+1)
+	for k, v := range channels {
+		if k != lane {
+			out[k] = v
+		}
+	}
+	ha, oiii, err := splitDuoband(filepath.Join(outDir, channels[lane]+".fits"), outDir)
+	if err != nil {
+		return out, "dual-band lane split skipped, finishing on the broadband base alone: " + err.Error()
+	}
+	out["Ha"], out["OIII"] = ha, oiii
+	return out, "mixed filter sets: the dual-band master was registered onto the broadband grid, then " +
+		"separated into pseudo-Hα (red pixels) and pseudo-[OIII] (max of green/blue) — the broadband " +
+		"stack is the colour base and the two emission lines screen over it"
 }
