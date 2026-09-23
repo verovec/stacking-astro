@@ -100,7 +100,7 @@ func runProcess(args []string) error {
 	var starRunner *starnet.Runner
 	if !*noAI {
 		graxRunner = graxpert.New(cfg.GraxpertBin, cfg.GraxpertURL).SetDefaults(cfg.GraxpertGPU, cfg.GraxpertBatch)
-		starRunner = starnet.NewVariant(cfg.StarnetBin, starnet.Variant(cfg.StarnetCLI))
+		starRunner = starnet.NewVariant(cfg.StarnetBin, starnet.Variant(cfg.StarnetCLI), cfg.StarnetURL)
 	}
 	// Optional local-AI-agent finish supervisor (opt-in via -supervise; nil → standard finish).
 	var superRunner *llm.Runner

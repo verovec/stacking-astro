@@ -47,6 +47,8 @@ UI shows at `GET /api/environment`.
 | `ASTRO_GRAXPERT_BATCH` | `0` | GraXpert denoise batch size (0 → GraXpert default) |
 | `STARNET_BIN` | first of `starnet2`, `starnet++` on PATH | StarNet — optional star removal (star reduction + the star-presence set); soft-fails to full stars |
 | `STARNET_CLI` | `auto` | How StarNet is invoked: `positional` (StarNet++ v2), `flags` (StarNet2 v2.5+), or `auto` to probe the binary |
+| `ASTRO_STARNET_URL` | — (`just stack`: `http://host.docker.internal:8085`) | Host StarNet HTTP service (`cmd/starnet-host`, `just run-starnet-service`). Used **only when `STARNET_BIN` does not resolve** — a working local binary always wins. This is the only way a linux/arm64 container gets star removal: upstream ships no arm64 Linux build, and a macOS binary cannot execute in the Linux image |
+| `ASTRO_STARNET_PORT` | `8085` | Port the host StarNet service listens on (must match `ASTRO_STARNET_URL`) |
 | `FFPROBE_BIN` | ffmpeg's sibling | ffprobe, used to probe video streams before lucky imaging |
 | `DCRAW_BIN` | `dcraw_emu` | LibRaw's developer — **preferred** for camera raws (no auto-brightening, no baked orientation, an exactly-known transfer curve). `brew install libraw` |
 | `SIPS_BIN` | `sips` | macOS fallback raw developer. Works, but applies Apple's opaque tone curve and cannot disable white balance — install LibRaw for narrowband-safe development |

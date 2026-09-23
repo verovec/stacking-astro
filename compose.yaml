@@ -113,6 +113,14 @@ services:
       # Empty (default) → use the in-container CPU GraXpert (no regression). Set it (e.g. to the host
       # service below) to run GraXpert natively, e.g. for the on-demand "Denoise final" action.
       ASTRO_GRAXPERT_URL: ${ASTRO_GRAXPERT_URL:-}
+      # Host StarNet service (cmd/starnet-host, `just run-starnet-service`). A containerized engine can
+      # NEVER exec StarNet: upstream ships no linux/arm64 build, and a macOS binary bind-mounted into
+      # the Linux image is a Mach-O Linux won't run. Unlike ASTRO_GRAXPERT_URL this defaults to the host
+      # service instead of empty — there is no in-container StarNet to fall back to, so an empty value
+      # just means "star reduction silently off". Nothing regresses when the service isn't running (the
+      # connection is refused and the finish keeps full stars, exactly as today), and a Linux x64 server
+      # that bind-mounts its own StarNet + STARNET_BIN keeps using it: a resolvable local binary wins.
+      ASTRO_STARNET_URL: ${ASTRO_STARNET_URL:-http://host.docker.internal:8085}
       # Camera / filter wheel / mount live on the HOST — they are USB devices, and a container cannot
       # see them. So the containerized engine must dial the host's device server, NOT its own
       # loopback: inside a container 127.0.0.1 is the container itself, which is why the default

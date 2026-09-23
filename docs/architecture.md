@@ -56,7 +56,7 @@ feeds are fetched at runtime and cached, and both soft-fail.
 | `internal/preset` | The built-in "best params per situation" catalog (29 recipes) merged with user presets, plus the object-type taxonomy (`ObjectType`) that drives the launch form's target chips. |
 | `internal/postprocess` | LRGB+Ha channel combine, color calibration, stretch; optional GIMP touch-ups. |
 | `internal/graxpert` | Optional host CLI: GraXpert AI background-gradient extraction / denoise (`GRAXPERT_BIN`). |
-| `internal/starnet` | Optional host CLI: StarNet star removal for star-reduced finishing + the star-presence set (`STARNET_BIN`; both the positional StarNet++ v2 and flag-style StarNet2 CLIs, auto-detected). |
+| `internal/starnet` | Optional host CLI: StarNet star removal for star-reduced finishing + the star-presence set (`STARNET_BIN`; both the positional StarNet++ v2 and flag-style StarNet2 CLIs, auto-detected). Offloads to the host service (`cmd/starnet-host`, `ASTRO_STARNET_URL`) when no local binary resolves — the containerized case. |
 | `internal/llm` | Optional, opt-in: drives a host-run OpenAI-compatible vision model to auto-tune the finish for **every stacking mode** — deep-sky/nebula composite, comet colour composite, milkyway grade, planetary sharpen — via per-mode `candidateRenderer` adapters (`internal/pipeline/supervise_*.go`); the shared render→judge→re-tune loop soft-fails when the server is down. |
 | `internal/planetary` | SER/AVI/MP4/MOV/stills lucky-imaging path: native-res disk-masked sharpness ranking, multi-point ZNCC alignment, per-AP top-K selection stack (each region built from its locally-sharpest frames), RL deconvolution, true-luminance colour compose (`true_lum`). Opt-in earthshine reveal (`earthshine_gain`): deterministic limb circle fit + SNR-gated lift of the unlit disc, composited after the Siril finish. |
 | `internal/comet` | Pure comet primitives: multi-scale coma detection, robust linear/quadratic track fit, starless ZNCC alignment, sub-pixel translate (driven by `pipeline.ProcessComet`). |
@@ -350,9 +350,17 @@ use, which a headless container never does, and without it `spcc` aborts even on
 in the container. Known issue: the **arm64 distro Siril 1.4.4 segfaults inside SPCC's aperture
 photometry** (local and online catalogues alike); the engine's colour ladder falls to **PCC** on the
 same solve (`internal/postprocess/colorcal.go`), which completes fine — so arm64 containers get a
-photometric balance from Gaia photometry rather than per-star spectra until upstream fixes SPCC. **StarNet++** is not baked in (licence not redistributable) — mount it +
-set `STARNET_BIN`; it soft-fails to full stars otherwise. The one thing that cannot run in a container on
-macOS is the **VLM** (no GPU/Metal) — keep it native there.
+photometric balance from Gaia photometry rather than per-star spectra until upstream fixes SPCC.
+**StarNet++** is not baked in (licence not redistributable) and — unlike every other tool here — cannot
+simply be mounted on Apple Silicon: upstream ships Linux x64, Windows x64 and both macOS builds, but no
+**linux/arm64** one, and a macOS binary bind-mounted into the Linux image is a Mach-O that will never
+exec. So there are two paths, chosen by architecture: on **linux/amd64**, mount your Linux x64 install
+and set `STARNET_BIN`; on **linux/arm64**, run the host service (`just run-starnet-service`,
+`cmd/starnet-host`) that `ASTRO_STARNET_URL` already points at under `just stack` — the same
+offload shape as `ASTRO_GRAXPERT_URL`, except a resolvable local binary always wins over the URL (the
+offload exists because no local binary can exist, not to reach a faster device). Without either it
+soft-fails to full stars. The one thing that cannot run in a container on macOS is the **VLM** (no
+GPU/Metal) — keep it native there.
 
 ### Which mode per environment
 

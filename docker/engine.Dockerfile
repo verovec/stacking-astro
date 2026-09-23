@@ -146,9 +146,16 @@ RUN set -eux; \
     rm /tmp/spccdb.tar.gz; \
     test -d /opt/siril-spcc-database/mono_sensors && test -d /opt/siril-spcc-database/wb_refs
 
-# StarNet++ is deliberately NOT baked in (its licence isn't redistributable). To enable star removal,
-# bind-mount your StarNet install and set STARNET_BIN; until then the pipeline keeps full stars
-# (no star reduction AND no star-presence set — the tier PNGs are simply not written).
+# StarNet++ is deliberately NOT baked in (its licence isn't redistributable). Two ways to enable star
+# removal, and which one applies is decided by ARCHITECTURE, not preference:
+#   • linux/amd64 image → bind-mount your Linux x64 StarNet install and set STARNET_BIN. A resolvable
+#     local binary always wins over the host service below.
+#   • linux/arm64 image (any Apple-Silicon build) → there is NO StarNet to mount: upstream publishes
+#     Linux x64, Windows x64 and both macOS builds, but no linux/arm64 one, and a macOS binary
+#     bind-mounted here is a Mach-O that Linux will never exec. Run the host service instead
+#     (`just run-starnet-service`) — ASTRO_STARNET_URL already points at it under `just stack`.
+# Until one of those is in place the pipeline keeps full stars (no star reduction AND no star-presence
+# set — the tier PNGs are simply not written).
 
 # --- engine binary + entrypoint, run as a non-root user ---
 RUN useradd --create-home --uid 10001 app
