@@ -130,6 +130,10 @@ type Options struct {
 	// FilterMapping is an optional user override (detected/known filter → chosen channel; "" or
 	// "ignore" excludes it), applied during the scan.
 	FilterMapping map[string]string
+	// FilterSetOverrides asserts, per light set (inspect.SetKey.ID), which clip filter a one-shot-color
+	// night was shot through, for the sets the pixel classifier declined or got wrong. Applied during
+	// the scan, ahead of the lane split (filtersetlanes.go). Empty → detection alone.
+	FilterSetOverrides map[string]filters.FilterSet
 	// ColorChoice is the user's answer to "monochrome or colour stack?", asserted on the run request.
 	// The zero value ("") and inspect.ChoiceAuto both defer to the scan's own verdict, which is what
 	// every run did before the knob existed. See inspect.ResolveColorModel.
@@ -437,6 +441,7 @@ func Process(ctx context.Context, opts Options) (*Result, error) {
 	scanOpts := inspect.DefaultScanOptions()
 	scanOpts.FilterMapping = opts.FilterMapping
 	scanOpts.ExcludeSets = opts.ExcludeSets
+	scanOpts.FilterSetOverrides = opts.FilterSetOverrides
 	inv, err := opts.scanInputs(ctx, scanOpts) // remote (no downloads) when a low-disk Stager is set, else local
 	if err != nil {
 		return nil, err

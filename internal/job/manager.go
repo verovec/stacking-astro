@@ -298,6 +298,15 @@ type RunRequest struct {
 	// Deepsky/nebula only.
 	ExcludeSets []string `json:"exclude_sets,omitempty"`
 
+	// FilterSetOverrides asserts, per light set (inspect.SetKey.ID → "broadband"/"dualband"), which
+	// clip filter a one-shot-color night was shot through — the same override /api/inspect accepts,
+	// carried into the RUN. Needed because the classifier reads the pixels and may decline (its two
+	// signals disagree) or be wrong (its sky thresholds are ADU, so a night shot at a different
+	// analogue gain lands in the wrong band): without it the classification could be corrected for
+	// looking at a scan but never for stacking it, and the two filter sets merge into one master.
+	// Empty → detection alone, byte-identical to today.
+	FilterSetOverrides map[string]string `json:"filter_set_overrides,omitempty"`
+
 	// ForceCalibration forces the available dark/flat/bias masters to be applied to the lights even when
 	// their gain/offset/bin, exposure or sensor temperature don't match (the Import "force these
 	// calibration frames" toggle). false → the strict, physically-matched default.
@@ -498,6 +507,11 @@ func (m *Manager) Enqueue(ctx context.Context, req RunRequest) (int64, error) {
 	// The colour knob is a closed enum. The API already rejects a bad value with 400; this also covers
 	// the paths that never pass through it (the CLI, and Restart replaying a stored request).
 	if _, err := inspect.ParseColorChoice(req.ColorModel); err != nil {
+		return 0, err
+	}
+	// Same contract for the per-set filter overrides: a typo fails the REQUEST rather than being
+	// dropped, which would leave the user watching their override "not take" with no explanation.
+	if _, err := parseFilterSetOverrides(req.FilterSetOverrides); err != nil {
 		return 0, err
 	}
 	// A referenced mosaic plan must exist NOW — a stale id must fail the request, not the worker.
@@ -1338,6 +1352,8 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			CalibExclude:     p.CalibExclude,
 			ExcludeSets:      p.ExcludeSets,
 			ForceCalibration: p.ForceCalibration,
+			// Validated at Enqueue, so this cannot fail here; nil when the user asserted nothing.
+			FilterSetOverrides: mustParseFilterSetOverrides(p.FilterSetOverrides),
 			// Pause/resume: reuse a paused run's output dir (skip already-stacked channels) and let the user
 			// pause mid-stack at a channel boundary. Only the deep-sky path honors mid-stack pause.
 			Resume:         resume,
