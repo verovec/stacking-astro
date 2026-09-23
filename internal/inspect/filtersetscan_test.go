@@ -40,6 +40,9 @@ func oscFrame(path string, typ FrameType, exposureMs int64) *Frame {
 	return &Frame{
 		Path: path, Type: typ, Bayer: "RGGB", Filter: filters.Color,
 		ExposureMs: exposureMs, Gain: 100, Offset: 50, BinX: 1, BinY: 1,
+		// EGAIN 1 e-/ADU keeps these fixtures stating their skies in the unit the thresholds use,
+		// so every expectation here is unchanged by the electron conversion.
+		EGain: 1.0,
 	}
 }
 

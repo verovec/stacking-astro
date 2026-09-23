@@ -35,6 +35,9 @@ func FrameFromHeader(path string, h *fits.Header) *Frame {
 	if o, ok := h.Int("OFFSET"); ok {
 		fr.Offset = o
 	}
+	if eg, ok := h.Float("EGAIN"); ok && eg > 0 {
+		fr.EGain = eg // electrons per ADU; see Frame.EGain
+	}
 	if t, ok := h.Float("CCD-TEMP"); ok {
 		fr.TempMilliC = int64(math.Round(t * 1000))
 		fr.HasTemp = true

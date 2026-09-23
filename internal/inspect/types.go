@@ -42,6 +42,11 @@ type Frame struct {
 	// int zero-value. Set wherever Gain is filled (header, sidecar, filename, manifest legend).
 	HasGain bool  `json:"has_gain,omitempty"`
 	Offset  int64 `json:"offset"`
+	// EGain is the sensor's conversion factor in ELECTRONS PER ADU (the FITS `EGAIN` card). It is
+	// what makes a sky level physical: an ADU count is an arbitrary unit that changes with the
+	// analogue gain, so two nights of the same sky at gain 0 and gain 100 read three times apart in
+	// ADU and identically in electrons. Zero when the header carries no EGAIN — never a guess.
+	EGain float64 `json:"egain,omitempty"`
 	// ISO is the camera ISO speed for phone/DSLR raws (read from EXIF); 0 for cooled-camera FITS,
 	// which use Gain/Offset instead. It keys phone calibration masters the way gain does for the ZWO.
 	ISO        int64 `json:"iso,omitempty"`
