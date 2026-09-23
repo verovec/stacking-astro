@@ -25,9 +25,24 @@ import (
 // 30–45 ADU unfiltered. The gap between the bands is deliberately left as "no verdict" rather than
 // split down the middle — a sky that lands there is genuinely ambiguous (a bright dual-band night
 // under a moon, a very dark broadband site) and guessing would be worse than declining.
+// The bands are in ELECTRONS per 120 s, not ADU. An ADU is not a physical unit: it is whatever the
+// analogue gain makes of an electron, so the SAME sky reads three times apart at gain 0 and gain 100
+// on one ASI2600MC (EGAIN 0.768 vs 0.243 e-/ADU). Thresholds written in ADU therefore measure the
+// gain as much as the sky, and a dual-band night shot at high gain reads as broadband — measured on
+// a real M31 capture: 27.5 ADU per 120 s, confidently "broadband", and 6.7 electrons, correctly
+// dual-band. Converting with the header's EGAIN makes the measurement gain-invariant.
+//
+// Validated across seven real captures on one body (electrons per 120 s):
+//
+//	dual-band:  IC 1848 2.3 · NGC 7000 4.7 · SH2-132 4.9 · M31 6.7
+//	broadband:  M31 34.9 · NGC 7000 38.4 · M45 43.4
+//
+// The families separate by a factor of five, and the bands below sit in the gap with room on both
+// sides. The gap between them is still deliberately left as "no verdict" rather than split down the
+// middle — a sky that lands there is genuinely ambiguous, and guessing would be worse than declining.
 const (
-	dualbandMaxPer120   = 10.0 // measured 2–6, with headroom for a brighter-than-typical night
-	broadbandMinPer120  = 20.0 // measured 30–45, with headroom for a darker-than-typical site
+	dualbandMaxPer120e  = 10.0 // measured 2.3–6.7, with headroom for a brighter-than-typical night
+	broadbandMinPer120e = 20.0 // measured 34.9–43.4, with headroom for a darker-than-typical site
 	normalizeExposureMs = 120_000.0
 )
 
@@ -84,25 +99,36 @@ func (s ChannelSky) greenBlueDominant() bool {
 	return s.G >= s.R || s.B >= s.R
 }
 
-// ClassifyFilterSet decides a set's filter set from its per-channel sky and its exposure. Returns
-// FilterSetUnknown unless the amplitude and the colour independently agree — see the package comment.
-func ClassifyFilterSet(sky ChannelSky, exposureMs int64) filters.FilterSet {
+// ClassifyFilterSet decides a set's filter set from its per-channel sky (in ADU above the bias
+// floor), its exposure and the sensor's eGain in electrons per ADU. Returns FilterSetUnknown unless
+// the amplitude and the colour independently agree — see the package comment.
+//
+// eGain <= 0 means the header carried no EGAIN, and then there is NO verdict: without it the sky
+// can only be expressed in ADU, which says as much about the analogue gain as about the sky, and a
+// wrong verdict silently mis-stacks a whole night. Declining costs nothing — every consumer falls
+// back to today's behaviour — so it is the honest answer rather than a guess in the wrong unit.
+func ClassifyFilterSet(sky ChannelSky, exposureMs int64, eGain float64) filters.FilterSet {
 	if exposureMs <= 0 {
 		return filters.FilterSetUnknown
 	}
+	if eGain <= 0 || math.IsNaN(eGain) || math.IsInf(eGain, 0) {
+		return filters.FilterSetUnknown // no EGAIN: the thresholds have no unit to compare against
+	}
 	// Normalize to the 120 s the thresholds are written for. Sky accumulates linearly with exposure,
-	// so this is the one conversion that makes a 60 s and a 300 s night comparable.
+	// so this is the one conversion that makes a 60 s and a 300 s night comparable. The colour test
+	// reads the same ADU rates — eGain is one positive scalar on all three channels, so it cannot
+	// change which channel leads.
 	scale := normalizeExposureMs / float64(exposureMs)
 	rate := ChannelSky{R: sky.R * scale, G: sky.G * scale, B: sky.B * scale}
-	amp := rate.amplitude()
+	amp := rate.amplitude() * eGain // ADU -> electrons: the physical, gain-invariant rate
 	if amp <= 0 || math.IsNaN(amp) || math.IsInf(amp, 0) {
 		return filters.FilterSetUnknown // unmeasured, or a floor subtracted past the signal
 	}
 
 	switch {
-	case amp <= dualbandMaxPer120 && rate.redDominant():
+	case amp <= dualbandMaxPer120e && rate.redDominant():
 		return filters.FilterSetDualband
-	case amp >= broadbandMinPer120 && rate.greenBlueDominant():
+	case amp >= broadbandMinPer120e && rate.greenBlueDominant():
 		return filters.FilterSetBroadband
 	default:
 		return filters.FilterSetUnknown

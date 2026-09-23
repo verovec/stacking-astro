@@ -125,7 +125,24 @@ func classifySet(set Set, floor float64, load imageLoader) filters.FilterSet {
 		return filters.FilterSetUnknown
 	}
 	above := subtractFloor(ChannelSky{R: median(rs), G: median(gs), B: median(bs)}, floor)
-	return ClassifyFilterSet(above, set.Key.ExposureMs)
+	return ClassifyFilterSet(above, set.Key.ExposureMs, setEGain(set))
+}
+
+// setEGain is the sensor conversion factor (electrons per ADU) the set was shot at, read from the
+// frames' EGAIN cards. A set is one body at one analogue gain — SetKey carries Gain — so the frames
+// agree; the median only guards against a stray frame with a missing or garbled card. Returns 0 when
+// no frame carries EGAIN, which ClassifyFilterSet turns into "no verdict" rather than a guess.
+func setEGain(set Set) float64 {
+	var vals []float64
+	for _, fr := range set.Frames {
+		if fr != nil && fr.EGain > 0 {
+			vals = append(vals, fr.EGain)
+		}
+	}
+	if len(vals) == 0 {
+		return 0
+	}
+	return median(vals)
 }
 
 // biasFloorADU measures the scan's electronic pedestal from its BIAS frames, falling back to DARKs
