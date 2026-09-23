@@ -1260,7 +1260,7 @@ func prepGimpInputs(ctx context.Context, opts Options, runner *siril.Runner, cha
 	// channels and let the broadband stack be the colour base. Runs before the single-lane duo-band
 	// split below, and consumes the lane — so that split then finds an ordinary colour map.
 	channels, dualSetNote := dualSetChannels(channels, outDir)
-	channels, duoNote := duobandChannels(opts.Preset, channels, outDir)
+	channels, duoNote := duobandChannels(opts.Preset, res.Inventory, channels, outDir)
 	// Whatever produced them, the separated emission channels are part of this run's result now —
 	// otherwise they are written, used once and invisible to every re-entry.
 	registerSynthesizedChannels(res, channels)
