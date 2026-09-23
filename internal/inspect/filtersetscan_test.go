@@ -247,3 +247,142 @@ func TestApplyFilterSets_SurvivesSetRebuild(t *testing.T) {
 		assert.Equal(t, inv.FilterSets[s.Key.ID()], s.FilterSet)
 	}
 }
+
+// lightSet is a one-shot-colour light set on a night, carrying a measured verdict.
+func lightSet(night string, exposureMs int64, fs filters.FilterSet) Set {
+	return Set{Key: SetKey{
+		Type: Light, Object: "NGC7000", Filter: filters.Color,
+		ExposureMs: exposureMs, Gain: 100, Offset: 50, Bin: 1, Session: night, Color: true,
+	}, FilterSet: fs}
+}
+
+// calSet is a calibration set on a night. It never carries a verdict of its own — that is the whole
+// reason NightFilterSet exists.
+func calSet(night string, typ FrameType, exposureMs int64) Set {
+	return Set{Key: SetKey{
+		Type: typ, ExposureMs: exposureMs, Gain: 100, Offset: 50, Bin: 1, Session: night, Color: true,
+	}}
+}
+
+// invWith assembles an inventory from sets and derives the durable verdict map from them, the way
+// annotateFilterSets does.
+func invWith(sets ...Set) *Inventory {
+	inv := &Inventory{Sets: sets, ColorModel: ColorOSC}
+	verdicts := map[string]filters.FilterSet{}
+	for _, s := range sets {
+		if s.FilterSet.Known() {
+			verdicts[s.Key.ID()] = s.FilterSet
+		}
+	}
+	if len(verdicts) > 0 {
+		inv.FilterSets = verdicts
+	}
+	return inv
+}
+
+// TestInventory_NightFilterSet is what lets a FLAT be gated on the clip filter at all.
+//
+// A flat has no sky: ClassifyFilterSet measures the night sky above the bias pedestal, and an
+// evenly-illuminated panel is not that, so 0005 deliberately classifies LIGHT sets only. A flat must
+// therefore inherit the verdict of the night it was shot on — and only when that night speaks with
+// one voice. Two different verdicts on one night mean the clip filter was swapped mid-session, and
+// nothing in the night key says which flat belongs to which half: the honest answer is unknown,
+// which leaves today's ranking untouched.
+func TestInventory_NightFilterSet(t *testing.T) {
+	const nightA, nightB = "2026-07-29", "2026-08-02"
+
+	tests := []struct {
+		name    string
+		inv     *Inventory
+		session string
+		want    filters.FilterSet
+	}{
+		{
+			name:    "the night's single light set decides it",
+			inv:     invWith(lightSet(nightA, 120_000, filters.FilterSetDualband)),
+			session: nightA,
+			want:    filters.FilterSetDualband,
+		},
+		{
+			name: "several light sets that agree still decide it",
+			inv: invWith(
+				lightSet(nightA, 120_000, filters.FilterSetDualband),
+				lightSet(nightA, 300_000, filters.FilterSetDualband),
+			),
+			session: nightA,
+			want:    filters.FilterSetDualband,
+		},
+		{
+			name: "a known verdict carries the night's unclassified sets with it",
+			inv: invWith(
+				lightSet(nightA, 120_000, filters.FilterSetBroadband),
+				lightSet(nightA, 300_000, filters.FilterSetUnknown),
+			),
+			session: nightA,
+			want:    filters.FilterSetBroadband,
+		},
+		{
+			name: "the clip filter was swapped mid-night — no honest verdict",
+			inv: invWith(
+				lightSet(nightA, 120_000, filters.FilterSetDualband),
+				lightSet(nightA, 300_000, filters.FilterSetBroadband),
+			),
+			session: nightA,
+			want:    filters.FilterSetUnknown,
+		},
+		{
+			name: "only the asked-for night counts",
+			inv: invWith(
+				lightSet(nightA, 120_000, filters.FilterSetDualband),
+				lightSet(nightB, 120_000, filters.FilterSetBroadband),
+			),
+			session: nightB,
+			want:    filters.FilterSetBroadband,
+		},
+		{
+			// The single-night scan, which is most captures: Session is "" on every set, so the
+			// undated bucket must resolve exactly like a named night.
+			name:    "a single-night scan resolves the empty night key",
+			inv:     invWith(lightSet("", 120_000, filters.FilterSetDualband), calSet("", Flat, 2000)),
+			session: "",
+			want:    filters.FilterSetDualband,
+		},
+		{
+			name:    "a night with no light set at all",
+			inv:     invWith(lightSet(nightA, 120_000, filters.FilterSetDualband), calSet(nightB, Flat, 2000)),
+			session: nightB,
+			want:    filters.FilterSetUnknown,
+		},
+		{
+			name:    "nothing was measured",
+			inv:     invWith(lightSet(nightA, 120_000, filters.FilterSetUnknown)),
+			session: nightA,
+			want:    filters.FilterSetUnknown,
+		},
+		{
+			name:    "no inventory",
+			inv:     nil,
+			session: nightA,
+			want:    filters.FilterSetUnknown,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.inv.NightFilterSet(tt.session))
+		})
+	}
+}
+
+// TestInventory_NightFilterSet_ReadsTheDurableMap: Sets are rebuilt from Frames by several code
+// paths and lose their projected FilterSet (see TestApplyFilterSets_SurvivesSetRebuild). The night
+// verdict must survive that, so it reads Inventory.FilterSets and not the Set field.
+func TestInventory_NightFilterSet_ReadsTheDurableMap(t *testing.T) {
+	inv := invWith(lightSet("2026-07-29", 120_000, filters.FilterSetDualband))
+	require.Equal(t, filters.FilterSetDualband, inv.NightFilterSet("2026-07-29"))
+
+	for i := range inv.Sets { // what a rebuild leaves behind
+		inv.Sets[i].FilterSet = ""
+	}
+
+	assert.Equal(t, filters.FilterSetDualband, inv.NightFilterSet("2026-07-29"))
+}

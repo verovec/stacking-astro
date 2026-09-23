@@ -74,6 +74,39 @@ func applyFilterSets(inv *Inventory) {
 	}
 }
 
+// NightFilterSet reports the clip filter a capture NIGHT was shot through, read from the LIGHT sets
+// of that night. It is how a frame that cannot be classified on its own inherits a verdict: a flat
+// is an evenly-illuminated panel, not a sky, so ClassifyFilterSet has nothing to measure on it — but
+// the clip filter sits in the optical train for the whole night, so the night's lights answer for it.
+//
+// One dissenting light set collapses the verdict to unknown. Two different verdicts on one night mean
+// the clip was swapped mid-session, and nothing in the night key says which flat belongs to which
+// half; unknown is the honest answer and leaves matching exactly as it is today. Sets with no verdict
+// abstain rather than dissent — an unclassifiable set is silence, not disagreement.
+//
+// It reads Inventory.FilterSets, the durable record, because several code paths rebuild Sets from
+// Frames and lose the projected Set.FilterSet (see applyFilterSets).
+func (inv *Inventory) NightFilterSet(session string) filters.FilterSet {
+	if inv == nil {
+		return filters.FilterSetUnknown
+	}
+	verdict := filters.FilterSetUnknown
+	for _, set := range inv.Sets {
+		if set.Key.Type != Light || set.Key.Session != session {
+			continue
+		}
+		v := inv.FilterSets[set.Key.ID()]
+		if !v.Known() {
+			continue
+		}
+		if verdict.Known() && v != verdict {
+			return filters.FilterSetUnknown
+		}
+		verdict = v
+	}
+	return verdict
+}
+
 // classifySet measures a bounded sample of the set and classifies the median of the per-frame skies.
 // The median rather than the mean: one frame ruined by a passing cloud or a car headlight should not
 // drag a whole night's verdict across a threshold.

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/verove-jordan/astronomy/internal/filters"
 	"github.com/verove-jordan/astronomy/internal/fsutil"
 	"github.com/verove-jordan/astronomy/internal/inspect"
 	"github.com/verove-jordan/astronomy/internal/siril"
@@ -37,6 +38,12 @@ type Master struct {
 	Bin        int        `json:"bin"`
 	FrameCount int        `json:"frame_count"`
 	Path       string     `json:"path"`
+	// FilterSet is which clip filter a one-shot-colour FLAT was shot through (inspect measures it per
+	// night — see internal/inspect/filterset.go). Empty/unknown on every mono master, on darks and
+	// bias (closed-shutter exposures: no light reaches the sensor, so the train cannot matter), and
+	// wherever the pixels could not settle it. Run-local like Session — the library has no column for
+	// it, and a library flat therefore always reads unknown, which keeps today's ranking.
+	FilterSet filters.FilterSet `json:"filter_set,omitempty"`
 	// Session is the capture-night key of a per-night master ("" = night-blind). Only FLATS of a
 	// multi-night scan carry one (dust/orientation state is per-night); such masters are run-local —
 	// never saved to the library (master_frames has no night column) and never satisfied BY a
@@ -100,6 +107,7 @@ func BuildMasters(ctx context.Context, runner *siril.Runner, inv *inspect.Invent
 				warnings = append(warnings, err.Error())
 				continue
 			}
+			stampFlatFilterSet(&m, inv, set)
 			masters = append(masters, m)
 		}
 	}

@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/verove-jordan/astronomy/internal/calib"
+	"github.com/verove-jordan/astronomy/internal/filters"
 	"github.com/verove-jordan/astronomy/internal/inspect"
 	"github.com/verove-jordan/astronomy/internal/store"
 )
@@ -35,7 +37,26 @@ type lightGroup struct {
 	Session string
 	Filter  string
 	Key     inspect.SetKey // for dark/bias/flat matching
-	Frames  []*inspect.Frame
+	// FilterSet is the clip filter this group's night was shot through (one-shot-colour only), so a
+	// dual-band group is never flat-fielded through a broadband flat. Set from the scan for the
+	// CURRENT session's groups; always unknown for prior-session groups, whose nights the catalog
+	// never classified — and unknown reproduces the pre-filter-set matching exactly.
+	FilterSet filters.FilterSet
+	Frames    []*inspect.Frame
+}
+
+// ref is the group's light reference for calibration matching: its key plus the clip filter its
+// night was shot through. Every master match in the run goes through it, so the gate cannot be
+// bypassed by a call site that forgot to pass the filter set.
+func (g lightGroup) ref() calib.LightRef {
+	return calib.LightRef{Key: g.Key, FilterSet: g.FilterSet}
+}
+
+// asSet re-presents the group as the inspected set it came from, for the single-set fast path. One
+// constructor for both fast-path call sites: building it inline twice is how the fast path would
+// quietly lose a newly added field — the filter set among them.
+func (g lightGroup) asSet() inspect.Set {
+	return inspect.Set{Key: g.Key, FilterSet: g.FilterSet, Frames: g.Frames, Count: len(g.Frames)}
 }
 
 // ReusePlan is the per-channel grouping plus a human-facing summary of what prior data is folded in.
@@ -155,7 +176,8 @@ func assembleReusePlan(ctx context.Context, cfg ReuseConfig, inv *inspect.Invent
 	plan := &ReusePlan{byFilter: map[string][]lightGroup{}}
 	for _, set := range inv.SetsOfType(inspect.Light) {
 		g := lightGroup{SessionID: currentSession, Current: true, Session: set.Frames[0].Session,
-			Filter: set.Key.Filter, Key: set.Key, Frames: set.Frames}
+			Filter: set.Key.Filter, Key: set.Key, FilterSet: calib.RefFor(inv, set).FilterSet,
+			Frames: set.Frames}
 		plan.byFilter[set.Key.Filter] = append(plan.byFilter[set.Key.Filter], g)
 	}
 	if cfg.Provider == nil {

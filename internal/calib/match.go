@@ -42,6 +42,12 @@ func MatchForLight(light inspect.SetKey, masters []Master) Selection {
 	return matchForLight(light, masters, false)
 }
 
+// MatchForRef is MatchForLightExcluding with the light's filter set supplied, so a one-shot-colour
+// night is not flat-fielded through the wrong clip filter. Every other gate is unchanged.
+func MatchForRef(ref LightRef, masters []Master, excluded []string, force bool) Selection {
+	return dropExcluded(ref.Key, matchForRef(ref, masters, force), excluded)
+}
+
 // matchForLight picks the most appropriate dark, flat and bias masters for a light set:
 //   - dark  — same gain/offset/bin and exposure, nearest sensor temperature (within tolerance); when
 //     none exists but a same-camera dark of a DIFFERENT exposure + a bias are available, that dark is
@@ -54,6 +60,13 @@ func MatchForLight(light inspect.SetKey, masters []Master) Selection {
 // without a bias to scale it — so whatever masters exist are always applied, mismatch and all, with a note
 // explaining the mismatch. Missing categories are reported in Notes rather than failing.
 func matchForLight(light inspect.SetKey, masters []Master, force bool) Selection {
+	return matchForRef(LightRef{Key: light}, masters, force)
+}
+
+// matchForRef is matchForLight with the light's filter set supplied. See LightRef.
+func matchForRef(ref LightRef, masters []Master, force bool) Selection {
+	light := ref.Key
+	masters, crossSet := keepSameFilterSet(ref, masters, force)
 	var sel Selection
 
 	sel.Bias = bestBias(light, masters, force)
@@ -98,8 +111,27 @@ func matchForLight(light inspect.SetKey, masters []Master, force bool) Selection
 			sel.Notes = append(sel.Notes, fmt.Sprintf(
 				"no %s flat — using the night %s flat (dust may have moved between nights)", light.Session, f.Session))
 		}
+		// Transparency when the user forced past the set gate: the flat IS applied, and its
+		// illumination profile is the wrong one.
+		if force && ref.FilterSet.Known() && f.FilterSet.Known() && ref.FilterSet != f.FilterSet {
+			sel.Notes = append(sel.Notes, fmt.Sprintf(
+				"forced flat — these are %s lights calibrated with a %s flat (wrong illumination profile)",
+				ref.FilterSet, f.FilterSet))
+		}
 	} else {
 		sel.Notes = append(sel.Notes, "no flat available — flat correction skipped")
+	}
+	// Name both sets when dropping the cross-set flats COST something — no flat at all, or one
+	// borrowed from another night. Without it the run just says "no flat available", and the user
+	// cannot tell a missing flat from one that was deliberately refused.
+	//
+	// Silent when the light's own night supplied a same-set flat: the exclusion changed nothing, the
+	// user is already shooting flats per filter set, and advising them to do so is the kind of note
+	// that teaches people to stop reading notes.
+	if crossSet > 0 && flatExclusionCost(light, sel.Flat) {
+		sel.Notes = append(sel.Notes, fmt.Sprintf(
+			"%d flat(s) excluded — these are %s lights and those flats are %s; shoot flats per filter set",
+			crossSet, ref.FilterSet, otherSet(ref.FilterSet)))
 	}
 	if sel.Bias == nil && sel.Dark == nil {
 		sel.Notes = append(sel.Notes, "no bias or dark — no read-noise calibration available")

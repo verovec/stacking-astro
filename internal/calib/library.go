@@ -47,6 +47,11 @@ func BuildOrReuseMasters(ctx context.Context, runner *siril.Runner, inv *inspect
 				warnings = append(warnings, fmt.Sprintf("reused library master %s (%d frames — same source frames)",
 					masterByFrameType[set.Key.Type], existing.FrameCount))
 				existing.FromLibrary = false // the file lives in the library, but these are this run's frames
+				// master_frames has no filter-set column, so this master came back from the library
+				// night-blind. It was stacked from THIS set's frames, so this scan knows what the
+				// library forgot — without re-stamping it, a second run over the same folder would
+				// quietly lose the clip-filter gate the first run had.
+				stampFlatFilterSet(existing, inv, set)
 				continue
 			}
 			// The run brought its own frames for this category and the library cannot prove its
@@ -66,6 +71,7 @@ func BuildOrReuseMasters(ctx context.Context, runner *siril.Runner, inv *inspect
 				warnings = append(warnings, err.Error())
 				continue
 			}
+			stampFlatFilterSet(&built, inv, set)
 			// Per-night masters (multi-night flats) are RUN-LOCAL: master_frames has no night column,
 			// so SaveMaster's dedup key would make two nights overwrite each other in the library.
 			// They rebuild in seconds; only night-blind masters persist.

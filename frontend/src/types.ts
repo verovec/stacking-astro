@@ -132,6 +132,13 @@ export interface Master {
   bin: number;
   frame_count: number;
   path: string;
+  // The capture night of a per-night master ("" / absent = night-blind). Only multi-night FLATs
+  // carry one — dust and orientation are per-night state.
+  session?: string;
+  // Which clip filter a one-shot-colour FLAT was shot through, inherited from its capture night.
+  // Absent on every mono master, on darks and bias (closed shutter), and on library masters —
+  // master_frames has no column for it.
+  filter_set?: string;
 }
 
 // PhoneMaster is a reusable phone/DSLR calibration master (iPhone DNG darks/bias/flats), keyed by
@@ -818,6 +825,13 @@ export interface PlanGroup {
   flat?: PlanMaster;
   bias?: PlanMaster;
   notes?: string[];
+  // The clip filter these lights were shot through (one-shot-colour only) — what makes the flat row
+  // readable: "capture flat, 30 frames" says nothing until you can see the lights are dual-band.
+  filter_set?: string;
+  // The planned FLAT is not the clean case: refused for being cross-set, borrowed from another
+  // capture night, forced past the set gate, or missing entirely. Branch on this rather than
+  // grepping `notes`, which is prose written for a human.
+  flat_fallback?: boolean;
 }
 
 export interface PlanChannel {
