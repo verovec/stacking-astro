@@ -54,8 +54,12 @@ pinned for output parity) / GIMP 2.10 / GraXpert / ffmpeg, plus `frontend` + `db
 **decoupled/opt-in**: `stack` never pulls it; on Linux+GPU the `ai` profile (Ollama) serves it in a
 container, on macOS it stays native (`just run-ia-model`) since Docker has no Metal. Host-dev (above)
 stays the faster daily macOS path; `stack` is the portable/Linux-server/parity path. **StarNet++ is not
-baked in** (licence not redistributable) — mount it + set `STARNET_BIN`; it soft-fails to full stars.
-See `docs/architecture.md` → "Fully containerized mode".
+baked in** (licence not redistributable) and how you reach it depends on the image arch: on **amd64**
+mount your Linux x64 install + set `STARNET_BIN`; on **arm64 there is nothing to mount** (upstream ships
+no linux/arm64 build, and a macOS binary in a Linux image is an unexecutable Mach-O) — run the host
+service `just run-starnet-service` (`cmd/starnet-host`), which `ASTRO_STARNET_URL` targets by default
+under `stack`. Either way it soft-fails to full stars. See `docs/architecture.md` → "Fully
+containerized mode".
 
 **Siril/GIMP integration.** Drive host `siril-cli` (default
 `/Applications/Siril.app/Contents/MacOS/siril-cli`, override via `SIRIL_BIN`) with generated `.ssf`
@@ -72,7 +76,12 @@ GPL Siril/GIMP). Both are **optional**: when the binary is absent the run logs a
 (Siril subsky / full stars). Runners live in `internal/graxpert` and `internal/starnet`; the pipeline
 wiring (soft-fail) is in `internal/pipeline/enhance.go`. Per-mode toggles are `mode.Preset.BackgroundAI`
 and `mode.Preset.StarReduce`. `astrostack process --no-ai` skips both. **Do not add new Python** for
-these — they are external binaries.
+these — they are external binaries. Both can also be **offloaded to a native host HTTP service** so a
+containerized engine still reaches them (`cmd/graxpert-host` + `ASTRO_GRAXPERT_URL`, `cmd/starnet-host`
++ `ASTRO_STARNET_URL`; paths travel, never pixels, because the bind mounts give both sides the same
+absolute paths). NOTE the deliberate asymmetry in which transport wins: for GraXpert an explicit URL
+beats a working local binary (the point is reaching the host GPU), while for StarNet a resolvable local
+binary always wins (the point is that on some arches no local binary can exist at all).
 
 **Finish supervisor (opt-in local-AI agent) is mode-generic.** The `--supervise` run option (+ the
 post-run **Refine** panel) drives a host vision model to render → judge → re-tune → keep-best, and now

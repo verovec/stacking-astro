@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/verove-jordan/astronomy/internal/config"
+	"github.com/verove-jordan/astronomy/internal/starnet"
 	"github.com/verove-jordan/astronomy/internal/toolhealth"
 )
 
@@ -133,7 +134,7 @@ func printReport(rep *toolhealth.Report, db toolhealth.Tool, cfg *config.Config)
 	fmt.Println()
 	fmt.Println("Optional — each one soft-fails to a documented fallback")
 	line("GraXpert", rep.Graxpert, cfg.GraxpertBin)
-	line("StarNet++", rep.Starnet, cfg.StarnetBin)
+	line("StarNet++", rep.Starnet, starnetTarget(cfg))
 	line("local AI model", rep.LLM, cfg.LLMBaseURL)
 
 	fmt.Println()
@@ -142,6 +143,17 @@ func printReport(rep *toolhealth.Report, db toolhealth.Tool, cfg *config.Config)
 		"catalogue", plateSolveDetail(rep.PlateSolve))
 
 	printWarnings(rep, db)
+}
+
+// starnetTarget names what StarNet will actually be for the next run: the local binary, or the host
+// service a containerized engine offloads to. Printing STARNET_BIN unconditionally would name a path
+// the engine is never going to reach whenever it runs in a container.
+func starnetTarget(cfg *config.Config) string {
+	r := starnet.NewVariant(cfg.StarnetBin, starnet.Variant(cfg.StarnetCLI), cfg.StarnetURL)
+	if ep := r.Endpoint(); ep != "" {
+		return ep + " (host service)"
+	}
+	return cfg.StarnetBin
 }
 
 // printWarnings prints toolhealth's own prose verbatim. Those strings are written to be read by a

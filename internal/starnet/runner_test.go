@@ -64,7 +64,7 @@ func TestResolveVariant_ExplicitWins(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// A bin that cannot exist: reaching the probe would yield positional, so a flags
 			// expectation proves the configured value short-circuited it.
-			r := NewVariant("/nonexistent/starnet-binary", tt.set)
+			r := NewVariant("/nonexistent/starnet-binary", tt.set, "")
 			assert.Equal(t, tt.want, r.resolveVariant(context.Background()))
 		})
 	}
@@ -88,5 +88,5 @@ func TestParsePercent(t *testing.T) {
 }
 
 func TestAvailable_EmptyBin(t *testing.T) {
-	assert.Error(t, New("").Available(context.Background()))
+	assert.Error(t, New("", "").Available(context.Background()))
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/verove-jordan/astronomy/internal/llm"
 	"github.com/verove-jordan/astronomy/internal/rawconv"
 	"github.com/verove-jordan/astronomy/internal/siril"
+	"github.com/verove-jordan/astronomy/internal/starnet"
 )
 
 // reportTTL caches the assembled report: probes spawn processes (siril-cli --version) and must not
@@ -64,6 +65,7 @@ type Report struct {
 type Checker struct {
 	cfg   *config.Config
 	grax  *graxpert.Runner
+	star  *starnet.Runner
 	siril *siril.Runner
 	llm   *llm.Runner
 
@@ -77,6 +79,7 @@ func New(cfg *config.Config) *Checker {
 	return &Checker{
 		cfg:   cfg,
 		grax:  graxpert.New(cfg.GraxpertBin, cfg.GraxpertURL),
+		star:  starnet.NewVariant(cfg.StarnetBin, starnet.Variant(cfg.StarnetCLI), cfg.StarnetURL),
 		siril: siril.New(cfg.SirilBin, siril.Limits{}),
 		llm:   llm.New(cfg.LLMBaseURL, cfg.LLMModel, cfg.LLMImageFormat),
 	}
@@ -138,20 +141,24 @@ func (c *Checker) collect(ctx context.Context) *Report {
 		r.Warnings = append(r.Warnings, "GraXpert cannot run its AI pipeline — gradients handled by Siril RBF subsky only ("+r.Graxpert.Err+")")
 	}
 
-	if _, err := exec.LookPath(c.cfg.StarnetBin); err != nil {
-		r.Starnet = Tool{Err: fmt.Sprintf("starnet binary %q not found", c.cfg.StarnetBin)}
+	// Availability, not a bare binary lookup: a containerized engine reaches StarNet through the host
+	// service (cmd/starnet-host), where "installed" means that service answers.
+	if err := c.star.Available(ctx); err != nil {
+		r.Starnet = Tool{Err: err.Error()}
 		// Said out loud, like every other optional tool. StarNet's absence used to be reported as a
 		// bare ok:false with no warning, which is the one form the UI banner does not render — so the
 		// nebula/comet star-reduction step silently did nothing and the picture merely looked
-		// different. It is never bundled (the licence is not redistributable), so on a container run
-		// it is ALWAYS absent unless the user mounted it, which makes saying so more important here
-		// rather than less.
-		r.Warnings = append(r.Warnings, "StarNet++ not found — star reduction is skipped and the "+
-			"nebula/comet finishes keep full stars (mount it and set STARNET_BIN)")
+		// different. It is never bundled (the licence is not redistributable) AND upstream ships no
+		// linux/arm64 build, so on a container run it is ALWAYS absent unless the host service is up —
+		// which makes saying so, and naming that fix, more important here rather than less.
+		r.Warnings = append(r.Warnings, "StarNet++ not available — star reduction is skipped and the "+
+			"nebula/comet finishes keep full stars ("+err.Error()+"). A containerized engine cannot exec "+
+			"a host StarNet: run `just run-starnet-service` and point ASTRO_STARNET_URL at it")
+	} else if ep := c.star.Endpoint(); ep != "" {
+		r.Starnet = Tool{OK: true, Detail: "host service " + ep}
 	} else {
 		r.Starnet = Tool{OK: true}
 	}
-
 
 	if kind, err := rawconv.Developer(); err != nil {
 		r.RawDev = Tool{Err: err.Error()}

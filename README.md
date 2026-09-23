@@ -113,10 +113,17 @@ report `just stack` prints from inside the container. Copy-pasteable install com
 
 The optional tools are **soft-fail** (missing → warning + fallback; disable with `--no-ai`) and
 are *invoked, never bundled* — their licences stay with your install. StarNet is therefore never
-in the image either: under `just stack`, bind-mount your install and set `STARNET_BIN` — without it
-a containerized run keeps full stars and writes no star-presence set (`final-starless.png`,
-`final-{25,50,75}-stars.png`). Either CLI generation works: the positional `starnet++` and the
-flag-style `starnet2` are auto-detected (`STARNET_CLI` overrides). For **offline plate-solving + SPCC**, download
+in the image either, and under `just stack` how you reach it depends on the image's architecture:
+
+- **linux/amd64** — bind-mount your Linux x64 install and set `STARNET_BIN`.
+- **linux/arm64** (any Apple-Silicon build) — there is nothing to mount: StarNet publishes no
+  linux/arm64 build, and a macOS binary inside the Linux image is a Mach-O that will never run. Start
+  the host service with **`just run-starnet-service`**; the containerized engine already calls it
+  (`ASTRO_STARNET_URL`, default `http://host.docker.internal:8085`).
+
+Without either, a containerized run keeps full stars and writes no star-presence set
+(`final-starless.png`, `final-{25,50,75}-stars.png`). Either CLI generation works: the positional
+`starnet++` and the flag-style `starnet2` are auto-detected (`STARNET_CLI` overrides). For **offline plate-solving + SPCC**, download
 the Gaia catalogues once: `just download-catalogues` (`just download-catalogues-spcc` adds the
 photometric chunks).
 

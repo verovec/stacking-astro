@@ -6,6 +6,12 @@
 // install (set via STARNET_BIN) and stream its stdout. It is never vendored. When absent, the
 // finish keeps full stars.
 //
+// A CONTAINERIZED engine cannot exec it at all: StarNet publishes Linux x64, Windows x64 and both
+// macOS builds, but no linux/arm64 one, so on an Apple-Silicon host the engine image (linux/arm64)
+// has no runnable StarNet — and a macOS binary bind-mounted into it is a Mach-O that Linux will
+// never execute. For that case the runner OFFLOADS to a native host HTTP service
+// (cmd/starnet-host, ASTRO_STARNET_URL); see offload for when each transport is chosen.
+//
 // Two CLI generations are in the wild and they take incompatible arguments — see Variant.
 package starnet
 
@@ -16,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -51,23 +58,61 @@ const (
 // generation is picked up without configuration.
 var DefaultBinCandidates = []string{"starnet2", "starnet++"}
 
-// Runner executes StarNet via its command-line interface.
+// Runner executes StarNet, either by exec'ing the host-installed binary or — when there is no runnable
+// local one and a host-service URL is set — by offloading each pass to a native StarNet HTTP service
+// (cmd/starnet-host) over that URL. Both modes share this type, so callers never branch.
 type Runner struct {
 	bin     string
 	variant Variant
+	url     string // optional host StarNet service base URL; used only when bin does not resolve
+	hc      *http.Client
 
 	mu     sync.Mutex // guards probed
 	probed Variant    // memoized result of the auto-probe ("" until it has concluded)
 }
 
-// New returns a Runner for the given StarNet binary path, auto-detecting its CLI generation on
-// first use. An empty path yields a Runner that reports Unavailable, so "not configured" and
-// "not installed" are handled identically.
-func New(bin string) *Runner { return NewVariant(bin, VariantAuto) }
+// New returns a Runner for the given StarNet binary path and optional host-service URL, auto-detecting
+// the CLI generation on first use. An empty bin AND empty url yields a Runner that reports Unavailable,
+// so "not configured" and "not installed" are handled identically.
+func New(bin, url string) *Runner { return NewVariant(bin, VariantAuto, url) }
 
 // NewVariant returns a Runner pinned to a CLI generation. Anything other than a known variant
-// (including "" and "auto") means auto-detect.
-func NewVariant(bin string, v Variant) *Runner { return &Runner{bin: bin, variant: v} }
+// (including "" and "auto") means auto-detect. url is the optional host-service base URL.
+func NewVariant(bin string, v Variant, url string) *Runner {
+	return &Runner{bin: bin, variant: v, url: strings.TrimRight(url, "/"), hc: &http.Client{}}
+}
+
+// offload reports whether this runner talks to the host service instead of exec'ing a binary. A usable
+// LOCAL binary always wins: unlike the GraXpert offload — which exists to reach the host GPU, and so
+// lets an explicit URL beat a working local install — this one exists only because some platforms have
+// no runnable StarNet build at all. Where one does run it is strictly the better path (no HTTP, no
+// second process), which also keeps a Linux x64 server that bind-mounts its own StarNet on the local
+// path even when the compose default hands it a URL.
+func (r *Runner) offload() bool {
+	if r == nil || r.url == "" {
+		return false
+	}
+	return !r.localUsable()
+}
+
+// Endpoint returns the host-service URL when this runner offloads, and "" when it exec's a local
+// binary. Status surfaces use it to name what StarNet will ACTUALLY be for the next run, rather than
+// printing a binary path the engine is never going to reach.
+func (r *Runner) Endpoint() string {
+	if r.offload() {
+		return r.url
+	}
+	return ""
+}
+
+// localUsable reports whether the configured binary resolves to something executable.
+func (r *Runner) localUsable() bool {
+	if r == nil || r.bin == "" {
+		return false
+	}
+	_, err := exec.LookPath(r.bin)
+	return err == nil
+}
 
 // resolveVariant returns the CLI generation to render arguments for: the configured one when it is
 // explicit, otherwise the memoized probe. A probe that could not conclude (binary absent, context
@@ -127,11 +172,19 @@ type Options struct {
 
 var percentRe = regexp.MustCompile(`(\d+)\s?%`)
 
-// Available reports whether the StarNet++ binary can be found and executed. Soft check: callers log
-// the error and keep full stars rather than aborting the run.
-func (r *Runner) Available(_ context.Context) error {
-	if r == nil || r.bin == "" {
-		return fmt.Errorf("starnet binary path is empty (set STARNET_BIN)")
+// Available reports whether StarNet can run: the binary can be found and executed, or — in offload
+// mode — the host service answers. Soft check: callers log the error and keep full stars rather than
+// aborting the run.
+func (r *Runner) Available(ctx context.Context) error {
+	if r == nil {
+		return fmt.Errorf("starnet runner is nil")
+	}
+	if r.offload() {
+		return r.remotePing(ctx) // the service being reachable IS the availability answer
+	}
+	if r.bin == "" {
+		return fmt.Errorf("starnet binary path is empty (set STARNET_BIN, or ASTRO_STARNET_URL " +
+			"to offload to a host service)")
 	}
 	if _, err := exec.LookPath(r.bin); err != nil {
 		return fmt.Errorf("starnet binary %q not found: %w", r.bin, err)
@@ -142,6 +195,10 @@ func (r *Runner) Available(_ context.Context) error {
 // RemoveStars runs StarNet++ on inTIFF (a 16-bit TIFF), writing the starless image to outTIFF.
 // Progress lines are streamed to onProgress (may be nil).
 func (r *Runner) RemoveStars(ctx context.Context, inTIFF, outTIFF string, opts Options, onProgress func(Progress)) error {
+	if r.offload() {
+		// The host service owns its binary, so it resolves the CLI generation too — nothing local to probe.
+		return r.runRemote(ctx, RemoteRequest{In: inTIFF, Out: outTIFF, Stride: opts.Stride}, onProgress)
+	}
 	if err := r.Available(ctx); err != nil {
 		return err
 	}

@@ -128,6 +128,16 @@ run-graxpert-service:
 graxpert-service-status:
     @curl -fsS "http://127.0.0.1:${ASTRO_GRAXPERT_PORT:-8083}/health" && echo " OK"
 
+# Serve the host StarNet on demand. A containerized engine cannot exec StarNet at all (no linux/arm64
+# build exists, and a macOS binary can't run in the Linux image), so without this `just stack` silently
+# keeps full stars. Foreground; the `stack` engine already points ASTRO_STARNET_URL here by default.
+run-starnet-service:
+    go run ./cmd/starnet-host
+
+# Health-check the host StarNet service.
+starnet-service-status:
+    @curl -fsS "http://127.0.0.1:${ASTRO_STARNET_PORT:-8085}/health" && echo " OK"
+
 # Inspect a capture directory and print the inventory (host).
 inspect DIR:
     go run ./cmd/astrostack inspect "{{DIR}}"
@@ -196,6 +206,11 @@ build-mcp:
 build-graxpert-host:
     @mkdir -p {{bin}}
     go build -o {{bin}}/graxpert-host ./cmd/graxpert-host
+
+# Build the host StarNet service binary into ./bin.
+build-starnet-host:
+    @mkdir -p {{bin}}
+    go build -o {{bin}}/starnet-host ./cmd/starnet-host
 
 # Build all binaries + the frontend (build identity stamped via ldflags — shows in /api/health,
 # every run record, and the UI's engine chip, so a stale-engine run is identifiable at a glance).

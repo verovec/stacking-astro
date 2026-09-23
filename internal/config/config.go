@@ -60,6 +60,10 @@ type Config struct {
 	// v2.5+). Empty/"auto" (the default) probes the binary itself; set it only to override a
 	// misdetection.
 	StarnetCLI string
+	// StarnetURL is an optional host StarNet HTTP service (cmd/starnet-host) used ONLY when StarnetBin
+	// does not resolve — the containerized case, since upstream ships no linux/arm64 build and a macOS
+	// binary cannot execute in the Linux image. A usable local binary always wins over it.
+	StarnetURL string
 
 	// Optional local LLM "supervisor" (opt-in via the run request / --supervise). The engine drives a
 	// host-run, OpenAI-compatible model server (LM Studio / mlx-vlm) over HTTP to auto-tune the finish.
@@ -187,6 +191,7 @@ func Load() *Config {
 		ChannelParallel: envInt("ASTRO_CHANNEL_PARALLEL", 1),
 		StarnetBin:      env("STARNET_BIN", firstOnPath(starnet.DefaultBinCandidates)),
 		StarnetCLI:      env("STARNET_CLI", string(starnet.VariantAuto)),
+		StarnetURL:      env("ASTRO_STARNET_URL", ""),
 
 		LLMBaseURL:           env("ASTRO_LLM_URL", "http://127.0.0.1:1234/v1"),
 		LLMModel:             env("ASTRO_LLM_MODEL", ""),

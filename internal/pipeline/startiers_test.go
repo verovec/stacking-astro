@@ -60,7 +60,7 @@ func writeFinalTIFF(t *testing.T, path string) {
 func tierOpts(bin string, tiers bool) Options {
 	return Options{
 		Preset:  &mode.Preset{StarTiers: tiers},
-		Starnet: starnet.NewVariant(bin, starnet.VariantPositional),
+		Starnet: starnet.NewVariant(bin, starnet.VariantPositional, ""),
 	}
 }
 
@@ -191,7 +191,7 @@ func TestEmitStarTiers_Gating(t *testing.T) {
 		cause string
 	}{
 		{"knob off", func(string) Options { return tierOpts(bin, false) }, finalResult, "star_tiers disabled"},
-		{"no preset", func(string) Options { return Options{Starnet: starnet.NewVariant(bin, starnet.VariantPositional)} }, finalResult, "no preset"},
+		{"no preset", func(string) Options { return Options{Starnet: starnet.NewVariant(bin, starnet.VariantPositional, "")} }, finalResult, "no preset"},
 		{"no starnet runner", func(string) Options { return Options{Preset: &mode.Preset{StarTiers: true}} }, finalResult, "no runner"},
 		{"finish produced nothing", func(string) Options { return tierOpts(bin, true) }, func(*testing.T, string) *Result { return &Result{} }, "no final"},
 	}

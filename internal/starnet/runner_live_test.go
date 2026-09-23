@@ -98,7 +98,7 @@ func TestRemoveStars_Live(t *testing.T) {
 	ctx := context.Background()
 
 	// The installed binary must be classified by the probe, not guessed.
-	r := New(bin)
+	r := New(bin, "")
 	variant := r.resolveVariant(ctx)
 	assert.Contains(t, []Variant{VariantFlags, VariantPositional}, variant)
 	t.Logf("starnet %s detected as %s", bin, variant)
