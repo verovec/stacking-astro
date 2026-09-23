@@ -108,5 +108,9 @@ func buildComposite(c *gimp.Client, base gimp.Inputs, p composeParams, outBase s
 	in.SIIScreen = in.SIIOpacity(p.SIIScreen) // [SII] emission screen, same rule
 	in.SIIBlack = p.SIIBlackPoint
 	in.SIITint = p.SIITint
+	// The two narrowband knobs — re-mixing is exactly what this re-entry is for, and it re-composites
+	// from the persisted linear/ layers, so moving either costs a re-finish and never a re-stack.
+	in.NBBlend = p.NBBlend
+	in.OIIIBoost = p.OIIIBoost
 	return gimp.BuildImage(c, in, p.Curve, in.HaOpacity(p.HaScreen), p.Saturation, outBase)
 }

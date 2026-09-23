@@ -1066,6 +1066,8 @@ func finishComposite(ctx context.Context, opts Options, in gimp.Inputs, notes []
 	in.StarDesat = opts.Preset.StarDesat           // desaturate bright star cores → no colour discs on dense star fields (clusters)
 	in.CropFrac = opts.Preset.CropFrac             // trim ragged stacking-edge bands off the export
 	in.HaExcludeStars = opts.Preset.HaExcludeStars // screen Ha onto nebulosity only when requested
+	in.NBBlend = opts.Preset.NBBlend               // one weight over both emission screens (mixed filter sets)
+	in.OIIIBoost = opts.Preset.OIIIBoost           // soft-shoulder lift on the [OIII] layer (1 = off)
 	// The star-cluster finish profile (gentle luminance, no core roll-off, colour-safe saturation,
 	// chroma blur, star-core desaturation) is already baked into opts.Preset by finishAligned/rerun for
 	// a cluster target — so every knob above + the saturation below flow through unchanged here.
