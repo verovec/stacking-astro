@@ -386,3 +386,68 @@ func TestInventory_NightFilterSet_ReadsTheDurableMap(t *testing.T) {
 
 	assert.Equal(t, filters.FilterSetDualband, inv.NightFilterSet("2026-07-29"))
 }
+
+// cfaStarfield builds an RGGB mosaic whose sky sits at the given levels and where starFrac of the
+// cells carry an extra starADU — the one-sided bright contamination every real light frame has.
+func cfaStarfield(r, g, b, starFrac, starADU float64) *fits.Image {
+	const w, h = 64, 64
+	pix := make([]float32, w*h)
+	cellsPerRow := w / 2
+	starEvery := int(1 / starFrac)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var v float64
+			switch {
+			case y%2 == 0 && x%2 == 0:
+				v = r
+			case y%2 == 1 && x%2 == 1:
+				v = b
+			default:
+				v = g
+			}
+			if cell := (y/2)*cellsPerRow + x/2; starEvery > 0 && cell%starEvery == 0 {
+				v += starADU
+			}
+			pix[y*w+x] = float32(v)
+		}
+	}
+	return &fits.Image{W: w, H: h, C: 1, Pix: [][]float32{pix}}
+}
+
+// A light frame's bright pixels are stars, not sky. Reading the plain MEAN of every photosite
+// reports the stars too, and on a real dual-band night that inflation was enough to push the
+// amplitude out of the dual-band band and into the "no verdict" gap (measured on IC 1848: 9.1 ADU
+// per 120 s read robustly, 10.9 read as a mean, against a 10.0 threshold).
+func TestCFAChannelSky_ReadsSkyNotStars(t *testing.T) {
+	const sky, stars, starADU = 512.0, 0.05, 40.0
+	im := cfaStarfield(sky, sky, sky, stars, starADU)
+
+	got, ok := cfaChannelSky(im.Pix[0], im.W, im.H, "RGGB")
+	require.True(t, ok)
+
+	assert.InDelta(t, sky, got.R, 0.5, "the sky level, not the sky plus a share of every star")
+	assert.InDelta(t, sky, got.G, 0.5)
+	assert.InDelta(t, sky, got.B, 0.5)
+	assert.Less(t, got.R, sky+stars*starADU,
+		"a plain mean would have landed here — %.1f ADU above the sky", stars*starADU)
+}
+
+// The regression that sent a real dual-band capture down the broadband road: the sky IS dual-band
+// faint, but a dense star field drags the mean across the threshold and the night ends up
+// unclassified — which every consumer reads as "no evidence" and finishes as plain colour.
+func TestFilterSetAnnotation_DenseStarFieldStillClassifies(t *testing.T) {
+	// Sky above the pedestal: R=12, G=9.6, B=5.6 -> amplitude 9.07, inside the dual-band band and
+	// red-dominant. The 5% star fraction adds 2.0 ADU to a mean, which would read 11.07: no verdict.
+	light := oscFrame("light.fits", Light, 120_000)
+	bias := oscFrame("bias.fits", Bias, 0)
+	inv := oscInventory(light, bias)
+	load := loaderFor(map[string]*fits.Image{
+		"light.fits": cfaStarfield(testBiasADU+12, testBiasADU+9.6, testBiasADU+5.6, 0.05, 40),
+		"bias.fits":  cfaImage(testBiasADU, testBiasADU, testBiasADU),
+	})
+
+	annotateFilterSets(inv, nil, load)
+
+	assert.Equal(t, filters.FilterSetDualband, inv.FilterSets[setIDFor(t, inv, Light, 120_000)],
+		"the stars must not decide the filter set")
+}
