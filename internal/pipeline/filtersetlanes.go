@@ -63,6 +63,11 @@ func laneFor(filter string, fs filters.FilterSet, split bool) string {
 	return filter
 }
 
+// baseFilterOf strips the lane marker, giving back the filter the lights were actually shot with.
+func baseFilterOf(lane string) string {
+	return strings.TrimSuffix(lane, dualbandLaneSuffix)
+}
+
 // dualbandLaneOf returns the channel map's dual-band lane key, or "" when the run did not split.
 func dualbandLaneOf(channels map[string]string) string {
 	for lane := range channels {
@@ -99,6 +104,16 @@ func dualSetChannels(channels map[string]string, outDir string) (map[string]stri
 		if k != lane {
 			out[k] = v
 		}
+	}
+	// The broadband lane produced no master — too few survivors, a corrupt group, a failed stack — so
+	// the dual-band lane is all that is left. Splitting now would leave Ha and OIII with NO colour
+	// channel to screen ONTO, which is strictly worse than not splitting: this run is simply an
+	// ordinary dual-band capture again, and the pipeline has always known how to finish one. Hand the
+	// lane back as the colour channel and let duobandChannels decide the split on the palette.
+	if len(out) == 0 {
+		out[baseFilterOf(lane)] = channels[lane]
+		return out, "the broadband lane produced no master — finishing the dual-band stack as an " +
+			"ordinary colour run (no broadband base to screen the emission lines onto)"
 	}
 	ha, oiii, err := splitDuoband(filepath.Join(outDir, channels[lane]+".fits"), outDir)
 	if err != nil {
@@ -138,4 +153,27 @@ func registerSynthesizedChannels(res *Result, channels map[string]string) {
 		}
 		res.Channels = append(res.Channels, ChannelResult{Object: object, Filter: f, Synthesized: true})
 	}
+}
+
+// dualbandLast moves the dual-band lane to the end of the registration order, so the BROADBAND
+// master is index 0 — the reference every other master is resampled onto.
+//
+// The broadband stack is the colour base and, on a mixed capture, the wider and deeper exposure.
+// Letting the narrowband pointing define the canvas would crop the base to the emission frame, and
+// `-framing=min` then keeps only the field the two share. A run with no split lane is returned
+// untouched.
+func dualbandLast(ordered []string) []string {
+	lane := ""
+	out := make([]string, 0, len(ordered))
+	for _, f := range ordered {
+		if strings.HasSuffix(f, dualbandLaneSuffix) {
+			lane = f
+			continue
+		}
+		out = append(out, f)
+	}
+	if lane == "" {
+		return ordered
+	}
+	return append(out, lane)
 }

@@ -157,3 +157,62 @@ func TestPartitionGroups_MonoIsUntouched(t *testing.T) {
 	require.Len(t, groups, 1)
 	assert.Equal(t, "L", groups[0].Key.Filter)
 }
+
+// TestDualbandLast pins the registration order. seqapplyreg lands every master on the REFERENCE's
+// pixel grid, and symlinkOrdered numbers the sequence from this slice — so index 0 is the reference
+// and it has to be the broadband master.
+//
+// It is not a matter of taste. The broadband stack is the colour base and, on a mixed capture, the
+// wider and deeper one; letting the narrowband pointing define the final canvas would crop the base
+// to the emission frame. `-framing=min` then keeps only the field they share.
+func TestDualbandLast(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{
+			name: "the dual-band lane moves behind the broadband one",
+			in:   []string{filters.Color + dualbandLaneSuffix, filters.Color},
+			want: []string{filters.Color, filters.Color + dualbandLaneSuffix},
+		},
+		{
+			name: "already in order — untouched",
+			in:   []string{filters.Color, filters.Color + dualbandLaneSuffix},
+			want: []string{filters.Color, filters.Color + dualbandLaneSuffix},
+		},
+		{
+			// Every ordinary run: no lane was split, so the canonical order stands exactly as it is.
+			name: "a mono channel order is never reordered",
+			in:   []string{"L", "R", "G", "B"},
+			want: []string{"L", "R", "G", "B"},
+		},
+		{
+			name: "single channel",
+			in:   []string{filters.Color},
+			want: []string{filters.Color},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, dualbandLast(tt.in))
+		})
+	}
+}
+
+// TestOrderedFilters_NonCanonicalIsDeterministic: orderedFilters emitted the filters it does not
+// know in Go MAP ORDER, which is randomised per run. Two lanes named RGB and RGB-dualband are both
+// unknown to the canonical list, so the reference master — and therefore the final canvas — could
+// change between two runs over identical input. Sorting makes a run reproducible.
+func TestOrderedFilters_NonCanonicalIsDeterministic(t *testing.T) {
+	masters := map[string]string{
+		"L": "a", filters.Color + dualbandLaneSuffix: "b", filters.Color: "c", "Zz": "d",
+	}
+	first := orderedFilters(masters)
+	for i := 0; i < 20; i++ {
+		assert.Equal(t, first, orderedFilters(masters), "ordering must not depend on map iteration")
+	}
+	assert.Equal(t, "L", first[0], "canonical filters still lead")
+	assert.Equal(t, []string{filters.Color, filters.Color + dualbandLaneSuffix, "Zz"}, first[1:],
+		"the rest are sorted, not random")
+}

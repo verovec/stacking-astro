@@ -104,3 +104,27 @@ func TestDualSetChannels_UnsplittableMasterDegrades(t *testing.T) {
 	assert.NotContains(t, out, "Ha")
 	assert.NotContains(t, out, filters.Color+dualbandLaneSuffix, "a lane that cannot be split is still not a colour channel")
 }
+
+// TestDualSetChannels_NoBroadbandBaseKeepsTheColourRun is the guard for a half-failed split. If the
+// broadband lane produced no master — too few survivors, a corrupt group, a failed stack — the
+// dual-band lane is all the run has left.
+//
+// Splitting it then would be the worst outcome available: the map would hold Ha and OIII and NO
+// colour channel, so the finish would have nothing to screen the emission lines ONTO. The honest
+// answer is that this run is now an ordinary dual-band capture, which the pipeline has always known
+// how to finish — so the lane goes back to being the colour channel and duobandChannels decides the
+// split on the palette, exactly as it does for an unsplit capture.
+func TestDualSetChannels_NoBroadbandBaseKeepsTheColourRun(t *testing.T) {
+	dir := t.TempDir()
+	writeColourMaster(t, dir, "aligned_RGB-dualband", 0.40, 0.20, 0.10)
+
+	out, note := dualSetChannels(map[string]string{
+		filters.Color + dualbandLaneSuffix: "aligned_RGB-dualband",
+	}, dir)
+
+	assert.Equal(t, "aligned_RGB-dualband", out[filters.Color],
+		"the surviving lane becomes the colour channel")
+	assert.NotContains(t, out, filters.Color+dualbandLaneSuffix)
+	assert.NotContains(t, out, "Ha", "nothing to screen onto — do not pre-split")
+	assert.Contains(t, note, "broadband")
+}

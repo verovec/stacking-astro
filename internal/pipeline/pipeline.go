@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"time"
 
@@ -1677,12 +1678,18 @@ func orderedFilters(masters map[string]string) []string {
 			seen[f] = true
 		}
 	}
+	// Everything the canonical list does not know — a one-shot-colour "RGB", a split lane — is
+	// appended SORTED. Ranging a map here made the order random per run, and since symlinkOrdered
+	// numbers the registration sequence from this slice, that randomised which master became the
+	// reference: two runs over identical input could land on different final canvases.
+	rest := make([]string, 0, len(masters))
 	for f := range masters {
 		if !seen[f] {
-			out = append(out, f)
+			rest = append(rest, f)
 		}
 	}
-	return out
+	sort.Strings(rest)
+	return append(out, rest...)
 }
 
 func fileExists(p string) bool {
