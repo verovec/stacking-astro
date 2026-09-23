@@ -879,7 +879,7 @@ func reStack(ctx context.Context, opts Options, preset *mode.Preset, inv *inspec
 		groups := plan.byFilter[filter]
 		var ch ChannelResult
 		if useFastPath(plan, groups) {
-			ch = processChannel(ctx, ro, groups[0].asSet(), masters, workRun, outDir, g, prog)
+			ch = processChannel(ctx, ro, groups[0].laneOf(), groups[0].asSet(), masters, workRun, outDir, g, prog)
 		} else {
 			// Zero-position stepRef: a nested re-stack must never advance the main run's bar; its
 			// per-session lines ride at the last position exactly like its other index-less lines.
@@ -1728,7 +1728,14 @@ func (o Options) masterStack(mt calib.MasterType) stackalg.Options {
 	return calib.MasterStackOptions(mt, o.masterStacks())
 }
 
-func processChannel(ctx context.Context, opts Options, set inspect.Set, masters []calib.Master,
+// processChannel stacks one channel from a single light set — the proven fast path.
+//
+// lane is the CHANNEL's name: what the result is labelled with, what its work dir and its
+// master_<tag>.fits are called. It equals the light's own filter for every ordinary run, and differs
+// only when a one-shot-colour scan splits its broadband and dual-band exposures into two lanes
+// (filtersetlanes.go), which must not both write master_RGB.fits. The light's key is untouched, so
+// calibration still matches on the real filter.
+func processChannel(ctx context.Context, opts Options, lane string, set inspect.Set, masters []calib.Master,
 	workRun, outDir string, gradeOpts grade.Options, onProgress func(siril.Progress)) ChannelResult {
 	// Masters from another sensor leave the POOL before the match, not the Selection after it: Siril
 	// would accept a wrong-sized master, skip the correction and still report success, and striking
@@ -1740,13 +1747,13 @@ func processChannel(ctx context.Context, opts Options, set inspect.Set, masters 
 	}
 	ch := ChannelResult{
 		Object:      set.Key.Object,
-		Filter:      set.Key.Filter,
+		Filter:      lane,
 		ExposureMs:  set.Key.ExposureMs,
 		InputFrames: set.Count,
 		Selection:   sel,
 	}
 
-	seqDir := filepath.Join(workRun, "light_"+sanitize(set.Key.Filter))
+	seqDir := filepath.Join(workRun, "light_"+sanitize(lane))
 	if _, err := fsutil.LinkFrames(seqDir, framePaths(set.Frames)); err != nil {
 		ch.Err = err.Error()
 		return ch
@@ -1766,21 +1773,21 @@ func processChannel(ctx context.Context, opts Options, set inspect.Set, masters 
 			ch.Err = err.Error()
 			return ch
 		}
-		warnChannel(opts, &ch, set.Key.Filter+": only 1 frame captured — using it as the channel master (no registration/stacking)")
+		warnChannel(opts, &ch, lane+": only 1 frame captured — using it as the channel master (no registration/stacking)")
 		promoteLoneCalibrated(ctx, opts, &ch,
-			calibratedFramePaths(seqDir, siril.CalibratedSeq("light", cm), 1)[0], set.Key.Filter, outDir, onProgress)
+			calibratedFramePaths(seqDir, siril.CalibratedSeq("light", cm), 1)[0], lane, outDir, onProgress)
 		_ = os.RemoveAll(seqDir)
 		return ch
 	}
 
 	// Calibrate + register (writes per-frame metrics to the calibrated sequence's .seq), then grade
 	// and stack the survivors.
-	if err := calibrateAndRegister(ctx, opts, &ch, seqDir, cm, ingest, set.Key.Filter, onProgress); err != nil {
+	if err := calibrateAndRegister(ctx, opts, &ch, seqDir, cm, ingest, lane, onProgress); err != nil {
 		ch.Err = err.Error()
 		return ch
 	}
 	finishStackedChannel(ctx, opts, seqDir, siril.CalibratedSeq("light", cm), siril.RegisteredSeq("light", cm),
-		set.Key.Filter, set.Frames, outDir, gradeOpts, opts.stackWeight(), onProgress, &ch, nil, nil,
+		lane, set.Frames, outDir, gradeOpts, opts.stackWeight(), onProgress, &ch, nil, nil,
 		(*regGeometry)(nil))
 	return ch
 }

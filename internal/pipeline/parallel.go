@@ -35,7 +35,7 @@ func stackOneChannel(ctx context.Context, opts Options, plan *ReusePlan, object,
 	gradeOpts grade.Options, prog func(siril.Progress), ref stepRef) ChannelResult {
 	groups := plan.byFilter[filter]
 	if useFastPath(plan, groups) {
-		return processChannel(ctx, opts, groups[0].asSet(), masters, workRun, outDir, gradeOpts, prog)
+		return processChannel(ctx, opts, groups[0].laneOf(), groups[0].asSet(), masters, workRun, outDir, gradeOpts, prog)
 	}
 	return processChannelGroups(ctx, opts, object, filter, groups, masters, flats, parity, workRun, outDir, gradeOpts, prog, ref, plan.AnchorNight)
 }
