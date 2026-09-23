@@ -109,3 +109,33 @@ func dualSetChannels(channels map[string]string, outDir string) (map[string]stri
 		"separated into pseudo-Hα (red pixels) and pseudo-[OIII] (max of green/blue) — the broadband " +
 		"stack is the colour base and the two emission lines screen over it"
 }
+
+// registerSynthesizedChannels records the emission channels a run SEPARATED from a colour master, so
+// everything reading the Result — the refine panel, a re-mix, run.json — can see the run has them.
+//
+// Without it the pseudo-Hα/[OIII] files were written, handed to the finish and then forgotten: a
+// mixed capture could be finished once and never re-tuned, because reconstructChannelsFromDisk walks
+// res.Channels and there was nothing there to walk.
+//
+// They are flagged Synthesized and carry no frame count or exposure. A pseudo-Hα separated from a
+// colour master is not an Hα master stacked from frames shot through a 3 nm filter, and anything
+// reporting integration has to be able to tell them apart.
+func registerSynthesizedChannels(res *Result, channels map[string]string) {
+	if res == nil {
+		return
+	}
+	have := make(map[string]bool, len(res.Channels))
+	object := ""
+	for _, ch := range res.Channels {
+		have[ch.Filter] = true
+		if object == "" {
+			object = ch.Object
+		}
+	}
+	for _, f := range []string{"Ha", "OIII", "SII"} {
+		if _, split := channels[f]; !split || have[f] {
+			continue
+		}
+		res.Channels = append(res.Channels, ChannelResult{Object: object, Filter: f, Synthesized: true})
+	}
+}

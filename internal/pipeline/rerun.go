@@ -167,7 +167,7 @@ func rerunFinish(ctx context.Context, opts Options, t tier, prior *Result, workR
 			return nil, nil, fmt.Errorf("re-stack: %w", err)
 		}
 		recaptureStackedPreviews(ctx, opts, outDir, channels)
-		final, _, err := finishWithGimp(ctx, opts, channels, workRun, outDir)
+		final, _, err := finishWithGimp(ctx, opts, channels, workRun, outDir, prior)
 		return final, channels, err
 	}
 
@@ -183,7 +183,7 @@ func rerunFinish(ctx context.Context, opts Options, t tier, prior *Result, workR
 		// No persisted prep (an older run) → rebuild it (Tier B); still correct, just not instant.
 		opts.report(Progress{Step: "rerun", Line: "no persisted linear prep — rebuilding it for this composite tweak"})
 	}
-	final, _, err := finishWithGimp(ctx, opts, channels, workRun, outDir)
+	final, _, err := finishWithGimp(ctx, opts, channels, workRun, outDir, prior)
 	return final, channels, err
 }
 

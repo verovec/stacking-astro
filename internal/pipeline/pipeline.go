@@ -265,6 +265,11 @@ type ChannelResult struct {
 	PreviewPath   string          `json:"preview_path,omitempty"`
 	Selection     calib.Selection `json:"selection"`
 	Metrics       []grade.Metric  `json:"metrics,omitempty"`
+	// Synthesized marks a channel SEPARATED from another channel's master rather than stacked from
+	// frames of its own — the pseudo-Hα/[OIII] a dual-band exposure is split into (duoband.go,
+	// filtersetlanes.go). It carries no frame count and no exposure, because it captured neither:
+	// without the flag a mixed run would report narrowband integration it never shot.
+	Synthesized bool `json:"synthesized,omitempty"`
 	// Photom records the per-group photometric normalization applied before a heterogeneous merge
 	// (different exposure/gain/temperature sessions), so run.json shows how each group was scaled.
 	Photom []photom.GroupRecord `json:"photom,omitempty"`
@@ -953,7 +958,7 @@ func finishAligned(ctx context.Context, opts Options, channels map[string]string
 	if opts.Gimp != nil && opts.Preset != nil {
 		if err := opts.Gimp.Available(); err != nil {
 			res.Warnings = append(res.Warnings, "GIMP unavailable, using Siril finish: "+err.Error())
-		} else if final, method, err := finishWithGimp(ctx, opts, channels, workRun, outDir); err != nil {
+		} else if final, method, err := finishWithGimp(ctx, opts, channels, workRun, outDir, res); err != nil {
 			if ctx.Err() != nil {
 				// The run was cancelled mid-finish: don't dress the interruption up as a tool
 				// failure, and don't burn time on the Siril fallback the same cancel would kill.
@@ -1006,7 +1011,8 @@ func finishAligned(ctx context.Context, opts Options, channels map[string]string
 // finishWithGimp produces stretched per-component TIFFs with Siril, then composites them into a
 // layered image (with curves) in GIMP. It also reports which colour-calibration rung the prep
 // landed on, so the caller can surface a degraded ladder (SPCC unavailable) as a run warning.
-func finishWithGimp(ctx context.Context, opts Options, channels map[string]string, workRun, outDir string) (*postprocess.Result, postprocess.CalMethod, error) {
+func finishWithGimp(ctx context.Context, opts Options, channels map[string]string, workRun, outDir string,
+	res *Result) (*postprocess.Result, postprocess.CalMethod, error) {
 	stretchDir := filepath.Join(workRun, "05_stretched")
 	if err := fsutil.EnsureDir(stretchDir); err != nil {
 		return nil, postprocess.CalNone, err
@@ -1023,7 +1029,7 @@ func finishWithGimp(ctx context.Context, opts Options, channels map[string]strin
 		Enabled: opts.Preset.ColorCalibration, RemoveGreen: true, StarField: true,
 		Solve: solve, Spcc: opts.Spcc,
 	}
-	in, notes, method, err := prepGimpInputs(ctx, opts, opts.Runner, channels, outDir, stretchDir, deg, cc, opts.Preset.BackgroundLevel, opts.Preset.LinkedStretch)
+	in, notes, method, err := prepGimpInputs(ctx, opts, opts.Runner, channels, outDir, stretchDir, deg, cc, opts.Preset.BackgroundLevel, opts.Preset.LinkedStretch, res)
 	if err != nil {
 		return nil, method, err
 	}
@@ -1220,8 +1226,11 @@ func saveDisplayTif(name string) string {
 // as a linear, background-extracted image, color-calibrated (SPCC → neutralization fallback), then
 // stretched; L and Ha are stretched as luminance/structure layers (no color calibration). Returns
 // the GIMP inputs and any color-calibration notes.
+// res records the emission channels this prep SEPARATES from a colour master (nil to skip — the
+// supervisor's re-entry re-runs the prep over an already-recorded result and has nothing to add).
 func prepGimpInputs(ctx context.Context, opts Options, runner *siril.Runner, channels map[string]string,
-	outDir, stretchDir string, deg int, cc postprocess.ColorCalOptions, bgLevel float64, linked bool) (gimp.Inputs, []string, postprocess.CalMethod, error) {
+	outDir, stretchDir string, deg int, cc postprocess.ColorCalOptions, bgLevel float64, linked bool,
+	res *Result) (gimp.Inputs, []string, postprocess.CalMethod, error) {
 	var calMethod postprocess.CalMethod
 	has := func(f string) bool { _, ok := channels[f]; return ok }
 	// channels[f] is a Siril-relative basename (e.g. "aligned_L"): correct for the Siril commands below
@@ -1244,6 +1253,9 @@ func prepGimpInputs(ctx context.Context, opts Options, runner *siril.Runner, cha
 	// split below, and consumes the lane — so that split then finds an ordinary colour map.
 	channels, dualSetNote := dualSetChannels(channels, outDir)
 	channels, duoNote := duobandChannels(opts.Preset, channels, outDir)
+	// Whatever produced them, the separated emission channels are part of this run's result now —
+	// otherwise they are written, used once and invisible to every re-entry.
+	registerSynthesizedChannels(res, channels)
 	pal, palNote := resolvePalette(opts.Preset, channels)
 	base := filepath.Join(stretchDir, "base")
 	in := gimp.Inputs{Base: base + ".tif", Color: pal.Color}

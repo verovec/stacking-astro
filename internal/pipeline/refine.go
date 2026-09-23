@@ -225,6 +225,11 @@ func reconstructChannelsFromDisk(outDir string, prior []ChannelResult) map[strin
 			channels[ch.Filter] = "aligned_" + tag
 		case fileExists(filepath.Join(outDir, "master_"+tag+".fits")):
 			channels[ch.Filter] = "master_" + tag
+		// A SEPARATED channel is written as syn_<tag> and has no master/aligned file of its own, so
+		// it is looked for last — a real master_Ha.fits is captured data and must always outrank a
+		// separation of the same name.
+		case fileExists(filepath.Join(outDir, "syn_"+tag+".fits")):
+			channels[ch.Filter] = "syn_" + tag
 		}
 	}
 	return channels

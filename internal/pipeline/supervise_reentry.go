@@ -79,7 +79,7 @@ func (r *reentry) restack(ctx context.Context, o Options, p mode.Preset) error {
 func (r *reentry) buildBase(ctx context.Context, o Options, p mode.Preset) error {
 	deg := backgroundDegree(ctx, o)
 	cc := postprocess.ColorCalOptions{Enabled: p.ColorCalibration, RemoveGreen: true, StarField: true, Solve: o.Solve, Spcc: o.Spcc}
-	base, notes, _, err := prepGimpInputs(ctx, o, o.Runner, r.channels, r.outDir, r.stretchDir, deg, cc, p.BackgroundLevel, p.LinkedStretch)
+	base, notes, _, err := prepGimpInputs(ctx, o, o.Runner, r.channels, r.outDir, r.stretchDir, deg, cc, p.BackgroundLevel, p.LinkedStretch, nil)
 	if err != nil {
 		return err
 	}
