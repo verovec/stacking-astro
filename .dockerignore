@@ -10,6 +10,9 @@ library/
 output/
 work/
 data/
+# Wide-field triage scratch: derived/ is regenerable TIFFs, rejected/ is culled frames
+derived/
+rejected/
 
 # Local model venv (~28 GB) and HF cache
 .venv-ia/
@@ -17,6 +20,9 @@ data/
 # VCS + code-graph index
 .git/
 .gitnexus/
+
+# Agent worktrees (full checkouts, ~6 GB) — never part of a build
+.claude/worktrees/
 
 # Build artifacts / hot-reload output
 bin/
