@@ -106,8 +106,23 @@ already the end of the ramp — so screening it "more red" would merely brighten
 picks how to tell them apart instead: `deep_red` (default) keeps a trace of blue for a crimson that
 reads as natural, `gold` is the amber accent the Hubble palette established and is far easier to see.
 
-The [OIII] and [SII] screens default to **0**, so a run that does not ask for them emits byte-identical
-GIMP script to before the knobs existed. A screen-only layer never constrains anything that reasons
+Two knobs weigh the emission contribution as a whole rather than line by line:
+
+| Knob | Range | Default | What it does |
+|---|---|---|---|
+| `nb_blend` | 0 – 1 | 1 (full) | one weight over **both** emission screens — the "how much narrowband" slider. Mixing a dual-band exposure into a broadband base at full strength drags the dual-band's noise in with its signal, so the contribution is a user choice. It scales the two together because moving them one at a time shifts the Hα/[OIII] colour balance as a side effect, which is what the per-line knobs above are for. 0 = the broadband base alone (the layers are dropped, not written inert) |
+| `oiii_boost` | 1 – 1.6 | 1 (off) | soft-shoulder lift on the [OIII] layer: identity below the knee, `tanh` roll-off asymptoting to 0.98, so faint teal gets the full factor while bright cores never clip flat. 1.25 subtle / 1.35 marked / 1.6 over-cooked. Prefer it to raising `oiii_screen`, which lifts the rims along with the cores |
+
+`oiii_boost` replaces a plain multiply, which failed instructively (runbook v8, the "fake cyan plate"):
+pushing the layer linearly drove its cores to 1.0 where they went **flat** — every pixel in the core
+equal to its neighbours and to white — and a flat core reads as a pasted plate of colour rather than as
+light. Turning the boost on therefore *engages* the shoulder, so a core sitting at 1.0 comes down
+(~0.93 at 1.1) even though the knob says "boost": that is the anti-clipping doing its job. Both knobs
+act at composite time on layers the Tier-A checkpoint already holds (`<outDir>/linear/`), so re-mixing
+after a run costs a re-finish and never a re-stack.
+
+The [OIII] and [SII] screens default to **0**, and `nb_blend`/`oiii_boost` to their no-op values, so a
+run that does not ask for them emits byte-identical GIMP script to before the knobs existed. A screen-only layer never constrains anything that reasons
 about coverage (`paletteResolved.screenOnly`) — it fades where its nights didn't reach, so letting it
 bound a multi-night mosaic crop would collapse the canvas to its own footprint.
 

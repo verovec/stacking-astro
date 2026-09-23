@@ -74,6 +74,8 @@ const DEEPSKY_GROUPS: ParamGroup[] = [
       "ha_screen",
       "ha_black_point",
       "oiii_screen",
+      "nb_blend",
+      "oiii_boost",
       "oiii_black_point",
       "sii_screen",
       "sii_black_point",

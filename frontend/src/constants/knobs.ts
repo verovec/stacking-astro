@@ -88,6 +88,28 @@ const COMPOSITE_KNOBS: KnobDef[] = [
     step: 0.02,
   },
   {
+    // The one-slider "how much narrowband": scales BOTH emission screens together. 1 = full (the
+    // composite as it was before the knob), 0 = the broadband base alone.
+    key: "nb_blend",
+    labelKey: "rerun.knobs.nb_blend",
+    kind: "number",
+    def: 1,
+    min: 0,
+    max: 1,
+    step: 0.05,
+  },
+  {
+    // Soft-shoulder lift on [OIII]: 1 = off, 1.25 subtle, 1.35 marked, 1.6 over-cooked. Never clips,
+    // which is why it is preferred over pushing oiii_screen.
+    key: "oiii_boost",
+    labelKey: "rerun.knobs.oiii_boost",
+    kind: "number",
+    def: 1,
+    min: 1,
+    max: 1.6,
+    step: 0.05,
+  },
+  {
     key: "oiii_black_point",
     labelKey: "rerun.knobs.oiii_black_point",
     kind: "number",
