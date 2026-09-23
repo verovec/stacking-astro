@@ -338,6 +338,31 @@ can be re-tuned without re-stacking.
 | either set unclassified | no split. One classified set is not evidence about another, and an unclassified set is silence, not "the other kind" |
 | monochrome rig | never — a filter wheel has no clip filter |
 | the **broadband** lane produced no master | no split: the surviving dual-band lane becomes the colour channel and finishes as an ordinary dual-band capture. Splitting would leave Ha/[OIII] with no base to screen onto |
+
+### Asserting the clip filter yourself
+
+Detection measures the sky from the pixels and declines when the two signals disagree — which is the
+right answer for a night whose sky genuinely straddles the thresholds (moonlight, dawn twilight, a
+variable site). A real IC 1848 capture misses the dual-band bound by 0.1 ADU per 120 s because the
+last frames of each night were shot into dawn; drop those and it classifies.
+
+When you know what was in the optical train, say so rather than letting the measurement guess. Both
+entry points take the same assertion, keyed by `inspect.SetKey.ID()` and valued
+`"broadband"` / `"dualband"`:
+
+```jsonc
+// POST /api/inspect — the Import UI path
+{ "path": "input/IC1848", "filter_set_overrides": { "<set id>": "dualband" } }
+
+// POST /api/jobs — a run launched directly (CLI, agent, curl)
+{ "path": "input/IC1848", "mode": "nebula", "format": "image",
+  "filter_set_overrides": { "<set id>": "dualband" } }
+```
+
+The user's word is final: an override applies even where detection measured nothing, and detection
+only fills the blanks. `"unknown"` asserts nothing and leaves detection in charge. A value outside
+the three fails the request rather than silently not taking — on either endpoint. Read the set ids
+back from an inspect response (`sets[].key`, or the `filter_sets` map for what was measured).
 | the dual-band master cannot be split (unreadable, not 3-plane) | the lane is dropped and the run finishes on the broadband base alone, with a note |
 
 ## Soft-fail fallbacks

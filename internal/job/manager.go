@@ -298,6 +298,14 @@ type RunRequest struct {
 	// Deepsky/nebula only.
 	ExcludeSets []string `json:"exclude_sets,omitempty"`
 
+	// FilterSetOverrides asserts, per light set (inspect.SetKey.ID → "broadband"/"dualband"), which
+	// clip filter a one-shot-colour night was shot through. A colour sensor has no FILTER card, so
+	// detection can only measure it from the pixels and honestly declines on a night whose sky
+	// straddles the thresholds. This is how a caller states it: the same assertion POST /api/inspect
+	// already accepts, so a run launched straight at POST /api/jobs is no longer stuck with
+	// "unknown". The user's word is final — detection only fills the blanks.
+	FilterSetOverrides map[string]string `json:"filter_set_overrides,omitempty"`
+
 	// ForceCalibration forces the available dark/flat/bias masters to be applied to the lights even when
 	// their gain/offset/bin, exposure or sensor temperature don't match (the Import "force these
 	// calibration frames" toggle). false → the strict, physically-matched default.
@@ -498,6 +506,11 @@ func (m *Manager) Enqueue(ctx context.Context, req RunRequest) (int64, error) {
 	// The colour knob is a closed enum. The API already rejects a bad value with 400; this also covers
 	// the paths that never pass through it (the CLI, and Restart replaying a stored request).
 	if _, err := inspect.ParseColorChoice(req.ColorModel); err != nil {
+		return 0, err
+	}
+	// Same contract as the inspect endpoint: a malformed clip-filter assertion must fail the REQUEST
+	// rather than leave the set silently unclassified and the user wondering why it did not take.
+	if _, err := req.filterSetOverrides(); err != nil {
 		return 0, err
 	}
 	// A referenced mosaic plan must exist NOW — a stale id must fail the request, not the worker.
@@ -1335,9 +1348,12 @@ func (m *Manager) execute(ctx context.Context, id int64, turnID, kind string, p 
 			Library: m.store, LibraryDir: m.cfg.LibraryDir, OnProgress: pipeProg, Steer: steer, Confirm: confirm,
 			FilterMapping: p.FilterMap, ColorChoice: p.colorChoice(), Solve: solve, Spcc: spcc, OpticsExplicit: p.opticsExplicit(), TargetHint: p.Target, CatalogDir: m.cfg.SirilCatalogDir,
 			Catalog:          m.store, // always record the run so its frames become reusable
-			CalibExclude:     p.CalibExclude,
-			ExcludeSets:      p.ExcludeSets,
-			ForceCalibration: p.ForceCalibration,
+			CalibExclude: p.CalibExclude,
+			ExcludeSets:  p.ExcludeSets,
+			// Validated at Enqueue, so the error here cannot be new; ignoring it keeps the assembly
+			// flat, and a request that somehow reached the worker malformed simply asserts nothing.
+			FilterSetOverrides: filterSetOverridesOrNil(p),
+			ForceCalibration:   p.ForceCalibration,
 			// Pause/resume: reuse a paused run's output dir (skip already-stacked channels) and let the user
 			// pause mid-stack at a channel boundary. Only the deep-sky path honors mid-stack pause.
 			Resume:         resume,

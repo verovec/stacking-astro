@@ -170,6 +170,10 @@ type Options struct {
 	// ExcludeSets holds canonical inspect.SetKey.ID tokens the user chose to drop in the Import
 	// stray-light check; those whole light sets are removed from the scan before grouping/stacking.
 	ExcludeSets []string
+	// FilterSetOverrides asserts, per light set (inspect.SetKey.ID), which clip filter a one-shot-
+	// colour night was shot through, for the sets the pixels could not settle. It reaches the scan
+	// verbatim and wins over detection — see inspect.annotateFilterSets. nil → detection alone.
+	FilterSetOverrides map[string]filters.FilterSet
 	// ForceCalibration relaxes the calibration matcher's gain/offset/bin, exposure and sensor-temperature
 	// gates so the available dark/flat/bias masters are applied to the lights even when they don't match
 	// (the Import "force these calibration frames" toggle). false → the strict, physically-matched default.
@@ -437,6 +441,7 @@ func Process(ctx context.Context, opts Options) (*Result, error) {
 	scanOpts := inspect.DefaultScanOptions()
 	scanOpts.FilterMapping = opts.FilterMapping
 	scanOpts.ExcludeSets = opts.ExcludeSets
+	scanOpts.FilterSetOverrides = opts.FilterSetOverrides
 	inv, err := opts.scanInputs(ctx, scanOpts) // remote (no downloads) when a low-disk Stager is set, else local
 	if err != nil {
 		return nil, err
