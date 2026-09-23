@@ -45,3 +45,23 @@ func oiiiBoostLUT(f float64) []float64 {
 	}
 	return lut
 }
+
+// nbBlendEpsilon is the opacity below which an emission screen is dropped rather than written at a
+// rounded-to-zero strength: the script prints opacity as a whole percent, so anything under half a
+// percent would emit "(gimp-layer-set-opacity oiii 0)" — a loaded, inert layer instead of an absent one.
+const nbBlendEpsilon = 0.005
+
+// nbBlended scales one emission screen opacity by the run's narrowband weight.
+//
+// blend <= 0 is UNSET and returns the opacity untouched. That asymmetry is deliberate: the zero value
+// of a new field must leave every existing composite exactly as it was, and "blend at zero" is
+// reachable with any small positive value, which nbBlendEpsilon then turns into a dropped layer.
+func nbBlended(blend, opacity float64) float64 {
+	if blend <= 0 || blend >= 1 {
+		return opacity
+	}
+	if scaled := opacity * blend; scaled >= nbBlendEpsilon {
+		return scaled
+	}
+	return 0
+}
