@@ -652,3 +652,18 @@ func TestApplyRegistrationScript_ZeroRefIndexEmitsNoSetref(t *testing.T) {
 	assert.NotContains(t, s, "setref")
 	assert.True(t, strings.HasSuffix(s, "seqapplyreg pp_light -framing=current\n"), "script:\n%s", s)
 }
+
+// A promoted lone-frame master must carry the same 32-bit-float [0,1] pixels as a stacked one.
+// `convert` links compatible FITS without re-encoding, so the old convert-and-copy promotion
+// published a raw ushort camera file among float masters — a unit trap for any reader that does
+// not renormalize (16-bit reads 0..65535, float reads 0..1).
+func TestPromoteLoneFrameScript(t *testing.T) {
+	s := PromoteLoneFrameScript("cal", "/lib/master_dark_x")
+
+	assert.Contains(t, s, "set32bits\n", "the save below must re-encode as 32-bit float")
+	assert.Contains(t, s, "convert cal -out=.\n")
+	assert.Contains(t, s, "load cal_00001\n")
+	assert.Contains(t, s, "fmul 1.0\n",
+		"the neutral processing step that forces the save to 32-bit float — a bare load+save keeps the source bit depth")
+	assert.Contains(t, s, "save /lib/master_dark_x\n")
+}

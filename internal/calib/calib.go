@@ -184,18 +184,19 @@ func stackMasterSet(ctx context.Context, runner *siril.Runner, key inspect.SetKe
 	// be stacked — Siril has no one-image sequences — and used to fail the whole category ("No
 	// sequence `cal' found"), silently costing the night its flat. Convert and promote the lone
 	// frame instead: the task-#352 trade, applied to calibration masters.
+	mt := masterByFrameType[key.Type]
 	if len(paths) == 1 {
 		if err := promoteLoneCalFrame(ctx, runner, seqDir, outBase, onProgress); err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("master %s: single-frame pool — the lone frame was promoted unstacked (no outlier rejection%s)",
-			filepath.Base(outBase), loneFlatSuffix(key)), nil
+		return lonePromotionNote(filepath.Base(outBase), mt), nil
 	}
-	mt := masterByFrameType[key.Type]
 	opts := MasterStackOptions(mt, stacks)
 	if mt != MasterFlat {
-		_, err := runner.Run(ctx, seqDir, siril.StackMasterScript("cal", outBase, len(paths), opts), onProgress)
-		return "", err
+		if _, err := runner.Run(ctx, seqDir, siril.StackMasterScript("cal", outBase, len(paths), opts), onProgress); err != nil {
+			return "", err
+		}
+		return thinDarkPoolNote(filepath.Base(outBase), mt, len(paths)), nil
 	}
 	biasPath := flatBias(key, built)
 	_, err := runner.Run(ctx, seqDir, siril.StackFlatScript("cal", outBase, biasPath, len(paths), opts), onProgress)
@@ -214,22 +215,39 @@ func stackMasterSet(ctx context.Context, runner *siril.Runner, key inspect.SetKe
 		filepath.Base(outBase), err), nil
 }
 
-// promoteLoneCalFrame converts a single-frame calibration pool and publishes the lone converted
-// frame as the master.
+// promoteLoneCalFrame converts a single-frame calibration pool and publishes the lone frame as the
+// master — re-encoded by Siril (load+save under set32bits) so it lands in the library as the same
+// 32-bit-float [0,1] pixels as a stacked master. The previous convert-and-copy published the raw
+// ushort camera file verbatim, leaving one master in a different unit convention than every other.
 func promoteLoneCalFrame(ctx context.Context, runner *siril.Runner, seqDir, outBase string,
 	onProgress func(siril.Progress)) error {
-	if _, err := runner.Run(ctx, seqDir, siril.ConvertScript("cal"), onProgress); err != nil {
-		return err
-	}
-	return fsutil.CopyFile(filepath.Join(seqDir, "cal_00001.fits"), outBase+".fits")
+	_, err := runner.Run(ctx, seqDir, siril.PromoteLoneFrameScript("cal", outBase), onProgress)
+	return err
 }
 
-// loneFlatSuffix adds the flat-specific caveat to the single-frame promotion note.
-func loneFlatSuffix(key inspect.SetKey) string {
-	if masterByFrameType[key.Type] == MasterFlat {
-		return ", no flat-bias calibration"
+// lonePromotionNote is the user-visible warning for a single-frame promotion, shared by the
+// session build (stackMasterSet) and the cross-session deep build (stackPooled) so both paths
+// surface the same message — the deep path used to promote silently.
+func lonePromotionNote(masterName string, mt MasterType) string {
+	suffix := ""
+	if mt == MasterFlat {
+		suffix = ", no flat-bias calibration"
 	}
-	return ""
+	return fmt.Sprintf("master %s: single-frame pool — the lone frame was promoted unstacked (no outlier rejection%s)",
+		masterName, suffix)
+}
+
+// thinDarkPoolNote flags a dark/dark-flat master whose pool is too small for outlier rejection:
+// with two frames every rejection algorithm degenerates to a plain mean, so a cosmic-ray hit or
+// hot-pixel transient in either frame survives into the master — and from there into every light
+// it calibrates, as a fixed pattern that stacking cannot average away. "" for healthy pools and
+// for bias/flats (high-signal frames where a 2-frame mean is merely noisy, not poisoned).
+func thinDarkPoolNote(masterName string, mt MasterType, n int) string {
+	if n != 2 || (mt != MasterDark && mt != MasterDarkFlat) {
+		return ""
+	}
+	return fmt.Sprintf("master %s: 2-frame pool — outlier rejection needs at least 3 darks, so a cosmic-ray hit in either frame survives into the master",
+		masterName)
 }
 
 // flatBias finds a bias (or dark-flat) master matching a flat set's gain/offset/bin.
