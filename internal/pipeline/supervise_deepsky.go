@@ -165,6 +165,7 @@ func supervisorState(p mode.Preset) map[string]any {
 			"background_level": p.BackgroundLevel, "linked_stretch": p.LinkedStretch,
 			"color_calibration": p.ColorCalibration, "combined_background_ai": p.CombinedBackgroundAI,
 			"background_degree": p.BackgroundDegree, "color_denoise_ai": p.ColorDenoiseAI,
+			"sky_desat":   p.SkyDesat,
 			"star_reduce": p.StarReduce, "stretch_headroom": p.StretchHeadroom,
 			"palette": p.Palette,
 		},

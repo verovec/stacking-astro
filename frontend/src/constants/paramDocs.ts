@@ -104,6 +104,7 @@ const DEEPSKY_GROUPS: ParamGroup[] = [
       "color_denoise_ai",
       "chroma_smooth_px",
       "chroma_bg_smooth_px",
+      "sky_desat",
       "sky_chroma_flatten_px",
       "sky_lum_flatten_px",
       "star_reduce",

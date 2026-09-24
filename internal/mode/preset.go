@@ -424,6 +424,17 @@ type Preset struct {
 	// colour untouched. Luminance is byte-for-byte unchanged (same identity as ChromaSmoothPx).
 	// 0 → off. See internal/pipeline/chromasmooth.go.
 	ChromaBgSmoothPx int
+	// SkyDesat neutralizes the COLOUR of the sky floor and of the mid-scale colour patches riding on
+	// faint nebulosity, luminance untouched (same mean-preserving identity as ChromaSmoothPx). Two
+	// SNR-masked stages: chroma is first pulled toward its coarse (ChromaBgSmoothPx-scale) field
+	// wherever luminance is not clearly signal — a frequency separation that erases blob-scale colour
+	// patches ON faint veils while their broad colour survives (the case ChromaBgSmoothPx cannot
+	// reach: the veil sits above its ~6σ SNR ceiling) — then the remaining chroma is scaled toward
+	// neutral on the true sky floor. This is the PRESENTATION answer to the real sky-chroma mottle of
+	// dusty fields (M45, card 0025: two independent nights correlate r≈0.9 sky-aligned, ≈0
+	// sensor-aligned — rejection cannot remove per-frame signal, so the choice is to show the floor's
+	// colour or neutralize it). 0 → off (byte-identical), 1 → fully neutral floor.
+	SkyDesat float64
 	// LumBoost gently lifts the L luminance curve's midtones (the value is the peak lift at
 	// mid-grey; sky-level points pinned by a shadow anchor, core/star points by a highlight
 	// anchor) — "a brighter galaxy periphery" without touching sky level, core detail or colour

@@ -260,6 +260,15 @@ const PREP_KNOBS: KnobDef[] = [
     step: 2,
   },
   {
+    key: "sky_desat",
+    labelKey: "rerun.knobs.sky_desat",
+    kind: "number",
+    def: 0,
+    min: 0,
+    max: 1,
+    step: 0.05,
+  },
+  {
     key: "sky_chroma_flatten_px",
     labelKey: "rerun.knobs.sky_chroma_flatten_px",
     kind: "number",
