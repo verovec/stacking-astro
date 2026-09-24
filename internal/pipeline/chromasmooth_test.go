@@ -288,47 +288,90 @@ func TestChromaSmoothRGB_ObjectColourPreserved(t *testing.T) {
 	assert.InDelta(t, tin, tout, 0.02*tin, "object interior tint must survive within 2%%")
 }
 
-// TestChromaSmoothRGB_SkyDesat_NeutralizesFloorKeepsVeil: the sky-desat pass on the dusty-veil
-// fixture — the true sky floor's chroma (blotch + speckle) goes essentially neutral (stage 2), the
-// blotch patches RIDING ON the faint veil are flattened by the frequency separation (stage 1, the
-// case chroma_bg_smooth_px cannot reach: the veil sits above its SNR ceiling), while the veil's own
-// broad tint and the bright galaxy's tint survive.
-func TestChromaSmoothRGB_SkyDesat_NeutralizesFloorKeepsVeil(t *testing.T) {
-	const w, h = 192, 192
-	cfg := starChromaCfg{w: w, h: h, pedestal: fixPedestal, lumNoise: fixLumNoise,
-		speckle: fixSpeckle, blotch: 0.01, veil: true, galaxy: true}
+// deepStackCfg is the sky-desat fixture at REALISTIC deep-stack scales: after ~80 stacked subs the
+// pixel noise is ~3e-5 of full scale while everything the stretch makes visible (dust veil, blue
+// nebulosity, colour patches) lives at +0.05%..+2% of the sky level — i.e. at enormous noise-SNR.
+// The card 0026 bug (σ-scaled masks classifying the whole veil as bright signal) is invisible to a
+// fixture with exaggerated noise, so this one pins the brightness-relative semantics instead.
+const (
+	dsPedestal         = float32(0.05)
+	dsLumNoise         = float32(2e-5) // ±checker → σL ≈ 3e-5: the deep-stack pixel noise scale
+	dsSpeckle          = float32(4e-6) // fine chroma noise → σc, the winsorization scale
+	dsBlotch           = float32(6e-6) // 48px chroma alternation — the patches, everywhere
+	dsVeilLift         = float32(5e-4) // veil at +1% of sky: ≫ noise, below skyDesatNebLo
+	dsVeilTint         = float32(4e-6)
+	dsBlobLift         = float32(7.5e-3) // bright extended signal at +15%: above skyDesatNebHi
+	dsBlobTint         = float32(8e-6)
+	dsStarAmp          = float32(3e-3) // point star: a LOCAL peak ≫ skyDesatStarHi after σ2 blur
+	dsW, dsH           = 288, 224
+	dsVeilCX, dsVeilCY = 200, 150
+	dsVeilRX, dsVeilRY = 80, 60
+	dsBlobCX, dsBlobCY = 70, 60
+	dsBlobRX, dsBlobRY = 40, 30
+	dsStarCX, dsStarCY = 60, 170
+)
+
+func makeDeepStackRGB(t *testing.T, dir string) string {
+	t.Helper()
+	im := fits.NewImage(dsW, dsH, 3)
+	sigmas := [3]float64{2.2, 2.5, 2.9} // per-channel PSF widths → authentic star wing chroma
+	for y := 0; y < dsH; y++ {
+		for x := 0; x < dsW; x++ {
+			i := y*dsW + x
+			lum := dsPedestal
+			if (x+y)%2 == 0 {
+				lum += dsLumNoise
+			} else {
+				lum -= dsLumNoise
+			}
+			chroma := float32(0)
+			if (x+y)%2 == 0 {
+				chroma += dsSpeckle
+			} else {
+				chroma -= dsSpeckle
+			}
+			chroma += dsBlotch * float32(math.Sin(2*math.Pi*float64(x)/48)*math.Sin(2*math.Pi*float64(y)/48))
+			if insideEllipse(x, y, dsVeilCX, dsVeilCY, dsVeilRX, dsVeilRY) {
+				lum += dsVeilLift
+				chroma += dsVeilTint
+			}
+			if insideEllipse(x, y, dsBlobCX, dsBlobCY, dsBlobRX, dsBlobRY) {
+				lum += dsBlobLift
+				chroma += dsBlobTint
+			}
+			r, g, b := lum+chroma, lum, lum-chroma
+			d2 := float64((x-dsStarCX)*(x-dsStarCX) + (y-dsStarCY)*(y-dsStarCY))
+			r += dsStarAmp * float32(math.Exp(-d2/(2*sigmas[0]*sigmas[0])))
+			g += dsStarAmp * float32(math.Exp(-d2/(2*sigmas[1]*sigmas[1])))
+			b += dsStarAmp * float32(math.Exp(-d2/(2*sigmas[2]*sigmas[2])))
+			im.Pix[0][i], im.Pix[1][i], im.Pix[2][i] = r, g, b
+		}
+	}
+	p := filepath.Join(dir, "deep.fits")
+	require.NoError(t, im.WriteFITS(p))
+	return p
+}
+
+// TestChromaSmoothRGB_SkyDesat_DeepStackSemantics pins the brightness-relative behaviour on the
+// realistic fixture: (a) the floor's chroma collapses, (b) the patches riding ON the faint veil
+// flatten while the veil's broad tint survives, (c) a bright extended object keeps its colour AND
+// its colour structure, (d) a star keeps its core chroma (contrast protection, not level).
+func TestChromaSmoothRGB_SkyDesat_DeepStackSemantics(t *testing.T) {
 	dir := t.TempDir()
-	path := makeStarChromaRGB(t, dir, "rgb", cfg)
+	path := makeDeepStackRGB(t, dir)
 	in := readRGB(t, path)
-	_, err := chromaSmoothRGB(path, chromaSmoothOpts{BgPx: 24, SkyDesat: 1})
+	_, err := chromaSmoothRGB(path, chromaSmoothOpts{SkyDesat: 1})
 	require.NoError(t, err)
 	out := readRGB(t, path)
 
-	// (a) sky floor (clear of both objects): chroma rms collapses.
-	skyRMS := func(im *fits.Image) float64 {
-		var sum float64
-		var n int
-		for y := 80; y < 112; y++ {
-			for x := 8; x < 96; x++ {
-				d := float64(im.Pix[0][y*w+x] - im.Pix[2][y*w+x])
-				sum += d * d
-				n++
-			}
-		}
-		return math.Sqrt(sum / float64(n))
-	}
-	require.Greater(t, skyRMS(in), 0.005, "fixture sanity: the floor carries measurable chroma mottle")
-	assert.Less(t, skyRMS(out), 0.15*skyRMS(in), "sky-floor chroma must be ≥85%% neutralized")
-
-	// (b) veil interior (eroded): the broad tint survives, the superimposed patches flatten.
-	veilStats := func(im *fits.Image) (mean, std float64) {
+	rb := func(im *fits.Image, i int) float64 { return float64(im.Pix[0][i] - im.Pix[2][i]) }
+	stats := func(im *fits.Image, keep func(x, y int) bool) (mean, std float64) {
 		var vals []float64
-		for y := 0; y < h; y++ {
-			for x := 0; x < w; x++ {
-				if !insideEllipse(x, y, veilCX, veilCY, veilRX/2, veilRY/2) {
-					continue
+		for y := 0; y < dsH; y++ {
+			for x := 0; x < dsW; x++ {
+				if keep(x, y) {
+					vals = append(vals, rb(im, y*dsW+x))
 				}
-				vals = append(vals, float64(im.Pix[0][y*w+x]-im.Pix[2][y*w+x]))
 			}
 		}
 		for _, v := range vals {
@@ -340,28 +383,36 @@ func TestChromaSmoothRGB_SkyDesat_NeutralizesFloorKeepsVeil(t *testing.T) {
 		}
 		return mean, math.Sqrt(std / float64(len(vals)))
 	}
-	mIn, sIn := veilStats(in)
-	mOut, sOut := veilStats(out)
-	require.InDelta(t, 2*veilTint, mIn, 0.004, "fixture sanity: veil interior tint is ~2·veilTint")
-	assert.Greater(t, mOut, 0.7*mIn, "the veil's broad colour must survive the desat (≥70%%)")
-	assert.Less(t, sOut, 0.4*sIn, "the colour patches ON the veil must flatten by ≥60%%")
 
-	// (c) the bright object keeps most of its colour (the fine SNR mask fades the pass out).
-	tint := func(im *fits.Image) float64 {
-		var sum float64
-		var n int
-		for y := 0; y < h; y++ {
-			for x := 0; x < w; x++ {
-				if !insideEllipse(x, y, galaxyCX, galaxyCY, galaxyRX/2, galaxyRY/2) {
-					continue
-				}
-				sum += float64(im.Pix[0][y*w+x] - im.Pix[2][y*w+x])
-				n++
-			}
-		}
-		return sum / float64(n)
+	// (a) floor (clear of veil, blob and star): chroma rms collapses.
+	sky := func(x, y int) bool {
+		return x >= 5 && x < 40 && y >= 100 && y < 215 && (x-dsStarCX)*(x-dsStarCX)+(y-dsStarCY)*(y-dsStarCY) > 30*30
 	}
-	assert.Greater(t, tint(out), 0.9*tint(in), "an object above the fine SNR mask keeps its tint even at sky_desat 1")
+	_, sIn := stats(in, sky)
+	_, sOut := stats(out, sky)
+	require.Greater(t, sIn, float64(dsBlotch), "fixture sanity: the floor carries the chroma mottle")
+	assert.Less(t, sOut, 0.15*sIn, "sky-floor chroma must be ≥85%% neutralized")
+
+	// (b) veil interior (eroded): broad tint survives, patches flatten.
+	veil := func(x, y int) bool { return insideEllipse(x, y, dsVeilCX, dsVeilCY, dsVeilRX/2, dsVeilRY/2) }
+	mIn, pIn := stats(in, veil)
+	mOut, pOut := stats(out, veil)
+	require.InDelta(t, 2*float64(dsVeilTint), mIn, 2e-6, "fixture sanity: veil interior tint")
+	assert.Greater(t, mOut, 0.6*mIn, "the veil's broad colour must survive (≥60%%)")
+	assert.Less(t, pOut, 0.4*pIn, "the colour patches ON the veil must flatten by ≥60%%")
+
+	// (c) bright extended object: tint AND colour structure preserved (the neb mask fades stage 1 out).
+	blob := func(x, y int) bool { return insideEllipse(x, y, dsBlobCX, dsBlobCY, dsBlobRX/2, dsBlobRY/2) }
+	bmIn, bsIn := stats(in, blob)
+	bmOut, bsOut := stats(out, blob)
+	assert.Greater(t, bmOut, 0.85*bmIn, "bright extended signal keeps its tint")
+	assert.Greater(t, bsOut, 0.75*bsIn, "bright extended signal keeps its colour STRUCTURE")
+
+	// (d) star core: chroma survives via the local-peak protection.
+	coreIn := rb(in, (dsStarCY)*dsW+dsStarCX+3) // wing pixel where per-channel PSFs disagree most
+	coreOut := rb(out, (dsStarCY)*dsW+dsStarCX+3)
+	require.Greater(t, math.Abs(coreIn), 1e-5, "fixture sanity: the star wing carries chroma")
+	assert.Greater(t, math.Abs(coreOut), 0.5*math.Abs(coreIn), "a star keeps ≥50%% of its wing chroma")
 }
 
 // TestChromaSmoothRGB_SkyDesatZero_NoopByteIdentical: sky_desat 0 with no radii is a TRUE no-op —

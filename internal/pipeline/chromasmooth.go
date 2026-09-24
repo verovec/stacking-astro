@@ -45,6 +45,18 @@ const (
 	chromaCoreLevel    = 0.85    // near-saturation level marking bright star cores in the linear combine
 	chromaStatsSamples = 200_000 // subsample size for the sky/noise statistics
 	skyDesatBgPx       = 48      // coarse-field radius for the sky-desat pass when ChromaBgSmoothPx is off
+
+	// The sky-desat masks are BRIGHTNESS-RELATIVE (fractions of the sky level), NOT stack-noise SNR:
+	// in a deep stack the noise sigma is so small that even the faintest visible dust sits at 40-400σ,
+	// so a σ-scaled mask classifies the whole veil as "bright signal" and the pass never touches the
+	// patches the stretch makes visible (the card 0025 field bug, root-caused on M45 24/09: the whole
+	// veil — brown patches AND blue nebulosity — lives between +0.05% and +0.2% of sky in linear).
+	skyDesatStarLo = 0.005 // local-peak contrast (lumS−lumC)/bg where star protection starts…
+	skyDesatStarHi = 0.02  // …and is total: a stacked faint star peaks ≥ +2% locally, veil texture ±0.2%
+	skyDesatNebLo  = 0.02  // coarse lift (lumC−bg)/bg where the patch-flattening stage starts fading…
+	skyDesatNebHi  = 0.10  // …and is off: bright extended signal keeps its own colour STRUCTURE
+	skyDesatRelLo  = 3e-4  // coarse lift below which the floor is fully neutralized…
+	skyDesatRelHi  = 15e-4 // …fading to none: faint nebulosity keeps the broad colour stage 1 leaves
 )
 
 // chromaSmoothRGB smooths ONLY the colour of a combined RGB linear FITS in place, preserving the
@@ -87,6 +99,8 @@ type chromaField struct {
 	w, h       int
 	mean       []float32 // (R+G+B)/3 — the preserved luminance
 	lumS       []float32 // gaussian-stabilised luminance driving the SNR mask
+	lumC       []float32 // coarse luminance field (sky-desat only): local-peak + relative-lift masks
+	starW      []float32 // sky-desat star weight (local-peak smoothstep), shared by the three channels
 	zero       []float32 // per-pixel mean of the clipped residuals — subtracted so Σ(blur input) ≡ 0
 	core       []bool    // dilated near-saturation cores: fully exempt from replacement
 	bg, sigmaL float64   // sky level + robust luminance sigma
@@ -109,7 +123,26 @@ func buildChromaField(im *fits.Image, o chromaSmoothOpts) (*chromaField, bool) {
 	f.lumS = imgops.GaussianBlur(f.mean, im.W, im.H, chromaMaskSigma)
 	f.core = chromaCoreMask(f.mean, im.W, im.H, max(o.FinePx, 4))
 	f.zero = chromaZeroSum(im, f.mean, f.clip)
+	if o.SkyDesat > 0 {
+		if !(f.bg > 0) {
+			return nil, false // the relative-lift masks divide by the sky level
+		}
+		f.lumC = imgops.GaussianBlur(f.mean, im.W, im.H, chromaSigmaPx(bgRadiusPx(o)))
+		f.starW = make([]float32, len(f.mean))
+		for i := range f.starW {
+			f.starW[i] = float32(smoothstep(skyDesatStarLo, skyDesatStarHi,
+				(float64(f.lumS[i])-float64(f.lumC[i]))/f.bg))
+		}
+	}
 	return f, true
+}
+
+// bgRadiusPx is the coarse-pass radius: the knob when set, the sky-desat default otherwise.
+func bgRadiusPx(o chromaSmoothOpts) int {
+	if o.BgPx > 0 {
+		return o.BgPx
+	}
+	return skyDesatBgPx
 }
 
 // chromaStats measures the sky level + robust sigma of the luminance plane and the pooled chroma
@@ -183,12 +216,23 @@ func chromaSmoothChannel(pix, scratch []float32, f *chromaField, o chromaSmoothO
 	for i := range scratch {
 		scratch[i] = clipF32(pix[i]-f.mean[i], f.clip) - f.zero[i]
 	}
-	var smF, smB []float32
+	var smF, smB, smD []float32
 	if o.FinePx > 0 {
 		smF = imgops.GaussianBlur(scratch, f.w, f.h, chromaSigmaPx(o.FinePx))
 	}
-	if o.BgPx > 0 || o.SkyDesat > 0 {
+	if o.BgPx > 0 {
 		smB = coarseChroma(scratch, smF, f, o)
+	}
+	if o.SkyDesat > 0 {
+		// The desat target field is built from STAR-MASKED residuals: a bright star's wing chroma
+		// must not leak into the coarse field stage 1 copies back, or every star grows a soft
+		// colour disc. The mask weight is channel-shared, so the three inputs still sum to zero
+		// per pixel and the mean stays exact.
+		dscratch := make([]float32, len(scratch))
+		for i := range scratch {
+			dscratch[i] = scratch[i] * (1 - f.starW[i])
+		}
+		smD = imgops.GaussianBlur(dscratch, f.w, f.h, chromaSigmaPx(bgRadiusPx(o)))
 	}
 	for i := range pix {
 		if f.core[i] {
@@ -203,15 +247,23 @@ func chromaSmoothChannel(pix, scratch []float32, f *chromaField, o chromaSmoothO
 			c += (1 - smoothstep(chromaBgSNRLo, chromaBgSNRHi, snr)) * (float64(smB[i]) - c)
 		}
 		if o.SkyDesat > 0 {
-			// Stage 1 — frequency separation up into faint nebulosity (the FINE mask, not the bg
-			// one): pull the chroma toward its coarse field, erasing blob-scale colour patches ON
-			// faint veils while their broad colour (the coarse field itself) survives.
-			c += o.SkyDesat * (1 - smoothstep(chromaFineSNRLo, chromaFineSNRHi, snr)) * (float64(smB[i]) - c)
-			// Stage 2 — neutralize what remains on the TRUE sky floor (the bg mask): the floor's
-			// broad colour goes to grey. Both stages are linear in c with channel-shared weights,
-			// and the coarse fields zero-sum across channels, so the per-pixel mean is preserved
-			// exactly (the chromaSmoothRGB identity).
-			c *= 1 - o.SkyDesat*(1-smoothstep(chromaBgSNRLo, chromaBgSNRHi, snr))
+			// Brightness-relative masks (NOT stack-σ SNR — see the constants' comment): a star is a
+			// LOCAL PEAK over the coarse field, bright extended signal is a large COARSE LIFT, the
+			// floor is a near-zero lift. All weights are channel-shared and both stages are linear
+			// in c (smB zero-sums across channels), so the per-pixel mean is preserved exactly.
+			star := float64(f.starW[i])
+			rel := (float64(f.lumC[i]) - f.bg) / f.bg
+			// Stage 1 — frequency separation over the whole sky + faint veil: pull the chroma toward
+			// its star-masked coarse field, erasing the 10-100px colour ALTERNATION (the patches)
+			// while broad colour (the coarse field itself) survives. Fades out on stars (their own
+			// colour is a point the coarse field can't represent) and on bright extended signal
+			// (real colour structure).
+			w1 := o.SkyDesat * (1 - star) * (1 - smoothstep(skyDesatNebLo, skyDesatNebHi, rel))
+			c += w1 * (float64(smD[i]) - c)
+			// Stage 2 — neutralize the TRUE floor: below skyDesatRelLo of lift the remaining broad
+			// colour goes to grey, fading to none by skyDesatRelHi so faint nebulosity keeps the
+			// broad tint stage 1 left it.
+			c *= 1 - o.SkyDesat*(1-star)*(1-smoothstep(skyDesatRelLo, skyDesatRelHi, rel))
 		}
 		pix[i] = f.mean[i] + float32(c)
 	}
@@ -221,11 +273,7 @@ func chromaSmoothChannel(pix, scratch []float32, f *chromaField, o chromaSmoothO
 // passes run (gaussian composition, σB² = σF² + σrest²), else a direct blur of the residuals. The
 // sky-desat pass reuses this field; when the bg radius knob is off it falls back to skyDesatBgPx.
 func coarseChroma(scratch, smF []float32, f *chromaField, o chromaSmoothOpts) []float32 {
-	px := o.BgPx
-	if px <= 0 {
-		px = skyDesatBgPx
-	}
-	sigmaB := chromaSigmaPx(px)
+	sigmaB := chromaSigmaPx(bgRadiusPx(o))
 	if smF == nil {
 		return imgops.GaussianBlur(scratch, f.w, f.h, sigmaB)
 	}

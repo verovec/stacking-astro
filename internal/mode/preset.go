@@ -426,14 +426,17 @@ type Preset struct {
 	ChromaBgSmoothPx int
 	// SkyDesat neutralizes the COLOUR of the sky floor and of the mid-scale colour patches riding on
 	// faint nebulosity, luminance untouched (same mean-preserving identity as ChromaSmoothPx). Two
-	// SNR-masked stages: chroma is first pulled toward its coarse (ChromaBgSmoothPx-scale) field
-	// wherever luminance is not clearly signal — a frequency separation that erases blob-scale colour
-	// patches ON faint veils while their broad colour survives (the case ChromaBgSmoothPx cannot
-	// reach: the veil sits above its ~6σ SNR ceiling) — then the remaining chroma is scaled toward
-	// neutral on the true sky floor. This is the PRESENTATION answer to the real sky-chroma mottle of
-	// dusty fields (M45, card 0025: two independent nights correlate r≈0.9 sky-aligned, ≈0
-	// sensor-aligned — rejection cannot remove per-frame signal, so the choice is to show the floor's
-	// colour or neutralize it). 0 → off (byte-identical), 1 → fully neutral floor.
+	// stages with BRIGHTNESS-RELATIVE masks (fractions of the sky level — NOT stack-noise SNR: in a
+	// deep stack even the faintest visible dust sits at 40-400σ, so a σ-scaled mask protects the
+	// whole veil and the pass touches nothing; the card 0025→0026 field bug): chroma is pulled
+	// toward its star-masked coarse field wherever the pixel is neither a local PEAK (a star,
+	// protected by contrast, not by level) nor bright extended signal (large coarse lift → its real
+	// colour structure is kept) — erasing the 10-100px colour alternation while broad colour
+	// survives — then the remaining chroma is scaled to grey on the true floor (sub-0.1% lift).
+	// The PRESENTATION answer to the real sky-chroma mottle of dusty fields (M45: two independent
+	// nights correlate r≈0.9 sky-aligned, ≈0 sensor-aligned — rejection cannot remove per-frame
+	// signal, so the choice is to show the floor's colour or neutralize it). 0 → off
+	// (byte-identical), 1 → fully neutral floor. See chromasmooth.go's skyDesat* constants.
 	SkyDesat float64
 	// LumBoost gently lifts the L luminance curve's midtones (the value is the peak lift at
 	// mid-grey; sky-level points pinned by a shadow anchor, core/star points by a highlight
