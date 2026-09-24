@@ -38,6 +38,19 @@ type SeamNoiseEq struct {
 	SigmaAfter  float64 `json:"sigma_after"`
 	Applied     bool    `json:"applied"`
 	Reason      string  `json:"reason,omitempty"`
+	// Mode records HOW the weighted pass treated the master: "luminance" for a colour master
+	// (noise.DenoiseWeighted smooths m=(R+G+B)/3 only, per-pixel chroma preserved — the fix for
+	// the regional colour patches of multi-night OSC masters), "mono" for a single-plane one.
+	Mode string `json:"mode,omitempty"`
+}
+
+// seamNoiseMode names the weighted-denoise treatment for a master with c planes — the run.json
+// provenance for which of noise.DenoiseWeighted's two behaviours applied.
+func seamNoiseMode(c int) string {
+	if c == 3 {
+		return "luminance"
+	}
+	return "mono"
 }
 
 // equalizeSeamNoise runs the weighted starlet pass on the linear master (in place), recording the
@@ -74,6 +87,7 @@ func equalizeSeamNoise(ctx context.Context, opts Options, ch *ChannelResult, mas
 	start := time.Now()
 	emit(onProgress, fmt.Sprintf("▶ seam noise equalization %s (depth %d→%d, weight ≤%.2f)",
 		filter, eq.DepthMin, eq.DepthMax, eq.WeightMax))
+	eq.Mode = seamNoiseMode(im.C)
 	eq.SigmaBefore = noise.Measure(im).Sigma
 	if err := noise.DenoiseWeighted(im, noise.DefaultOptions(), weights); err != nil {
 		eq.Reason = "weighted denoise: " + err.Error()
@@ -85,8 +99,8 @@ func equalizeSeamNoise(ctx context.Context, opts Options, ch *ChannelResult, mas
 	}
 	eq.SigmaAfter = noise.Measure(im).Sigma
 	eq.Applied = true
-	emit(onProgress, fmt.Sprintf("✓ seam noise equalization %s done in %s (σ %.4g → %.4g)",
-		filter, time.Since(start).Round(time.Second), eq.SigmaBefore, eq.SigmaAfter))
+	emit(onProgress, fmt.Sprintf("✓ seam noise equalization %s done in %s (%s pass, σ %.4g → %.4g)",
+		filter, time.Since(start).Round(time.Second), eq.Mode, eq.SigmaBefore, eq.SigmaAfter))
 }
 
 // seamNoiseWeights maps the coverage grid to a full-resolution starlet weight plane: counts are

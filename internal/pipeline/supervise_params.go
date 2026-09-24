@@ -141,6 +141,7 @@ type supervisePatch struct {
 	ColorDenoiseAI       *bool    `json:"color_denoise_ai,omitempty"`
 	ChromaSmoothPx       *int     `json:"chroma_smooth_px,omitempty"`
 	ChromaBgSmoothPx     *int     `json:"chroma_bg_smooth_px,omitempty"`
+	SkyDesat             *float64 `json:"sky_desat,omitempty"`
 	SkyChromaFlattenPx   *int     `json:"sky_chroma_flatten_px,omitempty"`
 	SkyLumFlattenPx      *int     `json:"sky_lum_flatten_px,omitempty"`
 	StarReduce           *float64 `json:"star_reduce,omitempty"`
@@ -205,6 +206,7 @@ func (patch supervisePatch) apply(p mode.Preset) mode.Preset {
 	setB(&p.ColorDenoiseAI, patch.ColorDenoiseAI)
 	setI(&p.ChromaSmoothPx, patch.ChromaSmoothPx)
 	setI(&p.ChromaBgSmoothPx, patch.ChromaBgSmoothPx)
+	setF(&p.SkyDesat, patch.SkyDesat)
 	setI(&p.SkyChromaFlattenPx, patch.SkyChromaFlattenPx)
 	setI(&p.SkyLumFlattenPx, patch.SkyLumFlattenPx)
 	setF(&p.StarReduce, patch.StarReduce)
@@ -280,6 +282,7 @@ func clampPreset(p mode.Preset) mode.Preset {
 	p.BackgroundDegree = clampi(p.BackgroundDegree, 1, 4)
 	p.ChromaSmoothPx = clampi(p.ChromaSmoothPx, 0, 16)
 	p.ChromaBgSmoothPx = clampi(p.ChromaBgSmoothPx, 0, 64)
+	p.SkyDesat = clampf(p.SkyDesat, 0, 1)
 	p.SkyChromaFlattenPx = clampi(p.SkyChromaFlattenPx, 0, 128)
 	p.SkyLumFlattenPx = clampi(p.SkyLumFlattenPx, 0, 256)
 	p.StarReduce = clampf(p.StarReduce, 0, 1)
@@ -326,6 +329,7 @@ func tierOf(prev, next mode.Preset) tier {
 		prev.ColorDenoiseAI != next.ColorDenoiseAI ||
 		prev.ChromaSmoothPx != next.ChromaSmoothPx ||
 		prev.ChromaBgSmoothPx != next.ChromaBgSmoothPx ||
+		floatChanged(prev.SkyDesat, next.SkyDesat) ||
 		prev.SkyChromaFlattenPx != next.SkyChromaFlattenPx ||
 		prev.SkyLumFlattenPx != next.SkyLumFlattenPx ||
 		floatChanged(prev.StarReduce, next.StarReduce) ||
@@ -395,6 +399,7 @@ func paramsMap(p mode.Preset) map[string]float64 {
 		"background_degree":     float64(p.BackgroundDegree),
 		"chroma_smooth_px":      float64(p.ChromaSmoothPx),
 		"chroma_bg_smooth_px":   float64(p.ChromaBgSmoothPx),
+		"sky_desat":             p.SkyDesat,
 		"sky_chroma_flatten_px": float64(p.SkyChromaFlattenPx),
 		"sky_lum_flatten_px":    float64(p.SkyLumFlattenPx),
 		"star_reduce":           p.StarReduce,

@@ -24,18 +24,26 @@ type starChromaCfg struct {
 	speckle  float32 // mean-NEUTRAL 1px checker on R/−B — the fine chroma noise (sets sigmaC)
 	star     bool    // saturated star at centre with per-channel PSF widths (σ 2.2/2.5/2.9)
 	blotch   float32 // mean-neutral 48px sin×sin field on R/−B — the large chroma mottle
-	galaxy   bool    // flat ellipse at ~20σ luminance with a uniform R−B tint of 2·galaxyTint
+	galaxy   bool    // flat ellipse far above every SNR mask with a uniform R−B tint of 2·galaxyTint
+	veil     bool    // faint ellipse at ~7σ luminance with a uniform R−B tint of 2·veilTint — the
+	// dusty-veil case: real broad colour BELOW the fine SNR mask, with the blotch field on top
 }
 
 const (
-	fixStarAmp                             = 0.95
-	galaxyLum                              = 0.06
-	galaxyTint                             = 0.01
+	fixStarAmp = 0.95
+	galaxyLum  = 0.24 // > 30σ whichever branch the checker MAD lands on — above the fine mask
+	galaxyTint = 0.01
+	// veilLum sits above the bg mask (>6σ) and inside the fine mask (≲10σ) under EITHER branch the
+	// checker fixture's two-valued MAD can land on (σL ≈ 0.003 or ≈ 0.006) — the masks' behaviour on
+	// the veil is then branch-independent: stage 1 fully applies, stage 2 not at all.
+	veilLum                                = 0.04
+	veilTint                               = 0.008
 	fixSpeckle                             = float32(0.004)
 	fixSigmaC                              = 1.4826 * 0.004 // MAD-based sigma of the ±fixSpeckle checker residuals
 	fixLumNoise                            = float32(0.002)
 	fixPedestal                            = float32(0.05)
 	galaxyCX, galaxyCY, galaxyRX, galaxyRY = 32, 32, 24, 16
+	veilCX, veilCY, veilRX, veilRY         = 144, 144, 32, 24
 )
 
 func makeStarChromaRGB(t *testing.T, dir, name string, cfg starChromaCfg) string {
@@ -66,6 +74,10 @@ func makeStarChromaRGB(t *testing.T, dir, name string, cfg starChromaCfg) string
 			if cfg.galaxy && insideEllipse(x, y, galaxyCX, galaxyCY, galaxyRX, galaxyRY) {
 				lum += galaxyLum
 				chroma += galaxyTint
+			}
+			if cfg.veil && insideEllipse(x, y, veilCX, veilCY, veilRX, veilRY) {
+				lum += veilLum
+				chroma += veilTint
 			}
 			r, g, b := lum+chroma, lum, lum-chroma
 			if cfg.star {
@@ -106,6 +118,8 @@ func TestChromaSmoothRGB_LuminanceByteIdentical(t *testing.T) {
 		{"fine only", chromaSmoothOpts{FinePx: 6}},
 		{"background only", chromaSmoothOpts{BgPx: 24}},
 		{"both", chromaSmoothOpts{FinePx: 6, BgPx: 24}},
+		{"sky desat only", chromaSmoothOpts{SkyDesat: 1}},
+		{"all three", chromaSmoothOpts{FinePx: 6, BgPx: 24, SkyDesat: 1}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -242,7 +256,7 @@ func TestChromaSmoothRGB_BackgroundMottleReduced(t *testing.T) {
 	assert.Greater(t, withoutBg, 0.6*before, "the fine pass alone barely touches 48px mottle — the coarse knob does the work")
 }
 
-// TestChromaSmoothRGB_ObjectColourPreserved: a real object (20σ above sky) keeps its colour — the
+// TestChromaSmoothRGB_ObjectColourPreserved: a real object (far above sky) keeps its colour — the
 // coarse pass is background-only, and the fine pass is an identity on a uniform tint.
 func TestChromaSmoothRGB_ObjectColourPreserved(t *testing.T) {
 	const w, h = 128, 128
@@ -272,6 +286,98 @@ func TestChromaSmoothRGB_ObjectColourPreserved(t *testing.T) {
 	tin, tout := tintMean(in), tintMean(out)
 	require.InDelta(t, 2*galaxyTint, tin, 1e-3, "fixture sanity: interior tint is 2·galaxyTint")
 	assert.InDelta(t, tin, tout, 0.02*tin, "object interior tint must survive within 2%%")
+}
+
+// TestChromaSmoothRGB_SkyDesat_NeutralizesFloorKeepsVeil: the sky-desat pass on the dusty-veil
+// fixture — the true sky floor's chroma (blotch + speckle) goes essentially neutral (stage 2), the
+// blotch patches RIDING ON the faint veil are flattened by the frequency separation (stage 1, the
+// case chroma_bg_smooth_px cannot reach: the veil sits above its SNR ceiling), while the veil's own
+// broad tint and the bright galaxy's tint survive.
+func TestChromaSmoothRGB_SkyDesat_NeutralizesFloorKeepsVeil(t *testing.T) {
+	const w, h = 192, 192
+	cfg := starChromaCfg{w: w, h: h, pedestal: fixPedestal, lumNoise: fixLumNoise,
+		speckle: fixSpeckle, blotch: 0.01, veil: true, galaxy: true}
+	dir := t.TempDir()
+	path := makeStarChromaRGB(t, dir, "rgb", cfg)
+	in := readRGB(t, path)
+	_, err := chromaSmoothRGB(path, chromaSmoothOpts{BgPx: 24, SkyDesat: 1})
+	require.NoError(t, err)
+	out := readRGB(t, path)
+
+	// (a) sky floor (clear of both objects): chroma rms collapses.
+	skyRMS := func(im *fits.Image) float64 {
+		var sum float64
+		var n int
+		for y := 80; y < 112; y++ {
+			for x := 8; x < 96; x++ {
+				d := float64(im.Pix[0][y*w+x] - im.Pix[2][y*w+x])
+				sum += d * d
+				n++
+			}
+		}
+		return math.Sqrt(sum / float64(n))
+	}
+	require.Greater(t, skyRMS(in), 0.005, "fixture sanity: the floor carries measurable chroma mottle")
+	assert.Less(t, skyRMS(out), 0.15*skyRMS(in), "sky-floor chroma must be ≥85%% neutralized")
+
+	// (b) veil interior (eroded): the broad tint survives, the superimposed patches flatten.
+	veilStats := func(im *fits.Image) (mean, std float64) {
+		var vals []float64
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				if !insideEllipse(x, y, veilCX, veilCY, veilRX/2, veilRY/2) {
+					continue
+				}
+				vals = append(vals, float64(im.Pix[0][y*w+x]-im.Pix[2][y*w+x]))
+			}
+		}
+		for _, v := range vals {
+			mean += v
+		}
+		mean /= float64(len(vals))
+		for _, v := range vals {
+			std += (v - mean) * (v - mean)
+		}
+		return mean, math.Sqrt(std / float64(len(vals)))
+	}
+	mIn, sIn := veilStats(in)
+	mOut, sOut := veilStats(out)
+	require.InDelta(t, 2*veilTint, mIn, 0.004, "fixture sanity: veil interior tint is ~2·veilTint")
+	assert.Greater(t, mOut, 0.7*mIn, "the veil's broad colour must survive the desat (≥70%%)")
+	assert.Less(t, sOut, 0.4*sIn, "the colour patches ON the veil must flatten by ≥60%%")
+
+	// (c) the bright object keeps most of its colour (the fine SNR mask fades the pass out).
+	tint := func(im *fits.Image) float64 {
+		var sum float64
+		var n int
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				if !insideEllipse(x, y, galaxyCX, galaxyCY, galaxyRX/2, galaxyRY/2) {
+					continue
+				}
+				sum += float64(im.Pix[0][y*w+x] - im.Pix[2][y*w+x])
+				n++
+			}
+		}
+		return sum / float64(n)
+	}
+	assert.Greater(t, tint(out), 0.9*tint(in), "an object above the fine SNR mask keeps its tint even at sky_desat 1")
+}
+
+// TestChromaSmoothRGB_SkyDesatZero_NoopByteIdentical: sky_desat 0 with no radii is a TRUE no-op —
+// the un-configured contract (default runs stay byte-identical).
+func TestChromaSmoothRGB_SkyDesatZero_NoopByteIdentical(t *testing.T) {
+	dir := t.TempDir()
+	path := makeStarChromaRGB(t, dir, "rgb", starChromaCfg{w: 64, h: 64,
+		pedestal: fixPedestal, lumNoise: fixLumNoise, speckle: fixSpeckle, blotch: 0.01})
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+	note, err := chromaSmoothRGB(path, chromaSmoothOpts{SkyDesat: 0})
+	require.NoError(t, err)
+	assert.Empty(t, note)
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.True(t, bytes.Equal(before, after), "sky_desat 0 and no radii → the file must not be rewritten")
 }
 
 // TestChromaSmoothRGB_NoopBothZero: both radii at 0 is a TRUE no-op — the file bytes are untouched.

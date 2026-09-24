@@ -20,15 +20,18 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/verove-jordan/astronomy/internal/fits"
 	"github.com/verove-jordan/astronomy/internal/imgops"
 )
 
-// chromaSmoothOpts carries the two chroma-NR radii in pixels (0 = that pass off).
+// chromaSmoothOpts carries the two chroma-NR radii in pixels (0 = that pass off) and the sky-desat
+// strength (0 = off).
 type chromaSmoothOpts struct {
-	FinePx int // Preset.ChromaSmoothPx — fine pass (residual colour patches)
-	BgPx   int // Preset.ChromaBgSmoothPx — coarse background-only pass (large chroma mottle)
+	FinePx   int     // Preset.ChromaSmoothPx — fine pass (residual colour patches)
+	BgPx     int     // Preset.ChromaBgSmoothPx — coarse background-only pass (large chroma mottle)
+	SkyDesat float64 // Preset.SkyDesat — neutralize the floor's colour + mid-scale patches on faint veils
 }
 
 // Tuning constants for the chroma NR masks, centralised so retuning is one edit.
@@ -41,6 +44,7 @@ const (
 	chromaBgSNRHi      = 6.0     // …none above it (any real signal keeps its colour)
 	chromaCoreLevel    = 0.85    // near-saturation level marking bright star cores in the linear combine
 	chromaStatsSamples = 200_000 // subsample size for the sky/noise statistics
+	skyDesatBgPx       = 48      // coarse-field radius for the sky-desat pass when ChromaBgSmoothPx is off
 )
 
 // chromaSmoothRGB smooths ONLY the colour of a combined RGB linear FITS in place, preserving the
@@ -51,7 +55,7 @@ const (
 // keep their authentic chroma (see the file comment). Both radii ≤ 0 or a non-colour image → no-op.
 // Soft-fail: returns a note and any error.
 func chromaSmoothRGB(path string, o chromaSmoothOpts) (string, error) {
-	if o.FinePx <= 0 && o.BgPx <= 0 {
+	if o.FinePx <= 0 && o.BgPx <= 0 && o.SkyDesat <= 0 {
 		return "", nil
 	}
 	im, err := fits.ReadImage(path)
@@ -183,7 +187,7 @@ func chromaSmoothChannel(pix, scratch []float32, f *chromaField, o chromaSmoothO
 	if o.FinePx > 0 {
 		smF = imgops.GaussianBlur(scratch, f.w, f.h, chromaSigmaPx(o.FinePx))
 	}
-	if o.BgPx > 0 {
+	if o.BgPx > 0 || o.SkyDesat > 0 {
 		smB = coarseChroma(scratch, smF, f, o)
 	}
 	for i := range pix {
@@ -195,17 +199,33 @@ func chromaSmoothChannel(pix, scratch []float32, f *chromaField, o chromaSmoothO
 		if smF != nil {
 			c += (1 - smoothstep(chromaFineSNRLo, chromaFineSNRHi, snr)) * (float64(smF[i]) - c)
 		}
-		if smB != nil {
+		if o.BgPx > 0 {
 			c += (1 - smoothstep(chromaBgSNRLo, chromaBgSNRHi, snr)) * (float64(smB[i]) - c)
+		}
+		if o.SkyDesat > 0 {
+			// Stage 1 — frequency separation up into faint nebulosity (the FINE mask, not the bg
+			// one): pull the chroma toward its coarse field, erasing blob-scale colour patches ON
+			// faint veils while their broad colour (the coarse field itself) survives.
+			c += o.SkyDesat * (1 - smoothstep(chromaFineSNRLo, chromaFineSNRHi, snr)) * (float64(smB[i]) - c)
+			// Stage 2 — neutralize what remains on the TRUE sky floor (the bg mask): the floor's
+			// broad colour goes to grey. Both stages are linear in c with channel-shared weights,
+			// and the coarse fields zero-sum across channels, so the per-pixel mean is preserved
+			// exactly (the chromaSmoothRGB identity).
+			c *= 1 - o.SkyDesat*(1-smoothstep(chromaBgSNRLo, chromaBgSNRHi, snr))
 		}
 		pix[i] = f.mean[i] + float32(c)
 	}
 }
 
 // coarseChroma is the background pass's smoothing field: a further blur of the fine field when both
-// passes run (gaussian composition, σB² = σF² + σrest²), else a direct blur of the residuals.
+// passes run (gaussian composition, σB² = σF² + σrest²), else a direct blur of the residuals. The
+// sky-desat pass reuses this field; when the bg radius knob is off it falls back to skyDesatBgPx.
 func coarseChroma(scratch, smF []float32, f *chromaField, o chromaSmoothOpts) []float32 {
-	sigmaB := chromaSigmaPx(o.BgPx)
+	px := o.BgPx
+	if px <= 0 {
+		px = skyDesatBgPx
+	}
+	sigmaB := chromaSigmaPx(px)
 	if smF == nil {
 		return imgops.GaussianBlur(scratch, f.w, f.h, sigmaB)
 	}
@@ -220,14 +240,17 @@ func chromaSigmaPx(px int) float64 { return float64(px) / math.Sqrt(3) }
 
 // chromaSmoothNote renders the run note for the enabled passes.
 func chromaSmoothNote(o chromaSmoothOpts) string {
-	switch {
-	case o.FinePx > 0 && o.BgPx > 0:
-		return fmt.Sprintf("chroma smoothed (mean-preserving, star-protected: gaussian %dpx + background %dpx)", o.FinePx, o.BgPx)
-	case o.FinePx > 0:
-		return fmt.Sprintf("chroma smoothed (mean-preserving, star-protected: gaussian %dpx)", o.FinePx)
-	default:
-		return fmt.Sprintf("chroma smoothed (mean-preserving, star-protected: background %dpx)", o.BgPx)
+	var parts []string
+	if o.FinePx > 0 {
+		parts = append(parts, fmt.Sprintf("gaussian %dpx", o.FinePx))
 	}
+	if o.BgPx > 0 {
+		parts = append(parts, fmt.Sprintf("background %dpx", o.BgPx))
+	}
+	if o.SkyDesat > 0 {
+		parts = append(parts, fmt.Sprintf("sky desat %.2g", o.SkyDesat))
+	}
+	return "chroma smoothed (mean-preserving, star-protected: " + strings.Join(parts, " + ") + ")"
 }
 
 // clipF32 clamps v to [−bound, bound].

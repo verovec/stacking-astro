@@ -47,6 +47,16 @@ func TestApplyParamPatch_PerMode(t *testing.T) {
 			check: func(t *testing.T, p mode.Preset) { assert.Equal(t, "sho", p.Palette) }, // normalized
 		},
 		{
+			name: "deepsky sky_desat is tierB", mode: mode.Deepsky,
+			params: `{"sky_desat":0.8}`, tier: "B", changed: []string{"sky_desat"},
+			check: func(t *testing.T, p mode.Preset) { assert.InDelta(t, 0.8, p.SkyDesat, 1e-9) },
+		},
+		{
+			name: "deepsky clamps a wild sky_desat", mode: mode.Deepsky,
+			params: `{"sky_desat":3}`, tier: "B", changed: []string{"sky_desat"},
+			check: func(t *testing.T, p mode.Preset) { assert.InDelta(t, 1, p.SkyDesat, 1e-9) },
+		},
+		{
 			name: "deepsky invalid palette is dropped", mode: mode.Deepsky,
 			params: `{"palette":"bogus"}`, tier: "A", changed: nil,
 			check: func(t *testing.T, p mode.Preset) { assert.Empty(t, p.Palette) },

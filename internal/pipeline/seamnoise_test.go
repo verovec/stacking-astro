@@ -93,3 +93,22 @@ func TestSeamNoiseWeights_GridMismatch(t *testing.T) {
 	assert.Nil(t, weights)
 	assert.Contains(t, reason, "does not match")
 }
+
+// The run.json provenance must say which weighted-denoise treatment the master got: a colour
+// master is smoothed in luminance only (chroma preserved — see noise.DenoiseWeighted), a mono
+// master keeps the historical single-plane pass.
+func TestSeamNoiseMode(t *testing.T) {
+	tests := []struct {
+		name   string
+		planes int
+		want   string
+	}{
+		{"a colour master is luminance-only", 3, "luminance"},
+		{"a mono master keeps the plane pass", 1, "mono"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, seamNoiseMode(tt.planes))
+		})
+	}
+}
