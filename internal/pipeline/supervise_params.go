@@ -142,6 +142,7 @@ type supervisePatch struct {
 	ChromaSmoothPx       *int     `json:"chroma_smooth_px,omitempty"`
 	ChromaBgSmoothPx     *int     `json:"chroma_bg_smooth_px,omitempty"`
 	SkyDesat             *float64 `json:"sky_desat,omitempty"`
+	SkyDesatKeepCool     *bool    `json:"sky_desat_keep_cool,omitempty"`
 	SkyChromaFlattenPx   *int     `json:"sky_chroma_flatten_px,omitempty"`
 	SkyLumFlattenPx      *int     `json:"sky_lum_flatten_px,omitempty"`
 	StarReduce           *float64 `json:"star_reduce,omitempty"`
@@ -207,6 +208,7 @@ func (patch supervisePatch) apply(p mode.Preset) mode.Preset {
 	setI(&p.ChromaSmoothPx, patch.ChromaSmoothPx)
 	setI(&p.ChromaBgSmoothPx, patch.ChromaBgSmoothPx)
 	setF(&p.SkyDesat, patch.SkyDesat)
+	setB(&p.SkyDesatKeepCool, patch.SkyDesatKeepCool)
 	setI(&p.SkyChromaFlattenPx, patch.SkyChromaFlattenPx)
 	setI(&p.SkyLumFlattenPx, patch.SkyLumFlattenPx)
 	setF(&p.StarReduce, patch.StarReduce)
@@ -330,6 +332,7 @@ func tierOf(prev, next mode.Preset) tier {
 		prev.ChromaSmoothPx != next.ChromaSmoothPx ||
 		prev.ChromaBgSmoothPx != next.ChromaBgSmoothPx ||
 		floatChanged(prev.SkyDesat, next.SkyDesat) ||
+		prev.SkyDesatKeepCool != next.SkyDesatKeepCool ||
 		prev.SkyChromaFlattenPx != next.SkyChromaFlattenPx ||
 		prev.SkyLumFlattenPx != next.SkyLumFlattenPx ||
 		floatChanged(prev.StarReduce, next.StarReduce) ||

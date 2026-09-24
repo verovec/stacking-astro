@@ -269,6 +269,12 @@ const PREP_KNOBS: KnobDef[] = [
     step: 0.05,
   },
   {
+    key: "sky_desat_keep_cool",
+    labelKey: "rerun.knobs.sky_desat_keep_cool",
+    kind: "toggle",
+    def: false,
+  },
+  {
     key: "sky_chroma_flatten_px",
     labelKey: "rerun.knobs.sky_chroma_flatten_px",
     kind: "number",

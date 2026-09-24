@@ -415,6 +415,76 @@ func TestChromaSmoothRGB_SkyDesat_DeepStackSemantics(t *testing.T) {
 	assert.Greater(t, math.Abs(coreOut), 0.5*math.Abs(coreIn), "a star keeps ≥50%% of its wing chroma")
 }
 
+// TestChromaSmoothRGB_SkyDesat_KeepCoolSavesBlue: with the hue-selective gate, WARM mid-scale
+// colour patches (brown dust mottle) flatten while COOL ones (blue reflection nebulosity — the same
+// spatial scales, hue is the only separator) survive; without the gate both flatten. Pinned on the
+// realistic deep-stack fixture with two synthetic discs added on the veil.
+func TestChromaSmoothRGB_SkyDesat_KeepCoolSavesBlue(t *testing.T) {
+	addDiscs := func(path string) {
+		im, err := fits.ReadImage(path)
+		require.NoError(t, err)
+		disc := func(cx, cy int, chroma float32) {
+			for y := cy - 14; y <= cy+14; y++ {
+				for x := cx - 14; x <= cx+14; x++ {
+					if (x-cx)*(x-cx)+(y-cy)*(y-cy) > 14*14 {
+						continue
+					}
+					i := y*dsW + x
+					im.Pix[0][i] += chroma // mean-neutral: +R / −B
+					im.Pix[2][i] -= chroma
+				}
+			}
+		}
+		disc(dsVeilCX-30, dsVeilCY, 8e-6)  // warm disc (brown patch) on the veil
+		disc(dsVeilCX+30, dsVeilCY, -8e-6) // cool disc (blue wisp) on the veil
+		require.NoError(t, im.OverwriteData(path))
+	}
+	discMean := func(im *fits.Image, cx, cy int) float64 {
+		var sum float64
+		var n int
+		for y := cy - 7; y <= cy+7; y++ {
+			for x := cx - 7; x <= cx+7; x++ {
+				sum += float64(im.Pix[0][y*dsW+x] - im.Pix[2][y*dsW+x])
+				n++
+			}
+		}
+		return sum / float64(n)
+	}
+	for _, tc := range []struct {
+		name     string
+		keepCool bool
+	}{
+		{"keep cool on", true},
+		{"keep cool off", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := makeDeepStackRGB(t, dir)
+			addDiscs(path)
+			in := readRGB(t, path)
+			warmIn := discMean(in, dsVeilCX-30, dsVeilCY)
+			coolIn := discMean(in, dsVeilCX+30, dsVeilCY)
+			require.Greater(t, warmIn, 8e-6, "fixture sanity: warm disc")
+			require.Less(t, coolIn, -8e-6, "fixture sanity: cool disc")
+
+			_, err := chromaSmoothRGB(path, chromaSmoothOpts{SkyDesat: 1, KeepCool: tc.keepCool})
+			require.NoError(t, err)
+			out := readRGB(t, path)
+			warmOut := discMean(out, dsVeilCX-30, dsVeilCY)
+			coolOut := discMean(out, dsVeilCX+30, dsVeilCY)
+			assert.Less(t, warmOut, 0.45*warmIn, "the warm patch must flatten in both modes")
+			if tc.keepCool {
+				kept := coolOut / coolIn // signed: the blue must keep its hue, not just its energy
+				assert.GreaterOrEqual(t, kept, 0.6, "the cool patch must survive the gated pass")
+				assert.LessOrEqual(t, kept, 1.2, "the cool patch must not be amplified")
+			} else {
+				assert.Less(t, math.Abs(coolOut), 0.45*math.Abs(coolIn),
+					"without the gate the cool patch flattens like the warm one")
+			}
+		})
+	}
+}
+
 // TestChromaSmoothRGB_SkyDesatZero_NoopByteIdentical: sky_desat 0 with no radii is a TRUE no-op —
 // the un-configured contract (default runs stay byte-identical).
 func TestChromaSmoothRGB_SkyDesatZero_NoopByteIdentical(t *testing.T) {
