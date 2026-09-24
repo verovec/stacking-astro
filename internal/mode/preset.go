@@ -438,6 +438,12 @@ type Preset struct {
 	// signal, so the choice is to show the floor's colour or neutralize it). 0 → off
 	// (byte-identical), 1 → fully neutral floor. See chromasmooth.go's skyDesat* constants.
 	SkyDesat float64
+	// SkyDesatKeepCool makes SkyDesat's patch-flattening stage hue-selective: only the WARM
+	// mid-scale colour deviations flatten (brown/olive dust mottle, airglow) while the COOL ones
+	// (blue reflection nebulosity — identical spatial scales, hue is the only separator left) keep
+	// their chroma. For reflection fields (M45). Leave OFF on emission fields: their real structure
+	// is red/warm and would be eaten. No effect when SkyDesat is 0.
+	SkyDesatKeepCool bool
 	// LumBoost gently lifts the L luminance curve's midtones (the value is the peak lift at
 	// mid-grey; sky-level points pinned by a shadow anchor, core/star points by a highlight
 	// anchor) — "a brighter galaxy periphery" without touching sky level, core detail or colour

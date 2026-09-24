@@ -381,6 +381,7 @@ func deepskyParams(p mode.Preset) map[string]any {
 		"background_degree": p.BackgroundDegree, "color_denoise_ai": p.ColorDenoiseAI,
 		"chroma_smooth_px": p.ChromaSmoothPx, "chroma_bg_smooth_px": p.ChromaBgSmoothPx,
 		"sky_desat":             p.SkyDesat,
+		"sky_desat_keep_cool":   p.SkyDesatKeepCool,
 		"sky_chroma_flatten_px": p.SkyChromaFlattenPx,
 		"sky_lum_flatten_px":    p.SkyLumFlattenPx,
 		"star_reduce":           p.StarReduce, "stretch_headroom": p.StretchHeadroom,

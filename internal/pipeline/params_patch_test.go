@@ -57,6 +57,11 @@ func TestApplyParamPatch_PerMode(t *testing.T) {
 			check: func(t *testing.T, p mode.Preset) { assert.InDelta(t, 1, p.SkyDesat, 1e-9) },
 		},
 		{
+			name: "deepsky sky_desat_keep_cool is tierB", mode: mode.Deepsky,
+			params: `{"sky_desat_keep_cool":true}`, tier: "B", changed: []string{"sky_desat_keep_cool"},
+			check: func(t *testing.T, p mode.Preset) { assert.True(t, p.SkyDesatKeepCool) },
+		},
+		{
 			name: "deepsky invalid palette is dropped", mode: mode.Deepsky,
 			params: `{"palette":"bogus"}`, tier: "A", changed: nil,
 			check: func(t *testing.T, p mode.Preset) { assert.Empty(t, p.Palette) },

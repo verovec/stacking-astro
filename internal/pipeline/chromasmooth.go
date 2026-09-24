@@ -32,6 +32,10 @@ type chromaSmoothOpts struct {
 	FinePx   int     // Preset.ChromaSmoothPx — fine pass (residual colour patches)
 	BgPx     int     // Preset.ChromaBgSmoothPx — coarse background-only pass (large chroma mottle)
 	SkyDesat float64 // Preset.SkyDesat — neutralize the floor's colour + mid-scale patches on faint veils
+	// Preset.SkyDesatKeepCool — hue-selective stage 1: flatten only the WARM mid-scale deviations
+	// (brown/olive dust mottle, airglow) and keep the cool ones (blue reflection nebulosity). The
+	// scales of both are identical on a reflection field, so hue is the only separator left.
+	KeepCool bool
 }
 
 // Tuning constants for the chroma NR masks, centralised so retuning is one edit.
@@ -55,8 +59,8 @@ const (
 	skyDesatStarHi = 0.02  // …and is total: a stacked faint star peaks ≥ +2% locally, veil texture ±0.2%
 	skyDesatNebLo  = 0.02  // coarse lift (lumC−bg)/bg where the patch-flattening stage starts fading…
 	skyDesatNebHi  = 0.10  // …and is off: bright extended signal keeps its own colour STRUCTURE
-	skyDesatRelLo  = 3e-4  // coarse lift below which the floor is fully neutralized…
-	skyDesatRelHi  = 15e-4 // …fading to none: faint nebulosity keeps the broad colour stage 1 leaves
+	skyDesatRelLo  = 1e-4  // coarse lift below which the floor is fully neutralized…
+	skyDesatRelHi  = 4e-4  // …fading to none BELOW the faint veil (M45 veil ≥ +0.05%): the veil keeps its colour
 )
 
 // chromaSmoothRGB smooths ONLY the colour of a combined RGB linear FITS in place, preserving the
@@ -84,8 +88,8 @@ func chromaSmoothRGB(path string, o chromaSmoothOpts) (string, error) {
 	// Reuse ONE residual buffer across the three channels (a 16MP master is ~64 MB/plane; the blurs
 	// allocate their own outputs, so this scratch is the only per-channel plane we control).
 	scratch := make([]float32, len(im.Pix[0]))
-	for _, pix := range im.Pix[:3] {
-		chromaSmoothChannel(pix, scratch, f, o)
+	for ch, pix := range im.Pix[:3] {
+		chromaSmoothChannel(ch, pix, scratch, f, o)
 	}
 	if err := im.OverwriteData(path); err != nil {
 		return "", fmt.Errorf("chroma smooth: write: %w", err)
@@ -97,14 +101,16 @@ func chromaSmoothRGB(path string, o chromaSmoothOpts) (string, error) {
 // its statistics (for the SNR protection weights), the winsorization zero-sum plane, and the core mask.
 type chromaField struct {
 	w, h       int
-	mean       []float32 // (R+G+B)/3 — the preserved luminance
-	lumS       []float32 // gaussian-stabilised luminance driving the SNR mask
-	lumC       []float32 // coarse luminance field (sky-desat only): local-peak + relative-lift masks
-	starW      []float32 // sky-desat star weight (local-peak smoothstep), shared by the three channels
-	zero       []float32 // per-pixel mean of the clipped residuals — subtracted so Σ(blur input) ≡ 0
-	core       []bool    // dilated near-saturation cores: fully exempt from replacement
-	bg, sigmaL float64   // sky level + robust luminance sigma
-	clip       float32   // winsorization bound (chromaClipSigmas·σc)
+	mean       []float32    // (R+G+B)/3 — the preserved luminance
+	lumS       []float32    // gaussian-stabilised luminance driving the SNR mask
+	lumC       []float32    // coarse luminance field (sky-desat only): local-peak + relative-lift masks
+	starW      []float32    // sky-desat star weight (local-peak smoothstep), shared by the three channels
+	smD        [3][]float32 // sky-desat coarse chroma fields (star-masked residuals), one per channel
+	warm       []float32    // KeepCool hue gate: 1 = warm mid-scale deviation (flatten), 0 = cool (keep)
+	zero       []float32    // per-pixel mean of the clipped residuals — subtracted so Σ(blur input) ≡ 0
+	core       []bool       // dilated near-saturation cores: fully exempt from replacement
+	bg, sigmaL float64      // sky level + robust luminance sigma
+	clip       float32      // winsorization bound (chromaClipSigmas·σc)
 }
 
 func buildChromaField(im *fits.Image, o chromaSmoothOpts) (*chromaField, bool) {
@@ -132,6 +138,33 @@ func buildChromaField(im *fits.Image, o chromaSmoothOpts) (*chromaField, bool) {
 		for i := range f.starW {
 			f.starW[i] = float32(smoothstep(skyDesatStarLo, skyDesatStarHi,
 				(float64(f.lumS[i])-float64(f.lumC[i]))/f.bg))
+		}
+		// The desat target fields are built from STAR-MASKED, UNCLIPPED residuals. Star-masked: a
+		// bright star's wing chroma must not leak into the coarse field stage 1 copies back, or
+		// every star grows a soft colour disc. Unclipped: the winsorization (a star-wing guard) also
+		// caps genuine broad nebula colour (a reflection veil's blue runs 5-20σc), which would turn
+		// the reference field grey and stage 1 would desaturate the veil with the patches — the star
+		// mask already does the guarding here. Raw residuals sum to zero across channels and the
+		// mask weight is channel-shared, so the mean stays exact.
+		d := make([]float32, len(f.mean))
+		for ch := 0; ch < 3; ch++ {
+			pix := im.Pix[ch]
+			for i := range d {
+				d[i] = (pix[i] - f.mean[i]) * (1 - f.starW[i])
+			}
+			f.smD[ch] = imgops.GaussianBlur(d, im.W, im.H, chromaSigmaPx(bgRadiusPx(o)))
+		}
+		if o.KeepCool {
+			// Hue gate on the MID-SCALE deviation (c − smD): warm (R−B rising above its coarse
+			// field) → flatten; cool → keep. Zero-centred over ±σc so neutral noise is half-treated;
+			// the gate is channel-shared, so the mean stays exact.
+			sigmaC := float64(f.clip) / chromaClipSigmas
+			f.warm = make([]float32, len(f.mean))
+			r, b := im.Pix[0], im.Pix[2]
+			for i := range f.warm {
+				dev := float64(r[i]-b[i]) - float64(f.smD[0][i]-f.smD[2][i])
+				f.warm[i] = float32(smoothstep(-sigmaC, sigmaC, dev))
+			}
 		}
 	}
 	return f, true
@@ -211,29 +244,20 @@ func chromaZeroSum(im *fits.Image, mean []float32, clip float32) []float32 {
 }
 
 // chromaSmoothChannel replaces one channel's chroma with its star-protected smoothed version, in
-// place. scratch must be len(pix) and is overwritten (shared across the three channel calls).
-func chromaSmoothChannel(pix, scratch []float32, f *chromaField, o chromaSmoothOpts) {
+// place. scratch must be len(pix) and is overwritten (shared across the three channel calls); ch is
+// the channel index (selects the precomputed sky-desat coarse field).
+func chromaSmoothChannel(ch int, pix, scratch []float32, f *chromaField, o chromaSmoothOpts) {
 	for i := range scratch {
 		scratch[i] = clipF32(pix[i]-f.mean[i], f.clip) - f.zero[i]
 	}
-	var smF, smB, smD []float32
+	var smF, smB []float32
 	if o.FinePx > 0 {
 		smF = imgops.GaussianBlur(scratch, f.w, f.h, chromaSigmaPx(o.FinePx))
 	}
 	if o.BgPx > 0 {
 		smB = coarseChroma(scratch, smF, f, o)
 	}
-	if o.SkyDesat > 0 {
-		// The desat target field is built from STAR-MASKED residuals: a bright star's wing chroma
-		// must not leak into the coarse field stage 1 copies back, or every star grows a soft
-		// colour disc. The mask weight is channel-shared, so the three inputs still sum to zero
-		// per pixel and the mean stays exact.
-		dscratch := make([]float32, len(scratch))
-		for i := range scratch {
-			dscratch[i] = scratch[i] * (1 - f.starW[i])
-		}
-		smD = imgops.GaussianBlur(dscratch, f.w, f.h, chromaSigmaPx(bgRadiusPx(o)))
-	}
+	smD := f.smD[ch]
 	for i := range pix {
 		if f.core[i] {
 			continue // saturated core + dilated wings: authentic chroma, untouched
@@ -259,6 +283,9 @@ func chromaSmoothChannel(pix, scratch []float32, f *chromaField, o chromaSmoothO
 			// colour is a point the coarse field can't represent) and on bright extended signal
 			// (real colour structure).
 			w1 := o.SkyDesat * (1 - star) * (1 - smoothstep(skyDesatNebLo, skyDesatNebHi, rel))
+			if f.warm != nil {
+				w1 *= float64(f.warm[i]) // KeepCool: only warm deviations flatten, blue survives
+			}
 			c += w1 * (float64(smD[i]) - c)
 			// Stage 2 — neutralize the TRUE floor: below skyDesatRelLo of lift the remaining broad
 			// colour goes to grey, fading to none by skyDesatRelHi so faint nebulosity keeps the
@@ -296,7 +323,11 @@ func chromaSmoothNote(o chromaSmoothOpts) string {
 		parts = append(parts, fmt.Sprintf("background %dpx", o.BgPx))
 	}
 	if o.SkyDesat > 0 {
-		parts = append(parts, fmt.Sprintf("sky desat %.2g", o.SkyDesat))
+		s := fmt.Sprintf("sky desat %.2g", o.SkyDesat)
+		if o.KeepCool {
+			s += " (cool-preserving)"
+		}
+		parts = append(parts, s)
 	}
 	return "chroma smoothed (mean-preserving, star-protected: " + strings.Join(parts, " + ") + ")"
 }

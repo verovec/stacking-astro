@@ -1356,7 +1356,7 @@ func prepGimpInputs(ctx context.Context, opts Options, runner *siril.Runner, cha
 		// Luminance is byte-for-byte unchanged (the L layer supplies detail in LRGB); see chromasmooth.go.
 		if opts.Preset != nil {
 			smoothOpts := chromaSmoothOpts{FinePx: opts.Preset.ChromaSmoothPx, BgPx: opts.Preset.ChromaBgSmoothPx,
-				SkyDesat: opts.Preset.SkyDesat}
+				SkyDesat: opts.Preset.SkyDesat, KeepCool: opts.Preset.SkyDesatKeepCool}
 			if n, err := chromaSmoothRGB(filepath.Join(outDir, "rgb_base.fits"), smoothOpts); err != nil {
 				notes = append(notes, "chroma smooth skipped: "+err.Error())
 			} else if n != "" {
