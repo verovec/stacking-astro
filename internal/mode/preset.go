@@ -424,6 +424,26 @@ type Preset struct {
 	// colour untouched. Luminance is byte-for-byte unchanged (same identity as ChromaSmoothPx).
 	// 0 → off. See internal/pipeline/chromasmooth.go.
 	ChromaBgSmoothPx int
+	// SkyDesat neutralizes the COLOUR of the sky floor and of the mid-scale colour patches riding on
+	// faint nebulosity, luminance untouched (same mean-preserving identity as ChromaSmoothPx). Two
+	// stages with BRIGHTNESS-RELATIVE masks (fractions of the sky level — NOT stack-noise SNR: in a
+	// deep stack even the faintest visible dust sits at 40-400σ, so a σ-scaled mask protects the
+	// whole veil and the pass touches nothing; the card 0025→0026 field bug): chroma is pulled
+	// toward its star-masked coarse field wherever the pixel is neither a local PEAK (a star,
+	// protected by contrast, not by level) nor bright extended signal (large coarse lift → its real
+	// colour structure is kept) — erasing the 10-100px colour alternation while broad colour
+	// survives — then the remaining chroma is scaled to grey on the true floor (sub-0.1% lift).
+	// The PRESENTATION answer to the real sky-chroma mottle of dusty fields (M45: two independent
+	// nights correlate r≈0.9 sky-aligned, ≈0 sensor-aligned — rejection cannot remove per-frame
+	// signal, so the choice is to show the floor's colour or neutralize it). 0 → off
+	// (byte-identical), 1 → fully neutral floor. See chromasmooth.go's skyDesat* constants.
+	SkyDesat float64
+	// SkyDesatKeepCool makes SkyDesat's patch-flattening stage hue-selective: only the WARM
+	// mid-scale colour deviations flatten (brown/olive dust mottle, airglow) while the COOL ones
+	// (blue reflection nebulosity — identical spatial scales, hue is the only separator left) keep
+	// their chroma. For reflection fields (M45). Leave OFF on emission fields: their real structure
+	// is red/warm and would be eaten. No effect when SkyDesat is 0.
+	SkyDesatKeepCool bool
 	// LumBoost gently lifts the L luminance curve's midtones (the value is the peak lift at
 	// mid-grey; sky-level points pinned by a shadow anchor, core/star points by a highlight
 	// anchor) — "a brighter galaxy periphery" without touching sky level, core detail or colour
