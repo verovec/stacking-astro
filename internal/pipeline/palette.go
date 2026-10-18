@@ -103,7 +103,7 @@ func resolvePalette(p *mode.Preset, channels map[string]string) (paletteResolved
 	// UNLESS it is a duo-band capture that has been split into real emission channels (duoband.go),
 	// which is exactly the case the filter-name chain below was written for.
 	if isColorRun(p) && !duobandMapped(p, has) {
-		return colorPalette(), ""
+		return colorPalette(has), ""
 	}
 	want := "natural"
 	if p != nil {

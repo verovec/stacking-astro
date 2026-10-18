@@ -96,6 +96,16 @@ func oscSource(channels map[string]string) string {
 // through untouched, in colour, with no emission screens. It bypasses resolvePalette entirely —
 // every entry in paletteSpecs is written in terms of filter names (Ha→R, OIII→G …), which a colour
 // sensor does not have, and the fallback chain would land on "mono" and throw the colour away.
-func colorPalette() paletteResolved {
-	return paletteResolved{Name: "rgb", R: "R", G: "G", B: "B", Color: true}
+func colorPalette(has func(string) bool) paletteResolved {
+	p := paletteResolved{Name: "rgb", R: "R", G: "G", B: "B", Color: true}
+	// A duo-band session stacked beside this broadband one arrives as real emission channels
+	// (filtersetlanes.go splits the lanes, duoband.go separates the lines). They are NOT base slots
+	// here — the colour master stays the base, which is the whole point of shooting broadband too —
+	// so they composite exactly as they do on the mono path: additive tinted screens over it.
+	// Without this the lines were synthesized and then silently dropped at the composite.
+	// A capture with no duo-band companion has no such channels, so this is a no-op for it.
+	p.HaScreen = has("Ha")
+	p.OIIIScreen = has("OIII")
+	p.SIIScreen = has("SII")
+	return p
 }

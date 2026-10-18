@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/verove-jordan/astronomy/internal/filters"
 	"github.com/verove-jordan/astronomy/internal/fits"
 	"github.com/verove-jordan/astronomy/internal/imgops"
 	"github.com/verove-jordan/astronomy/internal/noise"
@@ -68,24 +69,29 @@ func resolveChannelFITS(workDir, p string) string {
 // workDir (the Siril run dir); the excess FITS is written into writeDir. It returns (nil, reason)
 // when the subtraction cannot run — the caller then screens the raw Ha layer exactly as before.
 func haContinuumSubtract(workDir string, channels map[string]string, writeDir string) (*haContinuum, string) {
-	// R shares the Ha band; L still scales linearly with continuum.
-	return lineContinuumSubtract(workDir, channels, writeDir, "Ha", []string{"R", "L"}, haExcessBase)
+	// R shares the Ha band; L still scales linearly with continuum. A one-shot-colour run has
+	// neither, but its colour master carries the same continuum in its RED plane — see colourPlane.
+	return lineContinuumSubtract(workDir, channels, writeDir, "Ha", []string{"R", "L", filters.Color}, 0, haExcessBase)
 }
 
 // oiiiContinuumSubtract is the OIII twin: the [OIII] 500.7 nm line sits in the G/B overlap, so the
 // continuum is estimated from G first, then B, then L.
 func oiiiContinuumSubtract(workDir string, channels map[string]string, writeDir string) (*haContinuum, string) {
-	return lineContinuumSubtract(workDir, channels, writeDir, "OIII", []string{"G", "B", "L"}, "oiii_excess")
+	// On a colour master the 500.7 nm continuum is the GREEN plane (index 1), not the red one Ha uses.
+	return lineContinuumSubtract(workDir, channels, writeDir, "OIII", []string{"G", "B", "L", filters.Color}, 1, "oiii_excess")
 }
 
 // siiContinuumSubtract is the SII twin: [SII] 671.6/673.1 nm sits inside the R band (deeper red than
 // Hα 656 nm), so it takes the same reference order as Ha — R first, then L.
 func siiContinuumSubtract(workDir string, channels map[string]string, writeDir string) (*haContinuum, string) {
-	return lineContinuumSubtract(workDir, channels, writeDir, "SII", []string{"R", "L"}, "sii_excess")
+	return lineContinuumSubtract(workDir, channels, writeDir, "SII", []string{"R", "L", filters.Color}, 0, "sii_excess")
 }
 
 // lineContinuumSubtract is the shared engine behind the per-line wrappers: excess = clamp(line − k·ref, 0).
-func lineContinuumSubtract(workDir string, channels map[string]string, writeDir, line string, refOrder []string, outBase string) (*haContinuum, string) {
+// colourPlane says which plane of the one-shot-colour master carries THIS line's continuum: the red
+// plane for Hα/[SII], the green one for [OIII]. It is ignored for a mono reference, whose master has
+// a single plane. Only meaningful when refFilter resolves to filters.Color.
+func lineContinuumSubtract(workDir string, channels map[string]string, writeDir, line string, refOrder []string, colourPlane int, outBase string) (*haContinuum, string) {
 	refFilter := ""
 	for _, f := range refOrder {
 		if _, ok := channels[f]; ok {
@@ -108,7 +114,17 @@ func lineContinuumSubtract(workDir string, channels map[string]string, writeDir,
 		return nil, fmt.Sprintf("%s %dx%d vs %s %dx%d — masters not co-registered",
 			line, ha.W, ha.H, refFilter, ref.W, ref.H)
 	}
-	hp, rp := ha.Pix[0], ref.Pix[0]
+	// The line master is always single-plane; the reference may be the 3-plane colour master, and
+	// then the line dictates which plane holds its continuum.
+	refPlane := 0
+	if refFilter == filters.Color {
+		refPlane = colourPlane
+	}
+	if refPlane >= len(ref.Pix) {
+		return nil, fmt.Sprintf("%s reference has %d plane(s), need plane %d for %s",
+			refFilter, len(ref.Pix), refPlane, line)
+	}
+	hp, rp := ha.Pix[0], ref.Pix[refPlane]
 
 	refSub := imgops.Subsample(rp, 200_000)
 	lo := imgops.Percentile(refSub, haKSelectLo)
