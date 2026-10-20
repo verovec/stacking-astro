@@ -262,7 +262,11 @@ Chaîne d'affichage : image → process en cours (shader) → STF/affichage → 
 process natifs (§3.2–3.3 colonne M) tournent en plein cadre ; les process batch (S/G/N) s'exécutent
 sur l'image et reviennent dans l'historique. **Règle d'exactitude** : ce que l'aperçu montre est ce
 qu'« Appliquer » écrit (même shader, même précision), sauf pour S/G/N dont l'aperçu est l'image
-résultat elle-même (pas d'approximation).
+résultat elle-même (pas d'approximation). **Limite honnête** (revue 2026-10-20) : un process dont un
+paramètre est en pixels (ouverture, flou, rayon d'étoile) n'est exact qu'à 1:1 et dans la région ;
+sur un niveau de pyramide, l'opérateur morphologique ne commute pas avec le sous-échantillonnage.
+Ces process portent le drapeau `previewExactOnlyAt1to1` et le Studio affiche « aperçu approximatif
+hors 1:1 » tant qu'on n'est pas à l'échelle native.
 
 ---
 
@@ -379,16 +383,21 @@ sauvegardes les remplacent pour toi sans les écraser.
 | **E11** | Moteur `astrocore` | extraction du cœur Go, JSON-RPC sur socket, suppression HTTP/Postgres/web/Docker/GIMP/IA, bundle linéaire, SQLite, byte-identité des masters | — |
 | **E12** | Studio : process natifs | étirements (MTF/GHS/arcsinh), écrans d'émission, HDR, courbes, saturation/désat, combinaison des canaux, continuum-sub, masques, historique non destructif, Appliquer/Annuler ; parité v9 | E10 |
 | **E13** | Étoiles & export | StarNet, couche étoiles, recomposition, tiers, recadrage/orientation, jeu de livrables | E12 |
-| **E14** | Pré-traitement dans l'app | import depuis `input/`, classification, bibliothèque de calibration, profils de pré-traitement, exécution via `astrocore`, progression, bundle | E10, E11 |
+| **E14** | Pré-traitement dans l'app | import depuis `input/`, classification, bibliothèque de calibration + inspection des masters, revue des trames (métriques, blink, garder/rejeter, trame de référence), réglages d'empilement simple/avancé, exécution via `astrocore`, progression, bundle | E10, E11 |
 | **E15** | Pipelines, recettes, profils | recettes, pipelines à points d'arrêt, profils livrés, rejeu, verrouillage, diff, import/export | E12, E14 |
 | **E16** | Tutoriels & fiches | premiers pas, fiches de process, « pourquoi cette valeur », fr/en, contenu versionné | E12 |
-| **E17** | Process batch avancés | déconvolution Siril, débruitage GraXpert/Siril, SPCC/PCC, plate-solve, ondelettes, drizzle | E14 |
+| **E17** | Process batch avancés | extraction de fond (GraXpert/subsky, aperçu du modèle — livrée en v1), déconvolution Siril, débruitage GraXpert/Siril, SPCC/PCC, plate-solve, ondelettes, drizzle | E14 |
 | **E18** | Mono | rôles R/G/B/L, profils mono, palettes NB | E12, E14 |
 | **E19** | Nettoyage & livraison | suppression du legacy (web, Docker, Postgres, modes hors deep-sky), nouveau `CLAUDE.md`/README, signature/notarisation, DMG | E14, E15 |
 
-Première valeur visible pour le PO : **E10 + E11 (bundle) + E12** = ouvrir le run #78 dans l'app et
-régler Hα/OIII/HDR/saturation en temps réel plein cadre, exporter. Puis E13 (étoiles), puis E14
-(pré-traiter une nouvelle nuit sans quitter l'app).
+Ordre retenu après la revue du 2026-10-20 : **pré-traitement d'abord**. La file commence par
+E11 (carve, RPC, SQLite) + l'import E14, puis le viewer E10 et l'exécution E14 : l'app stacke une
+nuit depuis `input/` à la 12e carte, avec revue des trames, réglages d'empilement et inspection des
+masters (R2 vaut aussi dans le pré-traitement : aucun verdict que l'utilisateur ne peut voir et
+contredire). Le Studio E12 vient ensuite sur un bundle produit par l'app elle-même ; les oracles de
+parité (astrocomp/hdrcomp/stardesat) sont versionnés dans le dépôt avant le premier port.
+L'ancienne première valeur (ouvrir le run #78 et régler les écrans) reste la première valeur du
+Studio, elle n'est plus la première valeur de l'app.
 
 ---
 
