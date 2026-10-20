@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -139,11 +140,16 @@ func goldenStatus(c oracleCase, rec string) string {
 	if c.goldenDir == "" {
 		return ""
 	}
+	top, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return "golden not checked: run from inside the stacking-astro repo"
+	}
+	dir := filepath.Join(strings.TrimSpace(string(top)), c.goldenDir)
 	var differ []string
 	for _, name := range []string{"run.json", "steps.txt"} {
-		want, err := os.ReadFile(filepath.Join(c.goldenDir, name))
+		want, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
-			return fmt.Sprintf("golden unreadable (%v); run from the stacking-astro repo root", err)
+			return fmt.Sprintf("golden unreadable: %v", err)
 		}
 		got, err := os.ReadFile(filepath.Join(rec, name))
 		if err != nil || !bytes.Equal(want, got) {

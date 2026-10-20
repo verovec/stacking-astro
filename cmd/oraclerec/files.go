@@ -184,29 +184,48 @@ func writeHashes(path string, files []string, n normalizer) error {
 	return os.WriteFile(path, []byte(body), 0o644)
 }
 
+// legacyCommit is HEAD of the repo the recorder runs in, suffixed "-dirty" when the tree has
+// changes (the recording then cannot be reproduced from the commit alone), "unknown" outside git.
+func legacyCommit() string {
+	head, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "unknown"
+	}
+	commit := strings.TrimSpace(string(head))
+	if status, err := exec.Command("git", "status", "--porcelain").Output(); err != nil || len(status) > 0 {
+		commit += "-dirty"
+	}
+	return commit
+}
+
 // writeManifest records how the case was produced and the hash of every recorded file.
 func writeManifest(rec string, c oracleCase, cfg recordConfig, golden string) error {
 	version, _ := exec.Command(cfg.sirilBin, "--version").Output()
-	commit, _ := exec.Command("git", "rev-parse", "HEAD").Output()
-	entries, err := os.ReadDir(rec)
-	if err != nil {
-		return err
-	}
+	// Every file of the record, scripts/ included: the scripts are the byte-identity oracle.
 	files := map[string]string{}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
+	err := filepath.WalkDir(rec, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
 		}
-		body, err := os.ReadFile(filepath.Join(rec, e.Name()))
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(rec, path)
 		if err != nil {
 			return err
 		}
 		sum := sha256.Sum256(body)
-		files[e.Name()] = hex.EncodeToString(sum[:])
+		files[filepath.ToSlash(rel)] = hex.EncodeToString(sum[:])
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+	commit := legacyCommit()
 	manifest := map[string]any{
 		"case": c.name, "title": c.title, "timezone": recordTZ,
-		"siril": strings.TrimSpace(string(version)), "legacy_commit": strings.TrimSpace(string(commit)),
+		"siril": strings.TrimSpace(string(version)), "legacy_commit": commit,
 		"go": runtime.Version(), "files": files, "legacy_golden": golden,
 		"preset":  "deepsky golden preset: AI, external tools, colour calibration, previews, supervisor off; denoise 0; trail mask 0",
 		"hashes":  "masters.sha256 and bundle_layers.sha256 hash the FITS data unit only: Siril stamps DATE in every header",

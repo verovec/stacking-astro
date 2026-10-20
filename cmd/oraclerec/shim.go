@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // The shim: siril.Runner runs `<bin> -d <dir> -s <dir>/_astrostack.ssf` and overwrites that script
@@ -17,8 +17,9 @@ const (
 	shimScripts = "scripts"
 )
 
-// runShim copies the script, runs the real Siril as a child with the same arguments (stdout,
-// stderr and exit code pass through unchanged) and returns its exit code.
+// runShim copies the script, then replaces itself with the real Siril (same arguments, same
+// PID): output and exit code are Siril's, and the runner's cancellation and CPU/RAM sampling
+// reach Siril itself rather than an intermediate process. It returns only on failure.
 func runShim(args []string) int {
 	dir, script := argAfter(args, "-d"), argAfter(args, "-s")
 	if script != "" {
@@ -27,16 +28,10 @@ func runShim(args []string) int {
 			return 97
 		}
 	}
-	cmd := exec.Command(os.Getenv(envRealBin), args...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		if exit, ok := err.(*exec.ExitError); ok {
-			return exit.ExitCode()
-		}
-		fmt.Fprintln(os.Stderr, "oraclerec shim:", err)
-		return 98
-	}
-	return 0
+	bin := os.Getenv(envRealBin)
+	err := syscall.Exec(bin, append([]string{bin}, args...), os.Environ())
+	fmt.Fprintln(os.Stderr, "oraclerec shim: exec", bin+":", err)
+	return 98
 }
 
 // captureScript stores the script as scripts/NNNN_<base of -d>.ssf, where NNNN is the run-wide
