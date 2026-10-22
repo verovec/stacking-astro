@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title">
+  <title id="title">stacking-astro</title>
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#16294f"/>
+      <stop offset="1" stop-color="#05081a"/>
+    </radialGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff7e0"/>
+      <stop offset="0.55" stop-color="#ffd9a0" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="go" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7fe3f7"/>
+      <stop offset="1" stop-color="#00ADD8"/>
+    </linearGradient>
+    <clipPath id="disc"><circle cx="80" cy="80" r="74"/></clipPath>
+  </defs>
+  <circle cx="80" cy="80" r="74" fill="url(#sky)"/>
+  <g clip-path="url(#disc)">
+    <g fill="none" stroke="#7fe3f7" stroke-opacity="0.12" stroke-width="1.5">
+      <circle cx="80" cy="76" r="58"/>
+      <circle cx="80" cy="76" r="40"/>
+      <circle cx="80" cy="76" r="22"/>
+    </g>
+    <g fill="#ffffff">
+      <circle cx="30" cy="52" r="1.3" opacity="0.8"/>
+      <circle cx="126" cy="40" r="1.1" opacity="0.7"/>
+      <circle cx="40" cy="118" r="1" opacity="0.6"/>
+      <circle cx="136" cy="96" r="1.2" opacity="0.7"/>
+      <circle cx="58" cy="30" r="0.9" opacity="0.6"/>
+      <circle cx="104" cy="134" r="0.9" opacity="0.5"/>
+      <circle cx="22" cy="86" r="0.8" opacity="0.5"/>
+    </g>
+  </g>
+  <g transform="rotate(-22 80 76)">
+    <ellipse cx="80" cy="76" rx="34" ry="12" fill="url(#go)" fill-opacity="0.14"/>
+    <g fill="none" stroke="#f8fafc" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M86 70 C 102 66, 114 80, 110 96 C 106 112, 86 118, 68 112"/>
+      <path d="M74 82 C 58 86, 46 72, 50 56 C 54 40, 74 34, 92 40"/>
+    </g>
+    <ellipse cx="80" cy="76" rx="13" ry="8" fill="url(#core)"/>
+    <circle cx="80" cy="76" r="3" fill="#ffffff"/>
+  </g>
+  <g fill="none" stroke="url(#go)" stroke-width="2.5" stroke-linejoin="round" transform="translate(104 108)">
+    <rect x="8" y="8" width="26" height="16" rx="2.5" opacity="0.4"/>
+    <rect x="4" y="4" width="26" height="16" rx="2.5" opacity="0.7"/>
+    <rect x="0" y="0" width="26" height="16" rx="2.5"/>
+  </g>
+  <path d="M34 112 L36 118 L42 120 L36 122 L34 128 L32 122 L26 120 L32 118 Z" fill="#7fe3f7"/>
+  <circle cx="80" cy="80" r="74" fill="none" stroke="#00ADD8" stroke-opacity="0.35" stroke-width="2"/>
+</svg>
